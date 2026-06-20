@@ -345,7 +345,7 @@ class RetryManager:
                         if data:
                             retries.append(json.loads(data))
                             count += 1
-                    except:
+                    except Exception:
                         continue
                 
                 if cursor == 0:

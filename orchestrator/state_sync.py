@@ -177,12 +177,13 @@ class StateSynchronizer:
             from database.db import SessionLocal
             from database.models import InterviewSession
             from datetime import datetime
-            
+            from sqlalchemy import select
+
             session_db = SessionLocal()
             try:
-                interview = session_db.query(InterviewSession).filter(
-                    InterviewSession.session_id == session_id
-                ).first()
+                interview = session_db.execute(
+                    select(InterviewSession).where(InterviewSession.session_id == session_id)
+                ).scalar_one_or_none()
                 
                 if not interview:
                     logger.warning(f"Session {session_id} not found in database")

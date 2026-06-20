@@ -217,7 +217,7 @@ class HealthMonitor:
                                     "session_id": session.get("session_id"),
                                     "elapsed_seconds": elapsed
                                 })
-                        except:
+                        except Exception:
                             pass
             
             status = HealthStatus.HEALTHY
@@ -357,7 +357,7 @@ class HealthMonitor:
                                     f"Detected stuck session {session.get('session_id')}: "
                                     f"{elapsed}s processing"
                                 )
-                        except:
+                        except Exception:
                             pass
             
             return stuck_sessions
@@ -388,7 +388,7 @@ class HealthMonitor:
             for entry_json in entries:
                 try:
                     history.append(json.loads(entry_json))
-                except:
+                except Exception:
                     continue
             
             return history

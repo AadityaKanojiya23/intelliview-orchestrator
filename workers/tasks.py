@@ -71,11 +71,12 @@ def process_interview_session(self, session_id):
         )
         
         # Update database with start time and assigned node
+        from sqlalchemy import select
         db_session = SessionLocal()
         try:
-            interview = db_session.query(InterviewSession).filter(
-                InterviewSession.session_id == session_id
-            ).first()
+            interview = db_session.execute(
+                select(InterviewSession).where(InterviewSession.session_id == session_id)
+            ).scalar_one_or_none()
             
             if interview:
                 interview.assigned_node = worker_hostname
@@ -139,9 +140,9 @@ def process_interview_session(self, session_id):
         # Store results in database
         db_session = SessionLocal()
         try:
-            interview = db_session.query(InterviewSession).filter(
-                InterviewSession.session_id == session_id
-            ).first()
+            interview = db_session.execute(
+                select(InterviewSession).where(InterviewSession.session_id == session_id)
+            ).scalar_one_or_none()
             
             if interview:
                 interview.risk_score = final_risk_score

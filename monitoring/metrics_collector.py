@@ -117,7 +117,7 @@ class MetricsCollector:
                                 completed_count += 1
                             elif status == "FAILED":
                                 failed_count += 1
-                    except:
+                    except Exception:
                         continue
                 
                 if cursor == 0:
@@ -169,7 +169,7 @@ class MetricsCollector:
                             
                             total_capacity += worker.get("capacity", 0)
                             active_tasks += worker.get("active_tasks", 0)
-                    except:
+                    except Exception:
                         continue
                 
                 if cursor == 0:
@@ -378,7 +378,7 @@ class MetricsCollector:
                                 end_time = session.get("end_time", "")
                                 if end_time and end_time > one_minute_ago:
                                     count += 1
-                    except:
+                    except Exception:
                         continue
                 
                 if cursor == 0:
@@ -465,7 +465,7 @@ class MetricsCollector:
             for entry_json in entries:
                 try:
                     history.append(json.loads(entry_json))
-                except:
+                except Exception:
                     continue
             
             return history

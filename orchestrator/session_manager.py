@@ -13,6 +13,7 @@ Responsibilities:
 import logging
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
+from sqlalchemy import select
 from database.db import SessionLocal
 from database.models import InterviewSession
 from orchestrator.state_sync import StateSynchronizer
@@ -131,9 +132,9 @@ class SessionManager:
         session_db = SessionLocal()
         try:
             # Get current session
-            interview = session_db.query(InterviewSession).filter(
-                InterviewSession.session_id == session_id
-            ).first()
+            interview = session_db.execute(
+                select(InterviewSession).where(InterviewSession.session_id == session_id)
+            ).scalar_one_or_none()
             
             if not interview:
                 logger.error(f"Session {session_id} not found")
@@ -194,9 +195,9 @@ class SessionManager:
             # Fall back to database
             session_db = SessionLocal()
             try:
-                interview = session_db.query(InterviewSession).filter(
-                    InterviewSession.session_id == session_id
-                ).first()
+                interview = session_db.execute(
+                    select(InterviewSession).where(InterviewSession.session_id == session_id)
+                ).scalar_one_or_none()
                 
                 if not interview:
                     logger.warning(f"Session {session_id} not found")
@@ -265,9 +266,9 @@ class SessionManager:
         
         session_db = SessionLocal()
         try:
-            interview = session_db.query(InterviewSession).filter(
-                InterviewSession.session_id == session_id
-            ).first()
+            interview = session_db.execute(
+                select(InterviewSession).where(InterviewSession.session_id == session_id)
+            ).scalar_one_or_none()
             
             if not interview:
                 return False
@@ -345,10 +346,9 @@ class SessionManager:
             now = datetime.utcnow()
             
             # Check for PROCESSING sessions that have exceeded timeout
-            processing_sessions = session_db.query(InterviewSession).filter(
-                InterviewSession.status == self.PROCESSING,
-                InterviewSession.start_time.isnot(None)
-            ).all()
+            processing_sessions = session_db.execute(
+                select(InterviewSession).where(InterviewSession.status == self.PROCESSING)
+            ).scalars().all()
             
             for session in processing_sessions:
                 elapsed_time = (now - session.start_time).total_seconds()
@@ -360,10 +360,9 @@ class SessionManager:
                     timed_out_sessions.append(session.session_id)
             
             # Check for QUEUED sessions that have exceeded timeout
-            queued_sessions = session_db.query(InterviewSession).filter(
-                InterviewSession.status == self.QUEUED,
-                InterviewSession.created_at.isnot(None)
-            ).all()
+            queued_sessions = session_db.execute(
+                select(InterviewSession).where(InterviewSession.status == self.QUEUED)
+            ).scalars().all()
             
             for session in queued_sessions:
                 elapsed_time = (now - session.created_at).total_seconds()

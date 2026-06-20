@@ -237,7 +237,7 @@ class FaultManager:
                             session = json.loads(session_data)
                             if session.get("assigned_worker") == worker_id:
                                 tasks.append(session.get("session_id"))
-                    except:
+                    except Exception:
                         continue
                 
                 if cursor == 0:
@@ -368,7 +368,7 @@ class FaultManager:
                         if data:
                             items.append(json.loads(data))
                             count += 1
-                    except:
+                    except Exception:
                         continue
                 
                 if cursor == 0:
@@ -410,7 +410,7 @@ class FaultManager:
                         entries.append(json.loads(entry_json))
                         if len(entries) >= limit:
                             return entries[:limit]
-                    except:
+                    except Exception:
                         continue
             
             return entries[:limit]
@@ -439,7 +439,7 @@ class FaultManager:
             for entry_json in entries:
                 try:
                     items.append(json.loads(entry_json))
-                except:
+                except Exception:
                     continue
             
             return items
