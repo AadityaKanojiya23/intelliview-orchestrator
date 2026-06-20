@@ -12,7 +12,7 @@ Responsibilities:
 
 import logging
 from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from workers.tasks import process_interview_session
 from orchestrator.load_balancer import LoadBalancer, BalancingStrategy
@@ -172,7 +172,7 @@ class Scheduler:
                 return False
             
             # Queue task with delay
-            task = process_interview_session.apply_async(
+            process_interview_session.apply_async(
                 args=[session_id],
                 countdown=retry_delay
             )

@@ -15,6 +15,7 @@ import logging
 import json
 import redis
 from typing import Optional, Dict, Any
+from sqlalchemy import select
 from config import REDIS_URL
 
 logger = logging.getLogger(__name__)
@@ -177,7 +178,6 @@ class StateSynchronizer:
             from database.db import SessionLocal
             from database.models import InterviewSession
             from datetime import datetime
-            from sqlalchemy import select
 
             session_db = SessionLocal()
             try:

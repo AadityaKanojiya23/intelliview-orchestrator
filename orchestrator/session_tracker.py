@@ -66,68 +66,113 @@ class SessionTracker:
     def get_completed_sessions(self, limit: int = 100) -> List[Dict[str, Any]]:
         """
         Get recently completed sessions
-        
+
         Args:
             limit: Maximum number of sessions to retrieve
-            
+
         Returns:
             list: List of completed session details
         """
         session_db = SessionLocal()
         try:
-            sessions = session_db.execute(
-                select(InterviewSession).where(InterviewSession.status == "COMPLETED")
+            rows = session_db.execute(
+                select(InterviewSession)
+                .where(InterviewSession.status == "COMPLETED")
+                .order_by(InterviewSession.end_time.desc().nullslast())
+                .limit(limit)
             ).scalars().all()
-            
-            durations = []
-            for s in completed_sessions:
-                duration = (s.end_time - s.start_time).total_seconds()
-                durations.append(duration)
-            
+
+            return [
+                {
+                    "session_id": s.session_id,
+                    "candidate_id": s.candidate_id,
+                    "status": s.status,
+                    "risk_score": s.risk_score,
+                    "start_time": s.start_time.isoformat() if s.start_time else None,
+                    "end_time": s.end_time.isoformat() if s.end_time else None,
+                    "duration_seconds": (
+                        (s.end_time - s.start_time).total_seconds()
+                        if s.start_time and s.end_time
+                        else None
+                    ),
+                }
+                for s in rows
+            ]
+        except Exception as e:
+            logger.error(f"Error getting completed sessions: {e}")
+            return []
+        finally:
+            session_db.close()
+
+    def get_session_statistics(self) -> Dict[str, Any]:
+        """
+        Compute aggregate session statistics across all sessions.
+
+        Returns:
+            dict: Comprehensive session statistics
+        """
+        session_db = SessionLocal()
+        try:
+            total_sessions = session_db.execute(
+                select(func.count()).select_from(InterviewSession)
+            ).scalar() or 0
+
+            status_rows = session_db.execute(
+                select(InterviewSession.status, func.count()).group_by(InterviewSession.status)
+            ).all()
+            status_counts: Dict[str, int] = {row[0]: row[1] for row in status_rows}
+
+            completed_sessions = session_db.execute(
+                select(InterviewSession).where(
+                    InterviewSession.status == "COMPLETED",
+                    InterviewSession.start_time.isnot(None),
+                    InterviewSession.end_time.isnot(None),
+                )
+            ).scalars().all()
+
+            durations = [
+                (s.end_time - s.start_time).total_seconds() for s in completed_sessions
+            ]
             avg_duration = sum(durations) / len(durations) if durations else 0
-            
-            # Calculate risk score statistics
-            risk_scores = session_db.execute(
-                select(InterviewSession.risk_score).where(InterviewSession.risk_score.isnot(None))
-            ).scalars().all()
-            
-            risk_scores_list = [r[0] for r in risk_scores]
+
+            risk_scores_list = list(
+                session_db.execute(
+                    select(InterviewSession.risk_score).where(InterviewSession.risk_score.isnot(None))
+                ).scalars().all()
+            )
             avg_risk = sum(risk_scores_list) / len(risk_scores_list) if risk_scores_list else 0
             max_risk = max(risk_scores_list) if risk_scores_list else 0
             min_risk = min(risk_scores_list) if risk_scores_list else 0
-            
-            # Count high-risk sessions
+
             high_risk_count = session_db.execute(
                 select(func.count()).select_from(InterviewSession).where(InterviewSession.risk_score >= 0.8)
             ).scalar() or 0
-            
-            stats = {
+
+            active_states = (
+                "PROCESSING", "QUEUED", "VIDEO_PROCESSING",
+                "AUDIO_PROCESSING", "EVALUATING",
+            )
+            active_sessions = sum(status_counts.get(s, 0) for s in active_states)
+
+            return {
                 "total_sessions": total_sessions,
                 "status_breakdown": status_counts,
-                "active_sessions": status_counts.get("PROCESSING", 0) + 
-                                 status_counts.get("QUEUED", 0) +
-                                 status_counts.get("VIDEO_PROCESSING", 0) +
-                                 status_counts.get("AUDIO_PROCESSING", 0) +
-                                 status_counts.get("EVALUATING", 0),
+                "active_sessions": active_sessions,
                 "completed_sessions": status_counts.get("COMPLETED", 0),
                 "failed_sessions": status_counts.get("FAILED", 0),
                 "processing_stats": {
                     "average_duration_seconds": round(avg_duration, 2),
-                    "completed_session_count": len(completed_sessions)
+                    "completed_session_count": len(completed_sessions),
                 },
                 "risk_score_stats": {
                     "average_risk_score": round(avg_risk, 3),
                     "max_risk_score": round(max_risk, 3),
                     "min_risk_score": round(min_risk, 3),
-                    "high_risk_sessions": high_risk_count
-                }
+                    "high_risk_sessions": high_risk_count,
+                },
             }
-            
-            logger.debug("Generated session statistics")
-            return stats
-            
         except Exception as e:
-            logger.error(f"Error generating statistics: {str(e)}")
+            logger.error(f"Error generating statistics: {e}")
             return {}
         finally:
             session_db.close()

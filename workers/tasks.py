@@ -13,6 +13,12 @@ Execution Flow:
 6. On Error: PROCESSING → FAILED (handle failures gracefully)
 """
 
+import logging
+import socket
+from datetime import datetime
+
+from sqlalchemy import select
+
 from workers.celery_app import celery_app
 from workers.video_pipeline import run_video_analysis
 from workers.audio_pipeline import run_audio_analysis
@@ -22,9 +28,6 @@ from orchestrator.session_manager import SessionManager
 from orchestrator.state_sync import StateSynchronizer
 from database.db import SessionLocal
 from database.models import InterviewSession
-from datetime import datetime
-import logging
-import socket
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +74,6 @@ def process_interview_session(self, session_id):
         )
         
         # Update database with start time and assigned node
-        from sqlalchemy import select
         db_session = SessionLocal()
         try:
             interview = db_session.execute(

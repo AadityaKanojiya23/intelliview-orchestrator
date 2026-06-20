@@ -2,7 +2,6 @@
 Unit tests for the LoadBalancer selection strategies.
 """
 from orchestrator.load_balancer import LoadBalancer, BalancingStrategy
-from orchestrator.worker_registry import WorkerRegistry
 
 
 class FakeRegistry:

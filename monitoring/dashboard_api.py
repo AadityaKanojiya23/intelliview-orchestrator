@@ -18,7 +18,7 @@ import logging
 import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Optional
 
 from config import API_TOKEN
 

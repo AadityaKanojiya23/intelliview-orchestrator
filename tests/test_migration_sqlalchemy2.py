@@ -57,7 +57,6 @@ def test_session_tracker_active_sessions(db_session):
     db_session.commit()
 
     tracker = SessionTracker()
-    original = tracker.__class__
     # Patch SessionLocal to use our test session
     import orchestrator.session_tracker as st
     st.SessionLocal = lambda: db_session

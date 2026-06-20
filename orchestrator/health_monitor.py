@@ -13,7 +13,7 @@ Responsibilities:
 import logging
 import redis
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Any, Optional
 from config import REDIS_URL
 

@@ -1,7 +1,6 @@
 """
 Unit tests for the SessionManager state machine.
 """
-import pytest
 
 from orchestrator.session_manager import SessionManager
 

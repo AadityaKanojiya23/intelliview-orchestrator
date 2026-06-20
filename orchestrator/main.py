@@ -12,12 +12,13 @@ Integrates:
 - Task Queue integration with Celery
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List
+from typing import Optional
 import logging
-import asyncio
 import re
 import time as _time
 from datetime import datetime
@@ -28,27 +29,24 @@ from starlette.requests import Request as StarletteRequest
 
 from config import API_TOKEN, CORS_ALLOW_ORIGINS
 from orchestrator.logging_config import configure_logging, log_event
-
-# Configure logging before anything else so startup messages are structured.
-configure_logging()
-
-from workers.tasks import process_interview_session
 from orchestrator.session_manager import SessionManager
 from orchestrator.session_tracker import SessionTracker
 from orchestrator.state_sync import StateSynchronizer
 from orchestrator.scheduler import Scheduler, TaskPriority
 from orchestrator.load_balancer import LoadBalancer, BalancingStrategy
 from orchestrator.worker_registry import WorkerRegistry
-from orchestrator.fault_manager import FaultManager, FailureType
+from orchestrator.fault_manager import FaultManager
 from orchestrator.retry_manager import RetryManager, RetryStrategy
-from orchestrator.health_monitor import HealthMonitor, HealthStatus
+from orchestrator.health_monitor import HealthMonitor
 from monitoring.metrics_collector import MetricsCollector
 from monitoring.dashboard_api import create_dashboard_routes
 from monitoring.websocket_manager import ws_manager
 from database.db import engine
 from database.models import Base
 
-from contextlib import asynccontextmanager
+# Configure logging after imports so startup messages are structured.
+configure_logging()
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

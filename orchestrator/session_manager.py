@@ -12,7 +12,7 @@ Responsibilities:
 
 import logging
 from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 from sqlalchemy import select
 from database.db import SessionLocal
 from database.models import InterviewSession
