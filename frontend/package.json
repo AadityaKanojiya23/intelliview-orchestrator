@@ -19,7 +19,9 @@
     "lucide-react": "0.408.0",
     "clsx": "2.1.1",
     "date-fns": "3.6.0",
-    "zustand": "4.5.4"
+    "zustand": "4.5.4",
+    "framer-motion": "11.3.19",
+    "cmdk": "1.0.4"
   },
   "devDependencies": {
     "@types/node": "20.14.10",
