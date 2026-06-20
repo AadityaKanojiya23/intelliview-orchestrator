@@ -27,6 +27,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 
 from config import API_TOKEN, CORS_ALLOW_ORIGINS
+from orchestrator.logging_config import configure_logging, log_event
+
+# Configure logging before anything else so startup messages are structured.
+configure_logging()
 
 from workers.tasks import process_interview_session
 from orchestrator.session_manager import SessionManager
@@ -86,17 +90,24 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
         except Exception:
             elapsed_ms = (_time.perf_counter() - start) * 1000
-            logger.exception("unhandled error request_id=%s path=%s elapsed_ms=%.1f",
-                             request_id, request.url.path, elapsed_ms)
+            log_event(
+                logger, logging.ERROR, "unhandled_error",
+                request_id=request_id, path=request.url.path,
+                elapsed_ms=round(elapsed_ms, 1),
+            )
+            logger.debug("traceback", exc_info=True)
             raise
         elapsed_ms = (_time.perf_counter() - start) * 1000
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Response-Time-ms"] = f"{elapsed_ms:.1f}"
         if request.url.path != "/health":
-            logger.info(
-                "request_id=%s method=%s path=%s status=%s elapsed_ms=%.1f",
-                request_id, request.method, request.url.path,
-                response.status_code, elapsed_ms,
+            log_event(
+                logger, logging.INFO, "request",
+                request_id=request_id,
+                method=request.method,
+                path=request.url.path,
+                status=response.status_code,
+                elapsed_ms=round(elapsed_ms, 1),
             )
         return response
 
