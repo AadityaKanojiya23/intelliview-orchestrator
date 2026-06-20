@@ -14,11 +14,17 @@ Integrates:
 
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 import logging
 import asyncio
+import re
+import time as _time
 from datetime import datetime
+from uuid import uuid4
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
 
 from config import API_TOKEN, CORS_ALLOW_ORIGINS
 
@@ -56,6 +62,46 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+# ========== Request ID + duration middleware ==========
+
+_VALID_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+
+
+class RequestContextMiddleware(BaseHTTPMiddleware):
+    """Assigns a request ID, measures duration, and tags the response.
+
+    Honours an incoming `X-Request-ID` header if it matches a safe format;
+    otherwise generates a new UUID4. The ID is attached to the response as
+    `X-Request-ID` so callers can correlate logs.
+    """
+
+    async def dispatch(self, request: StarletteRequest, call_next):
+        incoming = request.headers.get("x-request-id", "").strip()
+        request_id = incoming if _VALID_ID_RE.match(incoming) else uuid4().hex
+        request.state.request_id = request_id
+        start = _time.perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:
+            elapsed_ms = (_time.perf_counter() - start) * 1000
+            logger.exception("unhandled error request_id=%s path=%s elapsed_ms=%.1f",
+                             request_id, request.url.path, elapsed_ms)
+            raise
+        elapsed_ms = (_time.perf_counter() - start) * 1000
+        response.headers["X-Request-ID"] = request_id
+        response.headers["X-Response-Time-ms"] = f"{elapsed_ms:.1f}"
+        if request.url.path != "/health":
+            logger.info(
+                "request_id=%s method=%s path=%s status=%s elapsed_ms=%.1f",
+                request_id, request.method, request.url.path,
+                response.status_code, elapsed_ms,
+            )
+        return response
+
+
+app.add_middleware(RequestContextMiddleware)
 
 # CORS — configurable via env. Default "*" is for local dev only.
 _cors_origins = ["*"] if CORS_ALLOW_ORIGINS in ("*", "") else [
@@ -118,10 +164,37 @@ app.include_router(dashboard_routes, prefix="/monitoring", tags=["monitoring"])
 
 class StartInterviewRequest(BaseModel):
     """Request model for starting an interview"""
-    candidate_id: str
-    candidate_name: Optional[str] = None
-    position: Optional[str] = None
-    priority: Optional[str] = "medium"
+    candidate_id: str = Field(min_length=1, max_length=128, description="Unique candidate identifier")
+    candidate_name: Optional[str] = Field(default=None, max_length=200)
+    position: Optional[str] = Field(default=None, max_length=120)
+    priority: str = Field(default="medium", description="One of: low, medium, high")
+
+    @field_validator("candidate_id")
+    @classmethod
+    def _candidate_id_format(cls, v: str) -> str:
+        v = v.strip()
+        if not re.match(r"^[A-Za-z0-9._-]+$", v):
+            raise ValueError("candidate_id may only contain letters, digits, '.', '_', '-'")
+        return v
+
+    @field_validator("priority")
+    @classmethod
+    def _priority_valid(cls, v: str) -> str:
+        v = v.strip().lower()
+        if v not in {"low", "medium", "high"}:
+            raise ValueError("priority must be one of: low, medium, high")
+        return v
+
+    @field_validator("candidate_name", "position")
+    @classmethod
+    def _strip_optional(cls, v):
+        return v.strip() if isinstance(v, str) else v
+
+
+class ErrorResponse(BaseModel):
+    """Standardised error envelope returned by the API."""
+    detail: str
+    request_id: Optional[str] = None
 
 
 class WorkerRegistrationRequest(BaseModel):
