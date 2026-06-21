@@ -4,6 +4,7 @@ Initializes Celery and connects to Redis message broker
 """
 
 from celery import Celery
+
 from config import REDIS_URL
 
 # Initialize Celery app

@@ -11,9 +11,11 @@ Responsibilities:
 """
 
 import logging
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any
+
 from sqlalchemy import select
+
 from database.db import SessionLocal
 from database.models import InterviewSession
 from orchestrator.state_sync import StateSynchronizer
@@ -71,8 +73,8 @@ class SessionManager:
     def create_session(
         self,
         candidate_id: str,
-        position: Optional[str] = None,
-        candidate_name: Optional[str] = None,
+        position: str | None = None,
+        candidate_name: str | None = None,
     ) -> str:
         """
         Create a new interview session
@@ -88,11 +90,11 @@ class SessionManager:
         session_db = SessionLocal()
         try:
             # Generate unique session ID
-            session_id = f"session_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{hash(candidate_id) % 100000:05d}"
-
-            logger.info(
-                f"Creating new interview session: {session_id} for candidate {candidate_id}"
+            session_id = (
+                f"session_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{hash(candidate_id) % 100000:05d}"
             )
+
+            logger.info(f"Creating new interview session: {session_id} for candidate {candidate_id}")
 
             # Create database record
             interview_session = InterviewSession(
@@ -123,7 +125,7 @@ class SessionManager:
             return session_id
 
         except Exception as e:
-            logger.error(f"Error creating session: {str(e)}")
+            logger.error(f"Error creating session: {e!s}")
             session_db.rollback()
             raise
         finally:
@@ -133,7 +135,7 @@ class SessionManager:
         self,
         session_id: str,
         new_status: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """
         Update session status with validation
@@ -150,9 +152,7 @@ class SessionManager:
         try:
             # Get current session
             interview = session_db.execute(
-                select(InterviewSession).where(
-                    InterviewSession.session_id == session_id
-                )
+                select(InterviewSession).where(InterviewSession.session_id == session_id)
             ).scalar_one_or_none()
 
             if not interview:
@@ -168,9 +168,7 @@ class SessionManager:
                 )
                 return False
 
-            logger.info(
-                f"Updating session {session_id} status: {current_status} -> {new_status}"
-            )
+            logger.info(f"Updating session {session_id} status: {current_status} -> {new_status}")
 
             # Update database
             interview.status = new_status
@@ -190,13 +188,13 @@ class SessionManager:
             return True
 
         except Exception as e:
-            logger.error(f"Error updating session status: {str(e)}")
+            logger.error(f"Error updating session status: {e!s}")
             session_db.rollback()
             return False
         finally:
             session_db.close()
 
-    def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def get_session(self, session_id: str) -> dict[str, Any] | None:
         """
         Retrieve session details
 
@@ -217,9 +215,7 @@ class SessionManager:
             session_db = SessionLocal()
             try:
                 interview = session_db.execute(
-                    select(InterviewSession).where(
-                        InterviewSession.session_id == session_id
-                    )
+                    select(InterviewSession).where(InterviewSession.session_id == session_id)
                 ).scalar_one_or_none()
 
                 if not interview:
@@ -233,18 +229,10 @@ class SessionManager:
                     "status": interview.status,
                     "risk_score": interview.risk_score,
                     "assigned_node": interview.assigned_node,
-                    "start_time": interview.start_time.isoformat()
-                    if interview.start_time
-                    else None,
-                    "end_time": interview.end_time.isoformat()
-                    if interview.end_time
-                    else None,
-                    "created_at": interview.created_at.isoformat()
-                    if interview.created_at
-                    else None,
-                    "updated_at": interview.updated_at.isoformat()
-                    if interview.updated_at
-                    else None,
+                    "start_time": interview.start_time.isoformat() if interview.start_time else None,
+                    "end_time": interview.end_time.isoformat() if interview.end_time else None,
+                    "created_at": interview.created_at.isoformat() if interview.created_at else None,
+                    "updated_at": interview.updated_at.isoformat() if interview.updated_at else None,
                     "video_analysis": interview.video_analysis,
                     "audio_analysis": interview.audio_analysis,
                     "evaluation_analysis": interview.evaluation_analysis,
@@ -260,7 +248,7 @@ class SessionManager:
                 session_db.close()
 
         except Exception as e:
-            logger.error(f"Error retrieving session: {str(e)}")
+            logger.error(f"Error retrieving session: {e!s}")
             return None
 
     def mark_session_failed(self, session_id: str, error_message: str) -> bool:
@@ -276,9 +264,7 @@ class SessionManager:
         """
         logger.warning(f"Marking session {session_id} as failed: {error_message}")
 
-        return self.update_session_status(
-            session_id, self.FAILED, {"error_message": error_message}
-        )
+        return self.update_session_status(session_id, self.FAILED, {"error_message": error_message})
 
     def mark_session_completed(self, session_id: str, risk_score: float) -> bool:
         """
@@ -291,16 +277,12 @@ class SessionManager:
         Returns:
             bool: True if successful
         """
-        logger.info(
-            f"Marking session {session_id} as completed with risk score {risk_score}"
-        )
+        logger.info(f"Marking session {session_id} as completed with risk score {risk_score}")
 
         session_db = SessionLocal()
         try:
             interview = session_db.execute(
-                select(InterviewSession).where(
-                    InterviewSession.session_id == session_id
-                )
+                select(InterviewSession).where(InterviewSession.session_id == session_id)
             ).scalar_one_or_none()
 
             if not interview:
@@ -325,7 +307,7 @@ class SessionManager:
             return True
 
         except Exception as e:
-            logger.error(f"Error marking session completed: {str(e)}")
+            logger.error(f"Error marking session completed: {e!s}")
             session_db.rollback()
             return False
         finally:
@@ -343,9 +325,7 @@ class SessionManager:
             bool: True if successful
         """
         logger.info(f"Cancelling session {session_id}: {reason}")
-        return self.update_session_status(
-            session_id, self.CANCELLED, {"cancellation_reason": reason}
-        )
+        return self.update_session_status(session_id, self.CANCELLED, {"cancellation_reason": reason})
 
     def _is_valid_transition(self, current_status: str, new_status: str) -> bool:
         """
@@ -378,11 +358,7 @@ class SessionManager:
 
             # Check for PROCESSING sessions that have exceeded timeout
             processing_sessions = (
-                session_db.execute(
-                    select(InterviewSession).where(
-                        InterviewSession.status == self.PROCESSING
-                    )
-                )
+                session_db.execute(select(InterviewSession).where(InterviewSession.status == self.PROCESSING))
                 .scalars()
                 .all()
             )
@@ -390,21 +366,13 @@ class SessionManager:
             for session in processing_sessions:
                 elapsed_time = (now - session.start_time).total_seconds()
                 if elapsed_time > self.PROCESSING_TIMEOUT:
-                    logger.warning(
-                        f"Session {session.session_id} timed out after {elapsed_time}s"
-                    )
-                    self.mark_session_failed(
-                        session.session_id, f"Processing timeout after {elapsed_time}s"
-                    )
+                    logger.warning(f"Session {session.session_id} timed out after {elapsed_time}s")
+                    self.mark_session_failed(session.session_id, f"Processing timeout after {elapsed_time}s")
                     timed_out_sessions.append(session.session_id)
 
             # Check for QUEUED sessions that have exceeded timeout
             queued_sessions = (
-                session_db.execute(
-                    select(InterviewSession).where(
-                        InterviewSession.status == self.QUEUED
-                    )
-                )
+                session_db.execute(select(InterviewSession).where(InterviewSession.status == self.QUEUED))
                 .scalars()
                 .all()
             )
@@ -412,18 +380,14 @@ class SessionManager:
             for session in queued_sessions:
                 elapsed_time = (now - session.created_at).total_seconds()
                 if elapsed_time > self.QUEUED_TIMEOUT:
-                    logger.warning(
-                        f"Session {session.session_id} stuck in QUEUED for {elapsed_time}s"
-                    )
-                    self.mark_session_failed(
-                        session.session_id, f"Queued timeout after {elapsed_time}s"
-                    )
+                    logger.warning(f"Session {session.session_id} stuck in QUEUED for {elapsed_time}s")
+                    self.mark_session_failed(session.session_id, f"Queued timeout after {elapsed_time}s")
                     timed_out_sessions.append(session.session_id)
 
             return timed_out_sessions
 
         except Exception as e:
-            logger.error(f"Error detecting timeout sessions: {str(e)}")
+            logger.error(f"Error detecting timeout sessions: {e!s}")
             return []
         finally:
             session_db.close()

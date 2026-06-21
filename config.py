@@ -1,48 +1,99 @@
 """
-Configuration for AI Interview Orchestrator.
+Configuration for the AI Interview Orchestrator.
 
-Loads settings from environment variables (or a .env file in dev). All values
-have sensible local defaults but should be overridden in production.
+Settings are loaded from environment variables (or a `.env` file in dev)
+via `pydantic-settings`. All values have sensible local defaults but
+should be overridden in production.
 """
-import os
-from dotenv import load_dotenv
+from functools import lru_cache
+from typing import List
 
-load_dotenv()
-
-
-def _bool(name: str, default: bool = False) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-# --- Service discovery ---
-# In docker-compose, services are reachable as `redis` / `postgres` on the
-# default bridge network. In local dev, default to localhost.
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+class Settings(BaseSettings):
+    """Application configuration loaded from the environment."""
 
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
-POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
-POSTGRES_DB = os.getenv("POSTGRES_DB", "ai_interview_db")
-POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+    )
 
-# --- Worker / Celery ---
-WORKER_CONCURRENCY = int(os.getenv("WORKER_CONCURRENCY", "4"))
-MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
+    # --- Service discovery ---
+    # In docker-compose, services are reachable as `redis` / `postgres` on
+    # the default bridge network. In local dev, default to localhost.
+    redis_url: str = "redis://localhost:6379/0"
 
-# --- API / Security ---
-# Token required by worker agents to call /register-worker and /worker/heartbeat.
-API_TOKEN = os.getenv("API_TOKEN", "dev-token-change-me")
-# Comma-separated origin list for CORS. Use "*" to allow all (dev only).
-CORS_ALLOW_ORIGINS = os.getenv("CORS_ALLOW_ORIGIGNS", "*")
+    postgres_host: str = "localhost"
+    postgres_port: int = 5432
+    postgres_db: str = "ai_interview_db"
+    postgres_user: str = "postgres"
+    postgres_password: str = "postgres"
 
-# --- Optional feature flags ---
-ENABLE_CELERY_BROKER = _bool("ENABLE_CELERY_BROKER", True)
+    # --- Worker / Celery ---
+    worker_concurrency: int = 4
+    max_retries: int = 3
+    worker_id: str = "worker-1"
 
-# --- Derived ---
-DATABASE_URL = (
-    f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}"
-    f"@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
-)
+    # --- API / Security ---
+    # Token required by worker agents to call /register-worker and
+    # /worker/heartbeat. **Change `dev-token-change-me` in production.**
+    api_token: str = "dev-token-change-me"
+
+    # Comma-separated origin list for CORS. Use "*" to allow all (dev only).
+    cors_allow_origins: List[str] = Field(default_factory=lambda: ["*"])
+
+    # --- Feature flags ---
+    enable_celery_broker: bool = True
+    json_logging: bool = True
+    auto_seed_demo_data: bool = False
+
+    # --- Derived ---
+    @property
+    def database_url(self) -> str:
+        return (
+            f"postgresql://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
+
+    @property
+    def is_default_token(self) -> bool:
+        return self.api_token == "dev-token-change-me"
+
+    @field_validator("cors_allow_origins", mode="before")
+    @classmethod
+    def _parse_cors(cls, value):
+        """Accept comma-separated strings or lists for CORS origins."""
+        if value is None or value == "":
+            return ["*"]
+        if isinstance(value, str):
+            parts = [v.strip() for v in value.split(",") if v.strip()]
+            return parts if parts else ["*"]
+        return value
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Cached settings accessor (per-process)."""
+    return Settings()
+
+
+# Module-level aliases for backwards compatibility with imports like
+# `from config import REDIS_URL`. New code should use `get_settings()`.
+settings = get_settings()
+REDIS_URL = settings.redis_url
+POSTGRES_HOST = settings.postgres_host
+POSTGRES_PORT = settings.postgres_port
+POSTGRES_DB = settings.postgres_db
+POSTGRES_USER = settings.postgres_user
+POSTGRES_PASSWORD = settings.postgres_password
+DATABASE_URL = settings.database_url
+WORKER_CONCURRENCY = settings.worker_concurrency
+MAX_RETRIES = settings.max_retries
+API_TOKEN = settings.api_token
+CORS_ALLOW_ORIGINS = ",".join(settings.cors_allow_origins)
+ENABLE_CELERY_BROKER = settings.enable_celery_broker
+JSON_LOGGING = "1" if settings.json_logging else "0"

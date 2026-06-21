@@ -6,8 +6,8 @@ For unit tests that don't need Redis/Postgres, see test_unit_*.py.
 """
 
 import os
-import sys
 import pathlib
+import sys
 
 import pytest
 

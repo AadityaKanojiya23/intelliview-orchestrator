@@ -10,11 +10,13 @@ Responsibilities:
 - Trigger alerts and recovery actions
 """
 
-import logging
-import redis
 import json
+import logging
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Any
+
+import redis
+
 from config import REDIS_URL
 
 logger = logging.getLogger(__name__)
@@ -69,7 +71,7 @@ class HealthMonitor:
             f"session_timeout={session_timeout}s, queue_threshold={queue_threshold}"
         )
 
-    def _connect_redis(self) -> Optional[redis.Redis]:
+    def _connect_redis(self) -> redis.Redis | None:
         """Connect to Redis server"""
         try:
             client = redis.from_url(self.redis_url, decode_responses=True)
@@ -77,12 +79,10 @@ class HealthMonitor:
             logger.info("Connected to Redis for health monitoring")
             return client
         except Exception as e:
-            logger.error(f"Failed to connect to Redis: {str(e)}")
+            logger.error(f"Failed to connect to Redis: {e!s}")
             return None
 
-    def check_system_health(
-        self, worker_registry=None, session_manager=None
-    ) -> Dict[str, Any]:
+    def check_system_health(self, worker_registry=None, session_manager=None) -> dict[str, Any]:
         """
         Perform comprehensive system health check
 
@@ -112,23 +112,29 @@ class HealthMonitor:
             if worker_registry:
                 worker_status = self.check_worker_health(worker_registry)
                 health_status["components"]["workers"] = worker_status
-                if worker_status["status"] in [
-                    HealthStatus.CRITICAL,
-                    HealthStatus.UNHEALTHY,
-                ]:
-                    if health_status["overall_status"] != HealthStatus.CRITICAL:
-                        health_status["overall_status"] = worker_status["status"]
+                if (
+                    worker_status["status"]
+                    in [
+                        HealthStatus.CRITICAL,
+                        HealthStatus.UNHEALTHY,
+                    ]
+                    and health_status["overall_status"] != HealthStatus.CRITICAL
+                ):
+                    health_status["overall_status"] = worker_status["status"]
 
             # Check sessions if manager provided
             if session_manager:
                 session_status = self.check_session_health(session_manager)
                 health_status["components"]["sessions"] = session_status
-                if session_status["status"] in [
-                    HealthStatus.CRITICAL,
-                    HealthStatus.DEGRADED,
-                ]:
-                    if health_status["overall_status"] == HealthStatus.HEALTHY:
-                        health_status["overall_status"] = session_status["status"]
+                if (
+                    session_status["status"]
+                    in [
+                        HealthStatus.CRITICAL,
+                        HealthStatus.DEGRADED,
+                    ]
+                    and health_status["overall_status"] == HealthStatus.HEALTHY
+                ):
+                    health_status["overall_status"] = session_status["status"]
 
             # Check queue backlog
             queue_status = self.check_queue_health()
@@ -146,25 +152,21 @@ class HealthMonitor:
                     300,  # 5 minute TTL
                     json.dumps(health_status),
                 )
-                self.redis_client.set(
-                    self.last_check_key, datetime.utcnow().isoformat()
-                )
+                self.redis_client.set(self.last_check_key, datetime.utcnow().isoformat())
 
-            logger.info(
-                f"System health check complete: {health_status['overall_status']}"
-            )
+            logger.info(f"System health check complete: {health_status['overall_status']}")
 
             return health_status
 
         except Exception as e:
-            logger.error(f"Error checking system health: {str(e)}")
+            logger.error(f"Error checking system health: {e!s}")
             return {
                 "timestamp": datetime.utcnow().isoformat(),
                 "overall_status": HealthStatus.UNHEALTHY,
                 "error": str(e),
             }
 
-    def check_worker_health(self, worker_registry) -> Dict[str, Any]:
+    def check_worker_health(self, worker_registry) -> dict[str, Any]:
         """
         Check health of all workers
 
@@ -199,10 +201,10 @@ class HealthMonitor:
             }
 
         except Exception as e:
-            logger.error(f"Error checking worker health: {str(e)}")
+            logger.error(f"Error checking worker health: {e!s}")
             return {"status": HealthStatus.UNHEALTHY, "error": str(e)}
 
-    def check_session_health(self, session_manager) -> Dict[str, Any]:
+    def check_session_health(self, session_manager) -> dict[str, Any]:
         """
         Check health of active sessions (detect stuck sessions)
 
@@ -252,16 +254,14 @@ class HealthMonitor:
                 "total_active": len(active_sessions),
                 "stuck_sessions": len(stuck_sessions),
                 "stuck_list": stuck_sessions[:5],
-                "max_processing_time": max(
-                    [s.get("elapsed_seconds", 0) for s in stuck_sessions], default=0
-                ),
+                "max_processing_time": max([s.get("elapsed_seconds", 0) for s in stuck_sessions], default=0),
             }
 
         except Exception as e:
-            logger.error(f"Error checking session health: {str(e)}")
+            logger.error(f"Error checking session health: {e!s}")
             return {"status": HealthStatus.UNHEALTHY, "error": str(e)}
 
-    def check_queue_health(self) -> Dict[str, Any]:
+    def check_queue_health(self) -> dict[str, Any]:
         """
         Check Redis queue backlog and health
 
@@ -278,9 +278,7 @@ class HealthMonitor:
                 }
 
             # Get queue lengths
-            queue_length = (
-                self.redis_client.llen("celery_queue") if self.redis_client else 0
-            )
+            queue_length = self.redis_client.llen("celery_queue") if self.redis_client else 0
 
             status = HealthStatus.HEALTHY
             if queue_length > self.queue_threshold:
@@ -298,10 +296,10 @@ class HealthMonitor:
             }
 
         except Exception as e:
-            logger.error(f"Error checking queue health: {str(e)}")
+            logger.error(f"Error checking queue health: {e!s}")
             return {"status": HealthStatus.UNHEALTHY, "error": str(e)}
 
-    def _check_redis_health(self) -> Dict[str, Any]:
+    def _check_redis_health(self) -> dict[str, Any]:
         """
         Check Redis connectivity and responsiveness
 
@@ -331,10 +329,10 @@ class HealthMonitor:
             }
 
         except Exception as e:
-            logger.error(f"Error checking Redis health: {str(e)}")
+            logger.error(f"Error checking Redis health: {e!s}")
             return {"status": HealthStatus.UNHEALTHY, "error": str(e)}
 
-    def detect_worker_failures(self, worker_registry) -> List[str]:
+    def detect_worker_failures(self, worker_registry) -> list[str]:
         """
         Identify workers that appear to have failed
 
@@ -349,17 +347,15 @@ class HealthMonitor:
             failed_workers = worker_registry.detect_unhealthy_workers()
 
             if failed_workers:
-                logger.warning(
-                    f"Detected {len(failed_workers)} failed workers: {failed_workers}"
-                )
+                logger.warning(f"Detected {len(failed_workers)} failed workers: {failed_workers}")
 
             return failed_workers
 
         except Exception as e:
-            logger.error(f"Error detecting worker failures: {str(e)}")
+            logger.error(f"Error detecting worker failures: {e!s}")
             return []
 
-    def detect_stuck_sessions(self, session_manager) -> List[str]:
+    def detect_stuck_sessions(self, session_manager) -> list[str]:
         """
         Identify sessions stuck in PROCESSING state
 
@@ -399,10 +395,10 @@ class HealthMonitor:
             return stuck_sessions
 
         except Exception as e:
-            logger.error(f"Error detecting stuck sessions: {str(e)}")
+            logger.error(f"Error detecting stuck sessions: {e!s}")
             return []
 
-    def get_health_history(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def get_health_history(self, limit: int = 20) -> list[dict[str, Any]]:
         """
         Get historical health status checks
 
@@ -430,5 +426,5 @@ class HealthMonitor:
             return history
 
         except Exception as e:
-            logger.error(f"Error getting health history: {str(e)}")
+            logger.error(f"Error getting health history: {e!s}")
             return []

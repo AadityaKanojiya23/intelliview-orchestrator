@@ -10,12 +10,14 @@ Responsibilities:
 - Coordinate system recovery workflows
 """
 
-import logging
-import redis
 import json
+import logging
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
 from enum import Enum
+from typing import Any
+
+import redis
+
 from config import REDIS_URL
 
 logger = logging.getLogger(__name__)
@@ -60,7 +62,7 @@ class FaultManager:
 
         logger.info(f"FaultManager initialized with debounce_time={debounce_time}s")
 
-    def _connect_redis(self) -> Optional[redis.Redis]:
+    def _connect_redis(self) -> redis.Redis | None:
         """Connect to Redis server"""
         try:
             client = redis.from_url(self.redis_url, decode_responses=True)
@@ -68,10 +70,10 @@ class FaultManager:
             logger.info("Connected to Redis for fault management")
             return client
         except Exception as e:
-            logger.error(f"Failed to connect to Redis: {str(e)}")
+            logger.error(f"Failed to connect to Redis: {e!s}")
             return None
 
-    def detect_failed_sessions(self, timeout_seconds: int = 1800) -> List[str]:
+    def detect_failed_sessions(self, timeout_seconds: int = 1800) -> list[str]:
         """
         Detect sessions that have been stuck in PROCESSING state too long
 
@@ -90,9 +92,7 @@ class FaultManager:
             # Scan for sessions stuck in PROCESSING
             cursor = 0
             while True:
-                cursor, keys = self.redis_client.scan(
-                    cursor, match="session:*", count=100
-                )
+                cursor, keys = self.redis_client.scan(cursor, match="session:*", count=100)
 
                 for key in keys:
                     try:
@@ -116,7 +116,7 @@ class FaultManager:
                                         f"{elapsed}s > {timeout_seconds}s"
                                     )
                     except Exception as e:
-                        logger.debug(f"Error processing session key {key}: {str(e)}")
+                        logger.debug(f"Error processing session key {key}: {e!s}")
                         continue
 
                 if cursor == 0:
@@ -125,12 +125,10 @@ class FaultManager:
             return failed_sessions
 
         except Exception as e:
-            logger.error(f"Error detecting failed sessions: {str(e)}")
+            logger.error(f"Error detecting failed sessions: {e!s}")
             return []
 
-    def handle_worker_failure(
-        self, worker_id: str, failure_reason: str = "unknown"
-    ) -> bool:
+    def handle_worker_failure(self, worker_id: str, failure_reason: str = "unknown") -> bool:
         """
         Handle failure of a worker node
 
@@ -160,9 +158,7 @@ class FaultManager:
             # Get tasks assigned to this worker (from session tracker)
             tasks_to_reassign = self._get_worker_tasks(worker_id)
 
-            logger.info(
-                f"Found {len(tasks_to_reassign)} tasks to reassign from failed worker {worker_id}"
-            )
+            logger.info(f"Found {len(tasks_to_reassign)} tasks to reassign from failed worker {worker_id}")
 
             # Reassign each task
             reassigned_count = 0
@@ -170,19 +166,15 @@ class FaultManager:
                 if self.reassign_task(session_id, original_worker=worker_id):
                     reassigned_count += 1
 
-            logger.info(
-                f"Successfully reassigned {reassigned_count}/{len(tasks_to_reassign)} tasks"
-            )
+            logger.info(f"Successfully reassigned {reassigned_count}/{len(tasks_to_reassign)} tasks")
 
             return True
 
         except Exception as e:
-            logger.error(f"Error handling worker failure: {str(e)}")
+            logger.error(f"Error handling worker failure: {e!s}")
             return False
 
-    def reassign_task(
-        self, session_id: str, original_worker: Optional[str] = None
-    ) -> bool:
+    def reassign_task(self, session_id: str, original_worker: str | None = None) -> bool:
         """
         Reassign a failed task to another healthy worker
 
@@ -195,8 +187,7 @@ class FaultManager:
         """
         try:
             logger.info(
-                f"Reassigning task {session_id}"
-                + (f" from {original_worker}" if original_worker else "")
+                f"Reassigning task {session_id}" + (f" from {original_worker}" if original_worker else "")
             )
 
             # Add to recovery queue for retry
@@ -220,10 +211,10 @@ class FaultManager:
             return True
 
         except Exception as e:
-            logger.error(f"Error reassigning task {session_id}: {str(e)}")
+            logger.error(f"Error reassigning task {session_id}: {e!s}")
             return False
 
-    def _get_worker_tasks(self, worker_id: str) -> List[str]:
+    def _get_worker_tasks(self, worker_id: str) -> list[str]:
         """Get list of sessions/tasks assigned to a worker"""
         try:
             if not self.redis_client:
@@ -233,9 +224,7 @@ class FaultManager:
             cursor = 0
 
             while True:
-                cursor, keys = self.redis_client.scan(
-                    cursor, match="session:*", count=100
-                )
+                cursor, keys = self.redis_client.scan(cursor, match="session:*", count=100)
 
                 for key in keys:
                     try:
@@ -252,7 +241,7 @@ class FaultManager:
 
             return tasks
         except Exception as e:
-            logger.error(f"Error getting worker tasks: {str(e)}")
+            logger.error(f"Error getting worker tasks: {e!s}")
             return []
 
     def _increment_reassignment_count(self, session_id: str) -> int:
@@ -267,15 +256,15 @@ class FaultManager:
 
             return count
         except Exception as e:
-            logger.warning(f"Error incrementing reassignment count: {str(e)}")
+            logger.warning(f"Error incrementing reassignment count: {e!s}")
             return 1
 
     def log_failure(
         self,
-        session_id: Optional[str],
+        session_id: str | None,
         failure_type: FailureType,
         error_message: str,
-        worker_id: Optional[str] = None,
+        worker_id: str | None = None,
     ) -> bool:
         """
         Log a failure event for auditing and analysis
@@ -300,9 +289,7 @@ class FaultManager:
 
             if self.redis_client:
                 # Add to failure log list (keep last 1000 failures)
-                log_key = (
-                    f"{self.failure_log_prefix}{datetime.utcnow().strftime('%Y-%m-%d')}"
-                )
+                log_key = f"{self.failure_log_prefix}{datetime.utcnow().strftime('%Y-%m-%d')}"
                 self.redis_client.lpush(log_key, json.dumps(log_entry))
                 self.redis_client.ltrim(log_key, 0, 999)
                 self.redis_client.expire(log_key, 604800)  # 7 day TTL
@@ -311,7 +298,7 @@ class FaultManager:
             return True
 
         except Exception as e:
-            logger.error(f"Error logging failure: {str(e)}")
+            logger.error(f"Error logging failure: {e!s}")
             return False
 
     def move_to_dead_letter_queue(self, session_id: str, reason: str) -> bool:
@@ -334,17 +321,15 @@ class FaultManager:
 
             if self.redis_client:
                 self.redis_client.lpush(self.dead_letter_queue, json.dumps(dlq_entry))
-                logger.warning(
-                    f"Session {session_id} moved to dead letter queue: {reason}"
-                )
+                logger.warning(f"Session {session_id} moved to dead letter queue: {reason}")
 
             return True
 
         except Exception as e:
-            logger.error(f"Error moving to dead letter queue: {str(e)}")
+            logger.error(f"Error moving to dead letter queue: {e!s}")
             return False
 
-    def get_recovery_queue(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_recovery_queue(self, limit: int = 100) -> list[dict[str, Any]]:
         """
         Get sessions queued for recovery/retry
 
@@ -385,10 +370,10 @@ class FaultManager:
             return items
 
         except Exception as e:
-            logger.error(f"Error getting recovery queue: {str(e)}")
+            logger.error(f"Error getting recovery queue: {e!s}")
             return []
 
-    def get_failure_log(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_failure_log(self, limit: int = 100) -> list[dict[str, Any]]:
         """
         Get recent failure log entries
 
@@ -424,10 +409,10 @@ class FaultManager:
             return entries[:limit]
 
         except Exception as e:
-            logger.error(f"Error getting failure log: {str(e)}")
+            logger.error(f"Error getting failure log: {e!s}")
             return []
 
-    def get_dead_letter_queue(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_dead_letter_queue(self, limit: int = 100) -> list[dict[str, Any]]:
         """
         Get entries from the dead letter queue
 
@@ -453,10 +438,10 @@ class FaultManager:
             return items
 
         except Exception as e:
-            logger.error(f"Error getting dead letter queue: {str(e)}")
+            logger.error(f"Error getting dead letter queue: {e!s}")
             return []
 
-    def get_system_fault_stats(self) -> Dict[str, Any]:
+    def get_system_fault_stats(self) -> dict[str, Any]:
         """
         Get aggregate fault statistics for the system
 
@@ -483,5 +468,5 @@ class FaultManager:
             }
 
         except Exception as e:
-            logger.error(f"Error getting fault stats: {str(e)}")
+            logger.error(f"Error getting fault stats: {e!s}")
             return {}

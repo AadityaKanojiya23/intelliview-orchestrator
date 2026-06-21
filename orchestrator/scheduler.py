@@ -11,13 +11,14 @@ Responsibilities:
 """
 
 import logging
-from typing import Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
-from workers.tasks import process_interview_session
-from orchestrator.load_balancer import LoadBalancer, BalancingStrategy
-from orchestrator.worker_registry import WorkerRegistry
+from typing import Any
+
+from orchestrator.load_balancer import BalancingStrategy, LoadBalancer
 from orchestrator.session_manager import SessionManager
+from orchestrator.worker_registry import WorkerRegistry
+from workers.tasks import process_interview_session
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +36,14 @@ class Scheduler:
     Manages task scheduling and distribution to workers
     """
 
-    def __init__(self, load_balancer: Optional[LoadBalancer] = None):
+    def __init__(self, load_balancer: LoadBalancer | None = None):
         """
         Initialize scheduler
 
         Args:
             load_balancer: Optional custom LoadBalancer instance
         """
-        self.load_balancer = load_balancer or LoadBalancer(
-            strategy=BalancingStrategy.LEAST_LOADED
-        )
+        self.load_balancer = load_balancer or LoadBalancer(strategy=BalancingStrategy.LEAST_LOADED)
         self.worker_registry = WorkerRegistry()
         self.session_manager = SessionManager()
         logger.info("Scheduler initialized with Least Loaded strategy")
@@ -74,9 +73,7 @@ class Scheduler:
             bool: True if scheduling successful
         """
         try:
-            logger.info(
-                f"Scheduling task for session {session_id} (priority: {priority.name})"
-            )
+            logger.info(f"Scheduling task for session {session_id} (priority: {priority.name})")
 
             # Verify session exists
             session_data = self.session_manager.get_session(session_id)
@@ -85,14 +82,10 @@ class Scheduler:
                 return False
 
             # Select worker
-            worker = self.load_balancer.get_best_worker_for_priority(
-                priority.name.lower()
-            )
+            worker = self.load_balancer.get_best_worker_for_priority(priority.name.lower())
 
             if not worker:
-                logger.warning(
-                    f"No worker available for session {session_id} - queueing task"
-                )
+                logger.warning(f"No worker available for session {session_id} - queueing task")
                 # Queue task directly to Redis, it will be picked up by any available worker
                 return self._queue_task(session_id, delay_seconds)
 
@@ -109,27 +102,21 @@ class Scheduler:
             # load for this worker.
             try:
                 if delay_seconds > 0:
-                    task = process_interview_session.apply_async(
-                        args=[session_id], countdown=delay_seconds
-                    )
+                    task = process_interview_session.apply_async(args=[session_id], countdown=delay_seconds)
                     logger.info(f"Task queued with {delay_seconds}s delay: {task.id}")
                 else:
                     task = process_interview_session.delay(session_id)
                     logger.info(f"Task enqueued immediately: {task.id}")
             except Exception as dispatch_err:
-                logger.error(
-                    f"Failed to enqueue task for session {session_id}: {dispatch_err}"
-                )
+                logger.error(f"Failed to enqueue task for session {session_id}: {dispatch_err}")
                 self.worker_registry.decrement_active_tasks(worker["worker_id"])
                 raise
 
             return True
 
         except Exception as e:
-            logger.error(f"Error scheduling task: {str(e)}")
-            self.session_manager.mark_session_failed(
-                session_id, f"Scheduling error: {str(e)}"
-            )
+            logger.error(f"Error scheduling task: {e!s}")
+            self.session_manager.mark_session_failed(session_id, f"Scheduling error: {e!s}")
             return False
 
     def _queue_task(self, session_id: str, delay_seconds: int = 0) -> bool:
@@ -145,9 +132,7 @@ class Scheduler:
         """
         try:
             if delay_seconds > 0:
-                task = process_interview_session.apply_async(
-                    args=[session_id], countdown=delay_seconds
-                )
+                task = process_interview_session.apply_async(args=[session_id], countdown=delay_seconds)
             else:
                 task = process_interview_session.delay(session_id)
 
@@ -155,7 +140,7 @@ class Scheduler:
             return True
 
         except Exception as e:
-            logger.error(f"Error queuing task: {str(e)}")
+            logger.error(f"Error queuing task: {e!s}")
             return False
 
     def reschedule_failed_task(self, session_id: str, retry_delay: int = 60) -> bool:
@@ -170,9 +155,7 @@ class Scheduler:
             bool: True if rescheduled successfully
         """
         try:
-            logger.info(
-                f"Rescheduling failed task: {session_id} (retry in {retry_delay}s)"
-            )
+            logger.info(f"Rescheduling failed task: {session_id} (retry in {retry_delay}s)")
 
             # Verify session exists
             session_data = self.session_manager.get_session(session_id)
@@ -186,28 +169,22 @@ class Scheduler:
 
             if retry_count >= max_retries:
                 logger.warning(f"Max retries exceeded for session {session_id}")
-                self.session_manager.mark_session_failed(
-                    session_id, f"Max retries exceeded ({max_retries})"
-                )
+                self.session_manager.mark_session_failed(session_id, f"Max retries exceeded ({max_retries})")
                 return False
 
             # Queue task with delay
-            process_interview_session.apply_async(
-                args=[session_id], countdown=retry_delay
-            )
+            process_interview_session.apply_async(args=[session_id], countdown=retry_delay)
 
-            logger.info(
-                f"Task rescheduled: {session_id} (attempt {retry_count + 1}/{max_retries})"
-            )
+            logger.info(f"Task rescheduled: {session_id} (attempt {retry_count + 1}/{max_retries})")
             return True
 
         except Exception as e:
-            logger.error(f"Error rescheduling task: {str(e)}")
+            logger.error(f"Error rescheduling task: {e!s}")
             return False
 
     def schedule_batch_tasks(
         self, session_ids: list, priority: TaskPriority = TaskPriority.MEDIUM
-    ) -> Dict[str, bool]:
+    ) -> dict[str, bool]:
         """
         Schedule multiple tasks at once
 
@@ -224,13 +201,11 @@ class Scheduler:
             results[session_id] = self.schedule_task(session_id, priority)
 
         successful = sum(1 for v in results.values() if v)
-        logger.info(
-            f"Batch scheduling complete: {successful}/{len(session_ids)} successful"
-        )
+        logger.info(f"Batch scheduling complete: {successful}/{len(session_ids)} successful")
 
         return results
 
-    def get_scheduling_status(self) -> Dict[str, Any]:
+    def get_scheduling_status(self) -> dict[str, Any]:
         """Get current scheduling and load information"""
         load_status = self.load_balancer.get_load_status()
 
@@ -239,13 +214,8 @@ class Scheduler:
 
         # Recommend strategy switch if needed
         recommendation = None
-        if (
-            is_overloaded
-            and self.load_balancer.strategy != BalancingStrategy.LEAST_LOADED
-        ):
-            recommendation = (
-                "Switch to LEAST_LOADED strategy to optimize load distribution"
-            )
+        if is_overloaded and self.load_balancer.strategy != BalancingStrategy.LEAST_LOADED:
+            recommendation = "Switch to LEAST_LOADED strategy to optimize load distribution"
 
         return {
             "load_balancer_strategy": self.load_balancer.strategy.value,
@@ -266,18 +236,13 @@ class Scheduler:
         # If utilization > 80%, ensure we're using least loaded
         if utilization > 80:
             if self.load_balancer.strategy != BalancingStrategy.LEAST_LOADED:
-                logger.info(
-                    f"High utilization ({utilization}%) - switching to LEAST_LOADED strategy"
-                )
+                logger.info(f"High utilization ({utilization}%) - switching to LEAST_LOADED strategy")
                 self.load_balancer.switch_strategy(BalancingStrategy.LEAST_LOADED)
 
         # If utilization < 30%, can use round robin for simplicity
-        elif utilization < 30:
-            if self.load_balancer.strategy != BalancingStrategy.ROUND_ROBIN:
-                logger.info(
-                    f"Low utilization ({utilization}%) - switching to ROUND_ROBIN strategy"
-                )
-                self.load_balancer.switch_strategy(BalancingStrategy.ROUND_ROBIN)
+        elif utilization < 30 and self.load_balancer.strategy != BalancingStrategy.ROUND_ROBIN:
+            logger.info(f"Low utilization ({utilization}%) - switching to ROUND_ROBIN strategy")
+            self.load_balancer.switch_strategy(BalancingStrategy.ROUND_ROBIN)
 
     def can_accept_task(self) -> bool:
         """
@@ -289,9 +254,7 @@ class Scheduler:
         available = self.worker_registry.get_available_workers()
         return len(available) > 0
 
-    def get_estimated_wait_time(
-        self, priority: TaskPriority = TaskPriority.MEDIUM
-    ) -> int:
+    def get_estimated_wait_time(self, priority: TaskPriority = TaskPriority.MEDIUM) -> int:
         """
         Estimate wait time for a task with given priority
 
@@ -317,6 +280,4 @@ class Scheduler:
             return -1  # Cannot estimate
 
         # Rough estimate: (queued_tasks / workers) * avg_duration
-        wait_time = int((total_queued_tasks / num_workers) * avg_task_duration)
-
-        return wait_time
+        return int((total_queued_tasks / num_workers) * avg_task_duration)

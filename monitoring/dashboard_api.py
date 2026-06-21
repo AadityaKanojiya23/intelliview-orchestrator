@@ -14,11 +14,11 @@ Endpoints:
 - WebSocket /ws/metrics - Real-time updates
 """
 
-import logging
 import asyncio
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+import logging
 from datetime import datetime
-from typing import Optional
+
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from config import API_TOKEN
 
@@ -79,7 +79,7 @@ def create_dashboard_routes(
                 "timestamp": datetime.utcnow().isoformat(),
             }
         except Exception as e:
-            logger.error(f"Error fetching system metrics: {str(e)}")
+            logger.error(f"Error fetching system metrics: {e!s}")
             return {
                 "status": "error",
                 "error": str(e),
@@ -107,7 +107,7 @@ def create_dashboard_routes(
                 "timestamp": datetime.utcnow().isoformat(),
             }
         except Exception as e:
-            logger.error(f"Error fetching worker metrics: {str(e)}")
+            logger.error(f"Error fetching worker metrics: {e!s}")
             return {
                 "status": "error",
                 "error": str(e),
@@ -135,7 +135,7 @@ def create_dashboard_routes(
                 "timestamp": datetime.utcnow().isoformat(),
             }
         except Exception as e:
-            logger.error(f"Error fetching session metrics: {str(e)}")
+            logger.error(f"Error fetching session metrics: {e!s}")
             return {
                 "status": "error",
                 "error": str(e),
@@ -163,7 +163,7 @@ def create_dashboard_routes(
                 "timestamp": datetime.utcnow().isoformat(),
             }
         except Exception as e:
-            logger.error(f"Error fetching queue metrics: {str(e)}")
+            logger.error(f"Error fetching queue metrics: {e!s}")
             return {
                 "status": "error",
                 "error": str(e),
@@ -191,7 +191,7 @@ def create_dashboard_routes(
                 "timestamp": datetime.utcnow().isoformat(),
             }
         except Exception as e:
-            logger.error(f"Error fetching failure metrics: {str(e)}")
+            logger.error(f"Error fetching failure metrics: {e!s}")
             return {
                 "status": "error",
                 "error": str(e),
@@ -219,7 +219,7 @@ def create_dashboard_routes(
                 "timestamp": datetime.utcnow().isoformat(),
             }
         except Exception as e:
-            logger.error(f"Error fetching retry metrics: {str(e)}")
+            logger.error(f"Error fetching retry metrics: {e!s}")
             return {
                 "status": "error",
                 "error": str(e),
@@ -239,9 +239,7 @@ def create_dashboard_routes(
         try:
             logger.debug("Fetching performance metrics")
 
-            performance_metrics = metrics_collector.get_performance_metrics(
-                session_tracker
-            )
+            performance_metrics = metrics_collector.get_performance_metrics(session_tracker)
 
             return {
                 "status": "success",
@@ -249,7 +247,7 @@ def create_dashboard_routes(
                 "timestamp": datetime.utcnow().isoformat(),
             }
         except Exception as e:
-            logger.error(f"Error fetching performance metrics: {str(e)}")
+            logger.error(f"Error fetching performance metrics: {e!s}")
             return {
                 "status": "error",
                 "error": str(e),
@@ -292,7 +290,7 @@ def create_dashboard_routes(
                 "timestamp": datetime.utcnow().isoformat(),
             }
         except Exception as e:
-            logger.error(f"Error generating dashboard summary: {str(e)}")
+            logger.error(f"Error generating dashboard summary: {e!s}")
             return {
                 "status": "error",
                 "error": str(e),
@@ -302,9 +300,7 @@ def create_dashboard_routes(
     # ========== WebSocket Real-Time Metrics Endpoint ==========
 
     @router.websocket("/ws/metrics")
-    async def websocket_metrics(
-        websocket: WebSocket, token: Optional[str] = Query(default=None)
-    ):
+    async def websocket_metrics(websocket: WebSocket, token: str | None = Query(default=None)):
         """
         WebSocket endpoint for real-time metrics push
 
@@ -325,9 +321,7 @@ def create_dashboard_routes(
             while True:
                 try:
                     # Receive any client messages (for heartbeat/keep-alive)
-                    data = await asyncio.wait_for(
-                        websocket.receive_text(), timeout=30.0
-                    )
+                    data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
 
                     # Echo received message (for ping/pong)
                     if data:
@@ -339,12 +333,8 @@ def create_dashboard_routes(
                     try:
                         metrics = {
                             "system": metrics_collector.get_system_metrics(),
-                            "workers": metrics_collector.get_worker_metrics(
-                                worker_registry
-                            ),
-                            "sessions": metrics_collector.get_session_metrics(
-                                session_tracker
-                            ),
+                            "workers": metrics_collector.get_worker_metrics(worker_registry),
+                            "sessions": metrics_collector.get_session_metrics(session_tracker),
                         }
                         await ws_manager.send_to_connection(
                             websocket,
@@ -355,13 +345,13 @@ def create_dashboard_routes(
                             },
                         )
                     except Exception as e:
-                        logger.error(f"Error sending metrics: {str(e)}")
+                        logger.error(f"Error sending metrics: {e!s}")
                         break
         except WebSocketDisconnect:
             await ws_manager.disconnect(websocket)
             logger.info("WebSocket client disconnected")
         except Exception as e:
-            logger.error(f"WebSocket error: {str(e)}")
+            logger.error(f"WebSocket error: {e!s}")
             await ws_manager.disconnect(websocket)
 
     return router

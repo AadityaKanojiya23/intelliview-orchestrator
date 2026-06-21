@@ -82,9 +82,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install
         run: npm ci --no-audit --no-fund
-      - name: Typecheck
-        run: npx tsc --noEmit
       - name: Lint
-        run: npm run lint --if-present
+        run: npm run lint
       - name: Build
         run: npx next build

@@ -59,7 +59,7 @@ EXPECTED = {
 }
 
 
-@pytest.mark.parametrize("method,path", sorted(EXPECTED))
+@pytest.mark.parametrize(("method", "path"), sorted(EXPECTED))
 def test_endpoint_exists(method, path):
     routes = _all_routes(app)
     assert (method, path) in routes, f"Missing endpoint {method} {path}"

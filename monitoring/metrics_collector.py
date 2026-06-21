@@ -10,11 +10,13 @@ Responsibilities:
 - Track retry counts and failure patterns
 """
 
-import logging
-import redis
 import json
+import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from typing import Any
+
+import redis
+
 from config import REDIS_URL
 
 logger = logging.getLogger(__name__)
@@ -44,7 +46,7 @@ class MetricsCollector:
 
         logger.info("MetricsCollector initialized")
 
-    def _connect_redis(self) -> Optional[redis.Redis]:
+    def _connect_redis(self) -> redis.Redis | None:
         """Connect to Redis server"""
         try:
             client = redis.from_url(self.redis_url, decode_responses=True)
@@ -52,10 +54,10 @@ class MetricsCollector:
             logger.info("Connected to Redis for metrics collection")
             return client
         except Exception as e:
-            logger.error(f"Failed to connect to Redis: {str(e)}")
+            logger.error(f"Failed to connect to Redis: {e!s}")
             return None
 
-    def get_system_metrics(self) -> Dict[str, Any]:
+    def get_system_metrics(self) -> dict[str, Any]:
         """
         Get comprehensive system-wide metrics
 
@@ -69,10 +71,7 @@ class MetricsCollector:
 
             # Determine system health
             health_status = "healthy"
-            if (
-                session_metrics.get("failed_count", 0)
-                > session_metrics.get("completed_count", 0) * 0.1
-            ):
+            if session_metrics.get("failed_count", 0) > session_metrics.get("completed_count", 0) * 0.1:
                 health_status = "degraded"
 
             return {
@@ -85,10 +84,10 @@ class MetricsCollector:
             }
 
         except Exception as e:
-            logger.error(f"Error collecting system metrics: {str(e)}")
+            logger.error(f"Error collecting system metrics: {e!s}")
             return {}
 
-    def _get_session_metrics(self) -> Dict[str, Any]:
+    def _get_session_metrics(self) -> dict[str, Any]:
         """Get session-related metrics"""
         try:
             if not self.redis_client:
@@ -101,9 +100,7 @@ class MetricsCollector:
 
             cursor = 0
             while True:
-                cursor, keys = self.redis_client.scan(
-                    cursor, match="session:*", count=100
-                )
+                cursor, keys = self.redis_client.scan(cursor, match="session:*", count=100)
 
                 for key in keys:
                     try:
@@ -140,10 +137,10 @@ class MetricsCollector:
             }
 
         except Exception as e:
-            logger.error(f"Error getting session metrics: {str(e)}")
+            logger.error(f"Error getting session metrics: {e!s}")
             return {}
 
-    def _get_worker_metrics(self) -> Dict[str, Any]:
+    def _get_worker_metrics(self) -> dict[str, Any]:
         """Get worker-related metrics"""
         try:
             if not self.redis_client:
@@ -156,9 +153,7 @@ class MetricsCollector:
 
             cursor = 0
             while True:
-                cursor, keys = self.redis_client.scan(
-                    cursor, match="worker:*", count=100
-                )
+                cursor, keys = self.redis_client.scan(cursor, match="worker:*", count=100)
 
                 for key in keys:
                     try:
@@ -178,9 +173,7 @@ class MetricsCollector:
                 if cursor == 0:
                     break
 
-            utilization = (
-                (active_tasks / total_capacity * 100) if total_capacity > 0 else 0
-            )
+            utilization = (active_tasks / total_capacity * 100) if total_capacity > 0 else 0
 
             return {
                 "total_workers": total_workers,
@@ -190,39 +183,33 @@ class MetricsCollector:
                 "active_tasks": active_tasks,
                 "available_slots": total_capacity - active_tasks,
                 "utilization_percent": round(utilization, 2),
-                "health_percent": (healthy_workers / total_workers * 100)
-                if total_workers > 0
-                else 0,
+                "health_percent": (healthy_workers / total_workers * 100) if total_workers > 0 else 0,
             }
 
         except Exception as e:
-            logger.error(f"Error getting worker metrics: {str(e)}")
+            logger.error(f"Error getting worker metrics: {e!s}")
             return {}
 
-    def _get_queue_metrics(self) -> Dict[str, Any]:
+    def _get_queue_metrics(self) -> dict[str, Any]:
         """Get queue-related metrics"""
         try:
             if not self.redis_client:
                 return {}
 
-            queue_length = (
-                self.redis_client.llen("celery_queue") if self.redis_client else 0
-            )
+            queue_length = self.redis_client.llen("celery_queue") if self.redis_client else 0
 
             return {
                 "queue_length": queue_length,
                 "pending_tasks": queue_length,
                 "threshold": 1000,
-                "backlog_percent": (queue_length / 1000 * 100)
-                if queue_length > 0
-                else 0,
+                "backlog_percent": (queue_length / 1000 * 100) if queue_length > 0 else 0,
             }
 
         except Exception as e:
-            logger.error(f"Error getting queue metrics: {str(e)}")
+            logger.error(f"Error getting queue metrics: {e!s}")
             return {}
 
-    def get_worker_metrics(self, worker_registry) -> Dict[str, Any]:
+    def get_worker_metrics(self, worker_registry) -> dict[str, Any]:
         """
         Get detailed worker performance metrics
 
@@ -242,12 +229,9 @@ class MetricsCollector:
                         "worker_id": worker_id,
                         "capacity": worker_data.get("capacity", 0),
                         "active_tasks": worker_data.get("active_tasks", 0),
-                        "available": worker_data.get("capacity", 0)
-                        - worker_data.get("active_tasks", 0),
+                        "available": worker_data.get("capacity", 0) - worker_data.get("active_tasks", 0),
                         "utilization": (
-                            worker_data.get("active_tasks", 0)
-                            / worker_data.get("capacity", 1)
-                            * 100
+                            worker_data.get("active_tasks", 0) / worker_data.get("capacity", 1) * 100
                         ),
                         "last_heartbeat": worker_data.get("last_heartbeat"),
                         "joined_at": worker_data.get("joined_at"),
@@ -261,10 +245,10 @@ class MetricsCollector:
             }
 
         except Exception as e:
-            logger.error(f"Error getting worker metrics: {str(e)}")
+            logger.error(f"Error getting worker metrics: {e!s}")
             return {}
 
-    def get_session_metrics(self, session_tracker) -> Dict[str, Any]:
+    def get_session_metrics(self, session_tracker) -> dict[str, Any]:
         """
         Get detailed session activity metrics
 
@@ -290,10 +274,10 @@ class MetricsCollector:
             }
 
         except Exception as e:
-            logger.error(f"Error getting session metrics: {str(e)}")
+            logger.error(f"Error getting session metrics: {e!s}")
             return {}
 
-    def get_failure_metrics(self, fault_manager) -> Dict[str, Any]:
+    def get_failure_metrics(self, fault_manager) -> dict[str, Any]:
         """
         Get failure and recovery metrics
 
@@ -316,10 +300,10 @@ class MetricsCollector:
             }
 
         except Exception as e:
-            logger.error(f"Error getting failure metrics: {str(e)}")
+            logger.error(f"Error getting failure metrics: {e!s}")
             return {}
 
-    def get_retry_metrics(self, retry_manager) -> Dict[str, Any]:
+    def get_retry_metrics(self, retry_manager) -> dict[str, Any]:
         """
         Get retry attempt metrics
 
@@ -333,9 +317,7 @@ class MetricsCollector:
             retry_stats = retry_manager.get_retry_statistics()
 
             return {
-                "total_scheduled_retries": retry_stats.get(
-                    "total_scheduled_retries", 0
-                ),
+                "total_scheduled_retries": retry_stats.get("total_scheduled_retries", 0),
                 "retry_strategy": retry_stats.get("retry_strategy", "unknown"),
                 "max_retries": retry_stats.get("max_retries", 0),
                 "recent_retries": retry_stats.get("scheduled_retries", [])[:5],
@@ -343,10 +325,10 @@ class MetricsCollector:
             }
 
         except Exception as e:
-            logger.error(f"Error getting retry metrics: {str(e)}")
+            logger.error(f"Error getting retry metrics: {e!s}")
             return {}
 
-    def get_performance_metrics(self, session_tracker) -> Dict[str, Any]:
+    def get_performance_metrics(self, session_tracker) -> dict[str, Any]:
         """
         Get system performance metrics
 
@@ -361,15 +343,14 @@ class MetricsCollector:
 
             return {
                 "avg_processing_time_seconds": stats.get("avg_processing_time", 0),
-                "total_sessions": stats.get("active_count", 0)
-                + stats.get("completed_count", 0),
+                "total_sessions": stats.get("active_count", 0) + stats.get("completed_count", 0),
                 "throughput_per_minute": self._calculate_throughput(),
                 "peak_concurrent_sessions": stats.get("peak_concurrent", 0),
                 "timestamp": datetime.utcnow().isoformat(),
             }
 
         except Exception as e:
-            logger.error(f"Error getting performance metrics: {str(e)}")
+            logger.error(f"Error getting performance metrics: {e!s}")
             return {}
 
     def _calculate_throughput(self) -> float:
@@ -384,9 +365,7 @@ class MetricsCollector:
             count = 0
             cursor = 0
             while True:
-                cursor, keys = self.redis_client.scan(
-                    cursor, match="session:*", count=100
-                )
+                cursor, keys = self.redis_client.scan(cursor, match="session:*", count=100)
 
                 for key in keys:
                     try:
@@ -406,7 +385,7 @@ class MetricsCollector:
             return float(count)
 
         except Exception as e:
-            logger.warning(f"Error calculating throughput: {str(e)}")
+            logger.warning(f"Error calculating throughput: {e!s}")
             return 0.0
 
     def _get_uptime(self) -> int:
@@ -426,7 +405,7 @@ class MetricsCollector:
             return 0
 
         except Exception as e:
-            logger.warning(f"Error getting uptime: {str(e)}")
+            logger.warning(f"Error getting uptime: {e!s}")
             return 0
 
     def record_metric(self, metric_name: str, value: Any) -> bool:
@@ -456,12 +435,10 @@ class MetricsCollector:
             return True
 
         except Exception as e:
-            logger.error(f"Error recording metric: {str(e)}")
+            logger.error(f"Error recording metric: {e!s}")
             return False
 
-    def get_metric_history(
-        self, metric_name: str, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    def get_metric_history(self, metric_name: str, limit: int = 100) -> list[dict[str, Any]]:
         """
         Get historical data for a metric
 
@@ -489,5 +466,5 @@ class MetricsCollector:
             return history
 
         except Exception as e:
-            logger.error(f"Error getting metric history: {str(e)}")
+            logger.error(f"Error getting metric history: {e!s}")
             return []

@@ -10,9 +10,11 @@ Responsibilities:
 """
 
 import logging
-from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
-from sqlalchemy import select, func
+from typing import Any
+
+from sqlalchemy import func, select
+
 from database.db import SessionLocal
 from database.models import InterviewSession
 
@@ -26,9 +28,8 @@ class SessionTracker:
 
     def __init__(self):
         """Initialize session tracker"""
-        pass
 
-    def get_active_sessions(self) -> List[Dict[str, Any]]:
+    def get_active_sessions(self) -> list[dict[str, Any]]:
         """
         Get all currently active sessions (CREATED, QUEUED, PROCESSING)
 
@@ -47,9 +48,7 @@ class SessionTracker:
             ]
             sessions = (
                 session_db.execute(
-                    select(InterviewSession).where(
-                        InterviewSession.status.in_(active_statuses)
-                    )
+                    select(InterviewSession).where(InterviewSession.status.in_(active_statuses))
                 )
                 .scalars()
                 .all()
@@ -63,12 +62,8 @@ class SessionTracker:
                         "candidate_id": s.candidate_id,
                         "status": s.status,
                         "assigned_node": s.assigned_node,
-                        "created_at": s.created_at.isoformat()
-                        if s.created_at
-                        else None,
-                        "updated_at": s.updated_at.isoformat()
-                        if s.updated_at
-                        else None,
+                        "created_at": s.created_at.isoformat() if s.created_at else None,
+                        "updated_at": s.updated_at.isoformat() if s.updated_at else None,
                     }
                 )
 
@@ -76,12 +71,12 @@ class SessionTracker:
             return result
 
         except Exception as e:
-            logger.error(f"Error getting active sessions: {str(e)}")
+            logger.error(f"Error getting active sessions: {e!s}")
             return []
         finally:
             session_db.close()
 
-    def get_completed_sessions(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_completed_sessions(self, limit: int = 100) -> list[dict[str, Any]]:
         """
         Get recently completed sessions
 
@@ -113,9 +108,7 @@ class SessionTracker:
                     "start_time": s.start_time.isoformat() if s.start_time else None,
                     "end_time": s.end_time.isoformat() if s.end_time else None,
                     "duration_seconds": (
-                        (s.end_time - s.start_time).total_seconds()
-                        if s.start_time and s.end_time
-                        else None
+                        (s.end_time - s.start_time).total_seconds() if s.start_time and s.end_time else None
                     ),
                 }
                 for s in rows
@@ -126,7 +119,7 @@ class SessionTracker:
         finally:
             session_db.close()
 
-    def get_session_statistics(self) -> Dict[str, Any]:
+    def get_session_statistics(self) -> dict[str, Any]:
         """
         Compute aggregate session statistics across all sessions.
 
@@ -136,18 +129,13 @@ class SessionTracker:
         session_db = SessionLocal()
         try:
             total_sessions = (
-                session_db.execute(
-                    select(func.count()).select_from(InterviewSession)
-                ).scalar()
-                or 0
+                session_db.execute(select(func.count()).select_from(InterviewSession)).scalar() or 0
             )
 
             status_rows = session_db.execute(
-                select(InterviewSession.status, func.count()).group_by(
-                    InterviewSession.status
-                )
+                select(InterviewSession.status, func.count()).group_by(InterviewSession.status)
             ).all()
-            status_counts: Dict[str, int] = {row[0]: row[1] for row in status_rows}
+            status_counts: dict[str, int] = {row[0]: row[1] for row in status_rows}
 
             completed_sessions = (
                 session_db.execute(
@@ -161,23 +149,17 @@ class SessionTracker:
                 .all()
             )
 
-            durations = [
-                (s.end_time - s.start_time).total_seconds() for s in completed_sessions
-            ]
+            durations = [(s.end_time - s.start_time).total_seconds() for s in completed_sessions]
             avg_duration = sum(durations) / len(durations) if durations else 0
 
             risk_scores_list = list(
                 session_db.execute(
-                    select(InterviewSession.risk_score).where(
-                        InterviewSession.risk_score.isnot(None)
-                    )
+                    select(InterviewSession.risk_score).where(InterviewSession.risk_score.isnot(None))
                 )
                 .scalars()
                 .all()
             )
-            avg_risk = (
-                sum(risk_scores_list) / len(risk_scores_list) if risk_scores_list else 0
-            )
+            avg_risk = sum(risk_scores_list) / len(risk_scores_list) if risk_scores_list else 0
             max_risk = max(risk_scores_list) if risk_scores_list else 0
             min_risk = min(risk_scores_list) if risk_scores_list else 0
 
@@ -222,7 +204,7 @@ class SessionTracker:
         finally:
             session_db.close()
 
-    def get_stuck_sessions(self, timeout_minutes: int = 30) -> List[Dict[str, Any]]:
+    def get_stuck_sessions(self, timeout_minutes: int = 30) -> list[dict[str, Any]]:
         """
         Detect sessions that are stuck (in PROCESSING state beyond timeout)
 
@@ -256,27 +238,23 @@ class SessionTracker:
                         "candidate_id": s.candidate_id,
                         "status": s.status,
                         "assigned_node": s.assigned_node,
-                        "start_time": s.start_time.isoformat()
-                        if s.start_time
-                        else None,
+                        "start_time": s.start_time.isoformat() if s.start_time else None,
                         "elapsed_seconds": round(elapsed_time, 2),
                     }
                 )
 
             if result:
-                logger.warning(
-                    f"Found {len(result)} stuck sessions (timeout > {timeout_minutes} minutes)"
-                )
+                logger.warning(f"Found {len(result)} stuck sessions (timeout > {timeout_minutes} minutes)")
 
             return result
 
         except Exception as e:
-            logger.error(f"Error detecting stuck sessions: {str(e)}")
+            logger.error(f"Error detecting stuck sessions: {e!s}")
             return []
         finally:
             session_db.close()
 
-    def get_worker_distribution(self) -> Dict[str, int]:
+    def get_worker_distribution(self) -> dict[str, int]:
         """
         Get distribution of active sessions across worker nodes
 
@@ -293,9 +271,7 @@ class SessionTracker:
             ]
             sessions = (
                 session_db.execute(
-                    select(InterviewSession).where(
-                        InterviewSession.status.in_(active_statuses)
-                    )
+                    select(InterviewSession).where(InterviewSession.status.in_(active_statuses))
                 )
                 .scalars()
                 .all()
@@ -310,14 +286,12 @@ class SessionTracker:
             return distribution
 
         except Exception as e:
-            logger.error(f"Error getting worker distribution: {str(e)}")
+            logger.error(f"Error getting worker distribution: {e!s}")
             return {}
         finally:
             session_db.close()
 
-    def get_high_risk_sessions(
-        self, threshold: float = 0.8, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    def get_high_risk_sessions(self, threshold: float = 0.8, limit: int = 50) -> list[dict[str, Any]]:
         """
         Get high-risk sessions that completed
 
@@ -356,19 +330,17 @@ class SessionTracker:
                     }
                 )
 
-            logger.debug(
-                f"Retrieved {len(result)} high-risk sessions (threshold: {threshold})"
-            )
+            logger.debug(f"Retrieved {len(result)} high-risk sessions (threshold: {threshold})")
             return result
 
         except Exception as e:
-            logger.error(f"Error getting high-risk sessions: {str(e)}")
+            logger.error(f"Error getting high-risk sessions: {e!s}")
             return []
         finally:
             session_db.close()
 
     @staticmethod
-    def _calculate_duration(start_time, end_time) -> Optional[float]:
+    def _calculate_duration(start_time, end_time) -> float | None:
         """
         Calculate duration between two timestamps
 

@@ -3,10 +3,12 @@ Database connection manager for AI Interview Orchestrator
 Centralizes SQLAlchemy connection and session management
 """
 
+import logging
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+
 from config import DATABASE_URL
-import logging
 
 logger = logging.getLogger(__name__)
 

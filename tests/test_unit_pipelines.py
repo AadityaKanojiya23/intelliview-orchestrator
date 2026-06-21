@@ -5,14 +5,6 @@ shape the RiskScoringEngine consumes, and the seeded deterministic outputs
 let end-to-end risk classification thresholds fire.
 """
 
-from workers.video_pipeline import (
-    calculate_video_risk_score,
-    detect_face,
-    detect_mobile_phone,
-    detect_multiple_persons,
-    detect_suspicious_head_movement,
-    run_video_analysis,
-)
 from workers.audio_pipeline import (
     calculate_audio_risk_score,
     detect_background_voices,
@@ -26,6 +18,14 @@ from workers.evaluation_pipeline import (
     evaluate_communication,
     evaluate_technical_accuracy,
     generate_feedback,
+)
+from workers.video_pipeline import (
+    calculate_video_risk_score,
+    detect_face,
+    detect_mobile_phone,
+    detect_multiple_persons,
+    detect_suspicious_head_movement,
+    run_video_analysis,
 )
 
 

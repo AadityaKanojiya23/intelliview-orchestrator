@@ -9,8 +9,9 @@ Strategies:
 """
 
 import logging
-from typing import Optional, Dict, Any
 from enum import Enum
+from typing import Any
+
 from orchestrator.worker_registry import WorkerRegistry
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ class LoadBalancer:
         self.round_robin_index = 0
         logger.info(f"Load Balancer initialized with strategy: {strategy.value}")
 
-    def select_worker(self) -> Optional[Dict[str, Any]]:
+    def select_worker(self) -> dict[str, Any] | None:
         """
         Select a worker for task execution based on current strategy
 
@@ -50,15 +51,14 @@ class LoadBalancer:
         """
         if self.strategy == BalancingStrategy.ROUND_ROBIN:
             return self._select_round_robin()
-        elif self.strategy == BalancingStrategy.LEAST_LOADED:
+        if self.strategy == BalancingStrategy.LEAST_LOADED:
             return self._select_least_loaded()
-        elif self.strategy == BalancingStrategy.QUEUE_BASED:
+        if self.strategy == BalancingStrategy.QUEUE_BASED:
             return self._select_queue_based()
-        else:
-            # Default to least loaded
-            return self._select_least_loaded()
+        # Default to least loaded
+        return self._select_least_loaded()
 
-    def _select_round_robin(self) -> Optional[Dict[str, Any]]:
+    def _select_round_robin(self) -> dict[str, Any] | None:
         """
         Round Robin Strategy: Distribute tasks in sequence
 
@@ -81,7 +81,7 @@ class LoadBalancer:
         logger.debug(f"Round Robin selected worker: {worker['worker_id']}")
         return worker
 
-    def _select_least_loaded(self) -> Optional[Dict[str, Any]]:
+    def _select_least_loaded(self) -> dict[str, Any] | None:
         """
         Least Loaded Strategy: Assign to worker with fewest active tasks (RECOMMENDED)
 
@@ -103,7 +103,7 @@ class LoadBalancer:
         )
         return worker
 
-    def _select_queue_based(self) -> Optional[Dict[str, Any]]:
+    def _select_queue_based(self) -> dict[str, Any] | None:
         """
         Queue-based Strategy: Fallback to queue if no workers available
 
@@ -132,7 +132,7 @@ class LoadBalancer:
         self.strategy = strategy
         logger.info(f"Switched to {strategy.value} strategy")
 
-    def get_best_worker_for_priority(self, priority: str) -> Optional[Dict[str, Any]]:
+    def get_best_worker_for_priority(self, priority: str) -> dict[str, Any] | None:
         """
         Select worker considering task priority
 
@@ -152,18 +152,15 @@ class LoadBalancer:
             return min(available, key=lambda w: w["active_tasks"])
 
         # For medium priority, select from least loaded
-        elif priority == "medium":
+        if priority == "medium":
             # Select a worker that's not overloaded
-            underutilized = [
-                w for w in available if w["active_tasks"] < w["capacity"] * 0.7
-            ]
+            underutilized = [w for w in available if w["active_tasks"] < w["capacity"] * 0.7]
             if underutilized:
                 return underutilized[0]
             return available[0]
 
         # For low priority, select any available
-        else:
-            return available[-1]  # Select the one with most load (fill it up)
+        return available[-1]  # Select the one with most load (fill it up)
 
     def is_system_overloaded(self, threshold: float = 0.9) -> bool:
         """
@@ -188,7 +185,7 @@ class LoadBalancer:
 
         return is_overloaded
 
-    def get_load_status(self) -> Dict[str, Any]:
+    def get_load_status(self) -> dict[str, Any]:
         """Get current system load status"""
         stats = self.worker_registry.get_worker_statistics()
         available_workers = len(self.worker_registry.get_available_workers())

@@ -1,4 +1,4 @@
-"""
+r"""
 Structured (JSON) logging for the orchestrator.
 
 Two output modes:
@@ -14,7 +14,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any
 
 
 class JsonFormatter(logging.Formatter):
@@ -51,7 +51,7 @@ class JsonFormatter(logging.Formatter):
     }
 
     def format(self, record: logging.LogRecord) -> str:
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
@@ -80,9 +80,7 @@ def configure_logging(level: str | None = None) -> None:
     if json_mode:
         handler.setFormatter(JsonFormatter())
     else:
-        handler.setFormatter(
-            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-        )
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     root.addHandler(handler)
 
 

@@ -10,10 +10,12 @@ Responsibilities:
 """
 
 import logging
-from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from threading import Lock
+from typing import Any
+
 import redis
+
 from config import REDIS_URL
 
 logger = logging.getLogger(__name__)
@@ -35,21 +37,21 @@ class WorkerRegistry:
         try:
             self.redis_url = REDIS_URL or "redis://localhost:6379/0"
             self.redis_client = self._connect_redis()
-            self.local_workers: Dict[str, Dict[str, Any]] = {}
+            self.local_workers: dict[str, dict[str, Any]] = {}
             self.lock = Lock()
             logger.info("Worker Registry initialized")
         except Exception as e:
-            logger.error(f"Error initializing Worker Registry: {str(e)}")
+            logger.error(f"Error initializing Worker Registry: {e!s}")
             self.redis_client = None
 
-    def _connect_redis(self) -> Optional[redis.Redis]:
+    def _connect_redis(self) -> redis.Redis | None:
         """Establish Redis connection"""
         try:
             client = redis.from_url(self.redis_url, decode_responses=True)
             client.ping()
             return client
         except Exception as e:
-            logger.warning(f"Could not connect to Redis: {str(e)}")
+            logger.warning(f"Could not connect to Redis: {e!s}")
             return None
 
     def register_worker(self, worker_id: str, capacity: int = 4) -> bool:
@@ -105,7 +107,7 @@ class WorkerRegistry:
             return True
 
         except Exception as e:
-            logger.error(f"Error registering worker: {str(e)}")
+            logger.error(f"Error registering worker: {e!s}")
             return False
 
     def update_worker_status(self, worker_id: str, status: str) -> bool:
@@ -126,9 +128,7 @@ class WorkerRegistry:
                     return False
 
                 self.local_workers[worker_id]["status"] = status
-                self.local_workers[worker_id]["updated_at"] = (
-                    datetime.utcnow().isoformat()
-                )
+                self.local_workers[worker_id]["updated_at"] = datetime.utcnow().isoformat()
 
             # Update in Redis
             if self.redis_client:
@@ -140,7 +140,7 @@ class WorkerRegistry:
             return True
 
         except Exception as e:
-            logger.error(f"Error updating worker status: {str(e)}")
+            logger.error(f"Error updating worker status: {e!s}")
             return False
 
     def heartbeat(self, worker_id: str, active_tasks: int) -> bool:
@@ -157,24 +157,18 @@ class WorkerRegistry:
         try:
             with self.lock:
                 if worker_id not in self.local_workers:
-                    logger.warning(
-                        f"Received heartbeat from unknown worker: {worker_id}"
-                    )
+                    logger.warning(f"Received heartbeat from unknown worker: {worker_id}")
                     return False
 
                 self.local_workers[worker_id]["active_tasks"] = active_tasks
-                self.local_workers[worker_id]["last_heartbeat"] = (
-                    datetime.utcnow().isoformat()
-                )
+                self.local_workers[worker_id]["last_heartbeat"] = datetime.utcnow().isoformat()
                 self.local_workers[worker_id]["status"] = "healthy"
 
             # Update in Redis
             if self.redis_client:
                 key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
                 self.redis_client.hset(key, "active_tasks", active_tasks)
-                self.redis_client.hset(
-                    key, "last_heartbeat", datetime.utcnow().isoformat()
-                )
+                self.redis_client.hset(key, "last_heartbeat", datetime.utcnow().isoformat())
                 self.redis_client.hset(key, "status", "healthy")
 
                 # Also store heartbeat timestamp
@@ -185,7 +179,7 @@ class WorkerRegistry:
             return True
 
         except Exception as e:
-            logger.error(f"Error processing heartbeat: {str(e)}")
+            logger.error(f"Error processing heartbeat: {e!s}")
             return False
 
     def increment_active_tasks(self, worker_id: str) -> bool:
@@ -202,7 +196,7 @@ class WorkerRegistry:
 
             return True
         except Exception as e:
-            logger.error(f"Error incrementing active tasks: {str(e)}")
+            logger.error(f"Error incrementing active tasks: {e!s}")
             return False
 
     def decrement_active_tasks(self, worker_id: str) -> bool:
@@ -222,20 +216,20 @@ class WorkerRegistry:
 
             return True
         except Exception as e:
-            logger.error(f"Error decrementing active tasks: {str(e)}")
+            logger.error(f"Error decrementing active tasks: {e!s}")
             return False
 
-    def get_worker(self, worker_id: str) -> Optional[Dict[str, Any]]:
+    def get_worker(self, worker_id: str) -> dict[str, Any] | None:
         """Get worker details"""
         with self.lock:
             return self.local_workers.get(worker_id)
 
-    def get_all_workers(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_workers(self) -> dict[str, dict[str, Any]]:
         """Get all registered workers"""
         with self.lock:
             return dict(self.local_workers)
 
-    def get_available_workers(self) -> List[Dict[str, Any]]:
+    def get_available_workers(self) -> list[dict[str, Any]]:
         """
         Get workers that are healthy and have capacity
 
@@ -245,15 +239,12 @@ class WorkerRegistry:
         available = []
         with self.lock:
             for worker in self.local_workers.values():
-                if (
-                    worker["status"] == "healthy"
-                    and worker["active_tasks"] < worker["capacity"]
-                ):
+                if worker["status"] == "healthy" and worker["active_tasks"] < worker["capacity"]:
                     available.append(worker)
 
         return available
 
-    def get_least_loaded_worker(self) -> Optional[Dict[str, Any]]:
+    def get_least_loaded_worker(self) -> dict[str, Any] | None:
         """
         Get the worker with the lowest active task count
 
@@ -267,23 +258,15 @@ class WorkerRegistry:
         # Sort by active_tasks and return the one with fewest
         return min(available, key=lambda w: w["active_tasks"])
 
-    def get_worker_statistics(self) -> Dict[str, Any]:
+    def get_worker_statistics(self) -> dict[str, Any]:
         """Get overall worker registry statistics"""
         with self.lock:
             total_workers = len(self.local_workers)
-            healthy_workers = sum(
-                1 for w in self.local_workers.values() if w["status"] == "healthy"
-            )
+            healthy_workers = sum(1 for w in self.local_workers.values() if w["status"] == "healthy")
             total_capacity = sum(w["capacity"] for w in self.local_workers.values())
-            total_active_tasks = sum(
-                w["active_tasks"] for w in self.local_workers.values()
-            )
-            total_processed = sum(
-                w.get("total_tasks_processed", 0) for w in self.local_workers.values()
-            )
-            idle_workers = sum(
-                1 for w in self.local_workers.values() if w["active_tasks"] == 0
-            )
+            total_active_tasks = sum(w["active_tasks"] for w in self.local_workers.values())
+            total_processed = sum(w.get("total_tasks_processed", 0) for w in self.local_workers.values())
+            idle_workers = sum(1 for w in self.local_workers.values() if w["active_tasks"] == 0)
             active_loads = [w["active_tasks"] for w in self.local_workers.values()]
             avg_active = (total_active_tasks / total_workers) if total_workers else 0
 
@@ -307,9 +290,7 @@ class WorkerRegistry:
                 "total_capacity": total_capacity,
                 "total_active_tasks": total_active_tasks,
                 "capacity_utilization": round(
-                    (total_active_tasks / total_capacity * 100)
-                    if total_capacity > 0
-                    else 0,
+                    (total_active_tasks / total_capacity * 100) if total_capacity > 0 else 0,
                     2,
                 ),
                 "total_tasks_processed": total_processed,
@@ -320,7 +301,7 @@ class WorkerRegistry:
                 "workers": worker_details,
             }
 
-    def detect_unhealthy_workers(self) -> List[str]:
+    def detect_unhealthy_workers(self) -> list[str]:
         """
         Detect workers that haven't sent heartbeat recently
 
@@ -328,9 +309,7 @@ class WorkerRegistry:
             list: List of unhealthy worker IDs
         """
         unhealthy = []
-        timeout_threshold = datetime.utcnow() - timedelta(
-            seconds=self.HEARTBEAT_TIMEOUT
-        )
+        timeout_threshold = datetime.utcnow() - timedelta(seconds=self.HEARTBEAT_TIMEOUT)
 
         with self.lock:
             for worker_id, worker in self.local_workers.items():
@@ -356,5 +335,5 @@ class WorkerRegistry:
             logger.info(f"Deregistered worker: {worker_id}")
             return True
         except Exception as e:
-            logger.error(f"Error deregistering worker: {str(e)}")
+            logger.error(f"Error deregistering worker: {e!s}")
             return False

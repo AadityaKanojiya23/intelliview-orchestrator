@@ -21,7 +21,7 @@ The provided defaults are deterministic per-session seeds so that:
 
 import hashlib
 import logging
-from typing import Dict, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +35,11 @@ _VIDEO_RISK_WEIGHTS = {
 
 def _seeded_unit(session_id: str, salt: str) -> float:
     """Stable pseudo-random in [0, 1) derived from session_id + salt."""
-    digest = hashlib.sha256(f"{session_id}:{salt}".encode("utf-8")).digest()
+    digest = hashlib.sha256(f"{session_id}:{salt}".encode()).digest()
     return int.from_bytes(digest[:4], "big") / 0xFFFFFFFF
 
 
-def run_video_analysis(session_id: str) -> Dict[str, Any]:
+def run_video_analysis(session_id: str) -> dict[str, Any]:
     """
     Execute video analysis pipeline for an interview session.
 
@@ -70,7 +70,7 @@ def run_video_analysis(session_id: str) -> Dict[str, Any]:
     return results
 
 
-def detect_face(session_id: str) -> Dict[str, Any]:
+def detect_face(session_id: str) -> dict[str, Any]:
     """Detect faces in video frames."""
     logger.info(f"Detecting faces for session {session_id}")
     return {
@@ -81,7 +81,7 @@ def detect_face(session_id: str) -> Dict[str, Any]:
     }
 
 
-def detect_suspicious_head_movement(session_id: str) -> Dict[str, Any]:
+def detect_suspicious_head_movement(session_id: str) -> dict[str, Any]:
     """Detect suspicious head movement patterns."""
     logger.info(f"Detecting head movements for session {session_id}")
     suspicion = _seeded_unit(session_id, "head")
@@ -93,7 +93,7 @@ def detect_suspicious_head_movement(session_id: str) -> Dict[str, Any]:
     }
 
 
-def detect_mobile_phone(session_id: str) -> Dict[str, Any]:
+def detect_mobile_phone(session_id: str) -> dict[str, Any]:
     """Detect if mobile phone is visible or used during interview."""
     logger.info(f"Detecting mobile phone for session {session_id}")
     detected = _seeded_unit(session_id, "phone") > 0.85
@@ -105,7 +105,7 @@ def detect_mobile_phone(session_id: str) -> Dict[str, Any]:
     }
 
 
-def detect_multiple_persons(session_id: str) -> Dict[str, Any]:
+def detect_multiple_persons(session_id: str) -> dict[str, Any]:
     """Detect if multiple persons are visible in the frame."""
     logger.info(f"Detecting multiple persons for session {session_id}")
     multi = _seeded_unit(session_id, "multi") > 0.88
@@ -117,7 +117,7 @@ def detect_multiple_persons(session_id: str) -> Dict[str, Any]:
     }
 
 
-def calculate_video_risk_score(results: Dict[str, Any]) -> float:
+def calculate_video_risk_score(results: dict[str, Any]) -> float:
     """Calculate a 0–1 risk score from video detection results."""
     score = 0.0
     if results.get("multiple_persons", {}).get("multiple_persons_detected"):

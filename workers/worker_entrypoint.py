@@ -9,7 +9,7 @@ import signal
 import sys
 import threading
 
-from celery.signals import task_prerun, task_postrun
+from celery.signals import task_postrun, task_prerun
 
 from config import WORKER_CONCURRENCY
 from workers.celery_app import celery_app
@@ -40,9 +40,7 @@ def main() -> int:
     api_url = os.getenv("API_URL", "http://fastapi:8000")
     worker_id = os.getenv("WORKER_ID", f"worker-{os.uname().nodename}-{os.getpid()}")
 
-    agent = WorkerAgent(
-        api_url=api_url, worker_id=worker_id, capacity=WORKER_CONCURRENCY
-    )
+    agent = WorkerAgent(api_url=api_url, worker_id=worker_id, capacity=WORKER_CONCURRENCY)
     if not agent.register():
         logger.error("Could not register worker; exiting")
         return 1

@@ -12,37 +12,35 @@ Integrates:
 - Task Queue integration with Celery
 """
 
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI, HTTPException, Depends, Header
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, field_validator
-from typing import Optional
 import logging
 import re
 import time as _time
+from contextlib import asynccontextmanager
 from datetime import datetime
 from uuid import uuid4
 
+from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 
 from config import API_TOKEN, CORS_ALLOW_ORIGINS
+from database.db import engine
+from database.models import Base
+from monitoring.dashboard_api import create_dashboard_routes
+from monitoring.metrics_collector import MetricsCollector
+from monitoring.websocket_manager import ws_manager
+from orchestrator.fault_manager import FaultManager
+from orchestrator.health_monitor import HealthMonitor
+from orchestrator.load_balancer import BalancingStrategy, LoadBalancer
 from orchestrator.logging_config import configure_logging, log_event
+from orchestrator.retry_manager import RetryManager, RetryStrategy
+from orchestrator.scheduler import Scheduler, TaskPriority
 from orchestrator.session_manager import SessionManager
 from orchestrator.session_tracker import SessionTracker
 from orchestrator.state_sync import StateSynchronizer
-from orchestrator.scheduler import Scheduler, TaskPriority
-from orchestrator.load_balancer import LoadBalancer, BalancingStrategy
 from orchestrator.worker_registry import WorkerRegistry
-from orchestrator.fault_manager import FaultManager
-from orchestrator.retry_manager import RetryManager, RetryStrategy
-from orchestrator.health_monitor import HealthMonitor
-from monitoring.metrics_collector import MetricsCollector
-from monitoring.dashboard_api import create_dashboard_routes
-from monitoring.websocket_manager import ws_manager
-from database.db import engine
-from database.models import Base
 
 # Configure logging after imports so startup messages are structured.
 configure_logging()
@@ -76,7 +74,7 @@ async def lifespan(app: FastAPI):
             if callable(close):
                 try:
                     close()
-                except Exception as exc:  # noqa: BLE001 — best-effort shutdown
+                except Exception as exc:
                     logger.debug("shutdown close failed: %s", exc)
 
 
@@ -158,7 +156,7 @@ app.add_middleware(
 # ========== Auth ==========
 
 
-def require_token(x_api_token: Optional[str] = Header(default=None)) -> None:
+def require_token(x_api_token: str | None = Header(default=None)) -> None:
     """Dependency that requires a valid API token.
 
     Worker agents (and any privileged caller) must send `X-API-Token`.
@@ -203,11 +201,9 @@ app.include_router(dashboard_routes, prefix="/monitoring", tags=["monitoring"])
 class StartInterviewRequest(BaseModel):
     """Request model for starting an interview"""
 
-    candidate_id: str = Field(
-        min_length=1, max_length=128, description="Unique candidate identifier"
-    )
-    candidate_name: Optional[str] = Field(default=None, max_length=200)
-    position: Optional[str] = Field(default=None, max_length=120)
+    candidate_id: str = Field(min_length=1, max_length=128, description="Unique candidate identifier")
+    candidate_name: str | None = Field(default=None, max_length=200)
+    position: str | None = Field(default=None, max_length=120)
     priority: str = Field(default="medium", description="One of: low, medium, high")
 
     @field_validator("candidate_id")
@@ -215,9 +211,7 @@ class StartInterviewRequest(BaseModel):
     def _candidate_id_format(cls, v: str) -> str:
         v = v.strip()
         if not re.match(r"^[A-Za-z0-9._-]+$", v):
-            raise ValueError(
-                "candidate_id may only contain letters, digits, '.', '_', '-'"
-            )
+            raise ValueError("candidate_id may only contain letters, digits, '.', '_', '-'")
         return v
 
     @field_validator("priority")
@@ -238,7 +232,7 @@ class ErrorResponse(BaseModel):
     """Standardised error envelope returned by the API."""
 
     detail: str
-    request_id: Optional[str] = None
+    request_id: str | None = None
 
 
 class WorkerRegistrationRequest(BaseModel):
@@ -260,10 +254,10 @@ class InterviewSessionResponse(BaseModel):
 
     session_id: str
     status: str
-    created_at: Optional[str] = None
+    created_at: str | None = None
     candidate_id: str
-    risk_score: Optional[float] = None
-    estimated_wait_time: Optional[int] = None
+    risk_score: float | None = None
+    estimated_wait_time: int | None = None
 
 
 class SessionStatusResponse(BaseModel):
@@ -272,11 +266,11 @@ class SessionStatusResponse(BaseModel):
     session_id: str
     status: str
     candidate_id: str
-    risk_score: Optional[float] = None
-    assigned_node: Optional[str] = None
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
-    updated_at: Optional[str] = None
+    risk_score: float | None = None
+    assigned_node: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    updated_at: str | None = None
 
 
 class TaskStatusResponse(BaseModel):
@@ -285,7 +279,7 @@ class TaskStatusResponse(BaseModel):
     session_id: str
     task_id: str
     status: str
-    result: Optional[dict] = None
+    result: dict | None = None
 
 
 @app.get("/health")
@@ -326,9 +320,7 @@ async def start_interview(request: StartInterviewRequest):
         HTTPException: On creation failure
     """
     try:
-        logger.info(
-            f"API: Creating interview session for candidate {request.candidate_id}"
-        )
+        logger.info(f"API: Creating interview session for candidate {request.candidate_id}")
 
         # Parse priority
         priority_map = {
@@ -348,9 +340,7 @@ async def start_interview(request: StartInterviewRequest):
         logger.info(f"Session created: {session_id}")
 
         # Update status to QUEUED
-        session_manager.update_session_status(
-            session_id, session_manager.QUEUED, {"priority": priority.name}
-        )
+        session_manager.update_session_status(session_id, session_manager.QUEUED, {"priority": priority.name})
 
         # Check if system can accept task
         if not scheduler.can_accept_task():
@@ -375,10 +365,8 @@ async def start_interview(request: StartInterviewRequest):
         )
 
     except Exception as e:
-        logger.error(f"Error starting interview session: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error starting interview: {str(e)}"
-        )
+        logger.error(f"Error starting interview session: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error starting interview: {e!s}")
 
 
 @app.get("/session-status/{session_id}", response_model=SessionStatusResponse)
@@ -424,8 +412,8 @@ async def get_session_status(session_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching session status: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching session: {str(e)}")
+        logger.error(f"Error fetching session status: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching session: {e!s}")
 
 
 @app.get("/task-status/{task_id}", response_model=TaskStatusResponse)
@@ -445,9 +433,7 @@ async def get_task_status(task_id: str):
         result = celery_app.AsyncResult(task_id)
         status = result.status
         payload = {
-            "session_id": result.result.get("session_id")
-            if isinstance(result.result, dict)
-            else None,
+            "session_id": result.result.get("session_id") if isinstance(result.result, dict) else None,
             "task_id": task_id,
             "status": status,
             "result": result.result if status == "SUCCESS" else None,
@@ -475,7 +461,7 @@ async def get_active_sessions():
         active = session_tracker.get_active_sessions()
         return {"count": len(active), "sessions": active}
     except Exception as e:
-        logger.error(f"Error fetching active sessions: {str(e)}")
+        logger.error(f"Error fetching active sessions: {e!s}")
         raise HTTPException(status_code=500, detail="Error fetching active sessions")
 
 
@@ -494,7 +480,7 @@ async def get_completed_sessions(limit: int = 100):
         completed = session_tracker.get_completed_sessions(limit=limit)
         return {"count": len(completed), "sessions": completed}
     except Exception as e:
-        logger.error(f"Error fetching completed sessions: {str(e)}")
+        logger.error(f"Error fetching completed sessions: {e!s}")
         raise HTTPException(status_code=500, detail="Error fetching completed sessions")
 
 
@@ -517,7 +503,7 @@ async def get_stuck_sessions(timeout_minutes: int = 30):
             "sessions": stuck,
         }
     except Exception as e:
-        logger.error(f"Error fetching stuck sessions: {str(e)}")
+        logger.error(f"Error fetching stuck sessions: {e!s}")
         raise HTTPException(status_code=500, detail="Error fetching stuck sessions")
 
 
@@ -539,10 +525,9 @@ async def get_session_statistics():
         dict: Session statistics
     """
     try:
-        stats = session_tracker.get_session_statistics()
-        return stats
+        return session_tracker.get_session_statistics()
     except Exception as e:
-        logger.error(f"Error generating statistics: {str(e)}")
+        logger.error(f"Error generating statistics: {e!s}")
         raise HTTPException(status_code=500, detail="Error generating statistics")
 
 
@@ -558,10 +543,8 @@ async def get_worker_distribution():
         distribution = session_tracker.get_worker_distribution()
         return {"workers": distribution, "total_active": sum(distribution.values())}
     except Exception as e:
-        logger.error(f"Error fetching worker distribution: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail="Error fetching worker distribution"
-        )
+        logger.error(f"Error fetching worker distribution: {e!s}")
+        raise HTTPException(status_code=500, detail="Error fetching worker distribution")
 
 
 @app.get("/high-risk-sessions")
@@ -577,12 +560,10 @@ async def get_high_risk_sessions(threshold: float = 0.8, limit: int = 50):
         dict: List of high-risk sessions
     """
     try:
-        high_risk = session_tracker.get_high_risk_sessions(
-            threshold=threshold, limit=limit
-        )
+        high_risk = session_tracker.get_high_risk_sessions(threshold=threshold, limit=limit)
         return {"count": len(high_risk), "threshold": threshold, "sessions": high_risk}
     except Exception as e:
-        logger.error(f"Error fetching high-risk sessions: {str(e)}")
+        logger.error(f"Error fetching high-risk sessions: {e!s}")
         raise HTTPException(status_code=500, detail="Error fetching high-risk sessions")
 
 
@@ -598,15 +579,14 @@ async def get_cache_stats():
         dict: Cache health and statistics
     """
     try:
-        cache_stats = state_sync.get_cache_stats()
-        return cache_stats
+        return state_sync.get_cache_stats()
     except Exception as e:
-        logger.error(f"Error fetching cache stats: {str(e)}")
+        logger.error(f"Error fetching cache stats: {e!s}")
         raise HTTPException(status_code=500, detail="Error fetching cache stats")
 
 
 @app.post("/sync-to-database")
-async def sync_cache_to_database(session_id: Optional[str] = None):
+async def sync_cache_to_database(session_id: str | None = None):
     """
     Manually sync cache to database
 
@@ -622,27 +602,23 @@ async def sync_cache_to_database(session_id: Optional[str] = None):
             if session_data:
                 state_sync.sync_state_to_db(session_id, session_data)
                 return {"message": f"Synced session {session_id}", "status": "success"}
-            else:
-                raise HTTPException(
-                    status_code=404, detail="Session not found in cache"
-                )
-        else:
-            # Sync all active sessions
-            active_sessions = state_sync.get_active_sessions()
-            for sid in active_sessions:
-                session_data = state_sync.get_session_state(sid)
-                if session_data:
-                    state_sync.sync_state_to_db(sid, session_data)
+            raise HTTPException(status_code=404, detail="Session not found in cache")
+        # Sync all active sessions
+        active_sessions = state_sync.get_active_sessions()
+        for sid in active_sessions:
+            session_data = state_sync.get_session_state(sid)
+            if session_data:
+                state_sync.sync_state_to_db(sid, session_data)
 
-            return {
-                "message": f"Synced {len(active_sessions)} sessions",
-                "status": "success",
-                "synced_count": len(active_sessions),
-            }
+        return {
+            "message": f"Synced {len(active_sessions)} sessions",
+            "status": "success",
+            "synced_count": len(active_sessions),
+        }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error syncing to database: {str(e)}")
+        logger.error(f"Error syncing to database: {e!s}")
         raise HTTPException(status_code=500, detail="Error syncing to database")
 
 
@@ -661,7 +637,7 @@ async def clear_session_cache():
         result = state_sync.clear_cache()
         return {"message": "Cache cleared", "status": "success" if result else "failed"}
     except Exception as e:
-        logger.error(f"Error clearing cache: {str(e)}")
+        logger.error(f"Error clearing cache: {e!s}")
         raise HTTPException(status_code=500, detail="Error clearing cache")
 
 
@@ -692,14 +668,10 @@ async def register_worker(request: WorkerRegistrationRequest):
         dict: Registration confirmation
     """
     try:
-        logger.info(
-            f"Registering worker: {request.worker_id} with capacity {request.capacity}"
-        )
+        logger.info(f"Registering worker: {request.worker_id} with capacity {request.capacity}")
 
         # Register worker in registry
-        worker_registry.register_worker(
-            worker_id=request.worker_id, capacity=request.capacity
-        )
+        worker_registry.register_worker(worker_id=request.worker_id, capacity=request.capacity)
 
         # Log successful registration
         logger.info(f"Worker registered successfully: {request.worker_id}")
@@ -712,10 +684,8 @@ async def register_worker(request: WorkerRegistrationRequest):
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        logger.error(f"Error registering worker: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error registering worker: {str(e)}"
-        )
+        logger.error(f"Error registering worker: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error registering worker: {e!s}")
 
 
 @app.post("/worker/heartbeat", dependencies=[Depends(require_token)])
@@ -733,21 +703,15 @@ async def worker_heartbeat(request: WorkerHeartbeatRequest):
         dict: Heartbeat confirmation
     """
     try:
-        logger.debug(
-            f"Heartbeat from worker: {request.worker_id} (active_tasks: {request.active_tasks})"
-        )
+        logger.debug(f"Heartbeat from worker: {request.worker_id} (active_tasks: {request.active_tasks})")
 
         # Update worker heartbeat in registry
-        worker_registry.heartbeat(
-            worker_id=request.worker_id, active_tasks=request.active_tasks
-        )
+        worker_registry.heartbeat(worker_id=request.worker_id, active_tasks=request.active_tasks)
 
         # Get worker health status
         worker_status = worker_registry.get_worker(request.worker_id)
         health_status = (
-            "healthy"
-            if worker_status and worker_status.get("health_status") == "healthy"
-            else "unknown"
+            "healthy" if worker_status and worker_status.get("health_status") == "healthy" else "unknown"
         )
 
         return {
@@ -759,10 +723,8 @@ async def worker_heartbeat(request: WorkerHeartbeatRequest):
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        logger.error(f"Error processing heartbeat: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error processing heartbeat: {str(e)}"
-        )
+        logger.error(f"Error processing heartbeat: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error processing heartbeat: {e!s}")
 
 
 @app.get("/workers")
@@ -791,8 +753,7 @@ async def list_workers():
                     "worker_id": worker_id,
                     "capacity": worker_data.get("capacity", 0),
                     "active_tasks": worker_data.get("active_tasks", 0),
-                    "available_capacity": worker_data.get("capacity", 0)
-                    - worker_data.get("active_tasks", 0),
+                    "available_capacity": worker_data.get("capacity", 0) - worker_data.get("active_tasks", 0),
                     "health_status": "healthy" if is_healthy else "unhealthy",
                     "last_heartbeat": worker_data.get("last_heartbeat", None),
                     "joined_at": worker_data.get("joined_at", None),
@@ -807,10 +768,8 @@ async def list_workers():
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        logger.error(f"Error fetching worker list: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error fetching worker list: {str(e)}"
-        )
+        logger.error(f"Error fetching worker list: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching worker list: {e!s}")
 
 
 @app.get("/worker-statistics")
@@ -845,10 +804,8 @@ async def get_worker_stats():
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        logger.error(f"Error generating worker statistics: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error generating worker statistics: {str(e)}"
-        )
+        logger.error(f"Error generating worker statistics: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error generating worker statistics: {e!s}")
 
 
 @app.get("/load-status")
@@ -879,16 +836,12 @@ async def get_load_status():
             "idle_workers": load_status.get("idle_workers", 0),
             "system_at_capacity": load_status.get("system_at_capacity", False),
             "system_overloaded": load_status.get("system_overloaded", False),
-            "recommended_strategy": load_status.get(
-                "recommended_strategy", "LEAST_LOADED"
-            ),
+            "recommended_strategy": load_status.get("recommended_strategy", "LEAST_LOADED"),
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        logger.error(f"Error fetching load status: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error fetching load status: {str(e)}"
-        )
+        logger.error(f"Error fetching load status: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching load status: {e!s}")
 
 
 @app.get("/scheduling-status")
@@ -915,10 +868,8 @@ async def get_scheduling_status():
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        logger.error(f"Error fetching scheduling status: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error fetching scheduling status: {str(e)}"
-        )
+        logger.error(f"Error fetching scheduling status: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching scheduling status: {e!s}")
 
 
 @app.post("/switch-strategy", dependencies=[Depends(require_token)])
@@ -969,10 +920,8 @@ async def switch_load_balancing_strategy(strategy: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error switching strategy: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error switching strategy: {str(e)}"
-        )
+        logger.error(f"Error switching strategy: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error switching strategy: {e!s}")
 
 
 @app.delete("/deregister-worker/{worker_id}", dependencies=[Depends(require_token)])
@@ -1003,10 +952,8 @@ async def deregister_worker(worker_id: str):
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        logger.error(f"Error deregistering worker: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error deregistering worker: {str(e)}"
-        )
+        logger.error(f"Error deregistering worker: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error deregistering worker: {e!s}")
 
 
 # ========== Fault Tolerance & Recovery Endpoints ==========
@@ -1035,10 +982,8 @@ async def get_failed_sessions(limit: int = 100):
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        logger.error(f"Error fetching failed sessions: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error fetching failed sessions: {str(e)}"
-        )
+        logger.error(f"Error fetching failed sessions: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching failed sessions: {e!s}")
 
 
 @app.post("/retry-session/{session_id}", dependencies=[Depends(require_token)])
@@ -1088,8 +1033,8 @@ async def retry_failed_session(session_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrying session: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error retrying session: {str(e)}")
+        logger.error(f"Error retrying session: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error retrying session: {e!s}")
 
 
 @app.get("/system-health")
@@ -1110,16 +1055,13 @@ async def get_system_health():
         logger.debug("Performing system health check")
 
         # Perform comprehensive health check
-        health = health_monitor.check_system_health(
+        return health_monitor.check_system_health(
             worker_registry=worker_registry, session_manager=session_manager
         )
 
-        return health
     except Exception as e:
-        logger.error(f"Error checking system health: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error checking system health: {str(e)}"
-        )
+        logger.error(f"Error checking system health: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error checking system health: {e!s}")
 
 
 @app.get("/worker-health")
@@ -1134,14 +1076,11 @@ async def get_worker_health():
         logger.debug("Fetching worker health status")
 
         # Check worker health
-        worker_health = health_monitor.check_worker_health(worker_registry)
+        return health_monitor.check_worker_health(worker_registry)
 
-        return worker_health
     except Exception as e:
-        logger.error(f"Error fetching worker health: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error fetching worker health: {str(e)}"
-        )
+        logger.error(f"Error fetching worker health: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching worker health: {e!s}")
 
 
 @app.get("/recovery-queue")
@@ -1166,10 +1105,8 @@ async def get_recovery_queue(limit: int = 50):
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        logger.error(f"Error fetching recovery queue: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error fetching recovery queue: {str(e)}"
-        )
+        logger.error(f"Error fetching recovery queue: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching recovery queue: {e!s}")
 
 
 @app.get("/failure-log")
@@ -1194,10 +1131,8 @@ async def get_failure_log(limit: int = 100):
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        logger.error(f"Error fetching failure log: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error fetching failure log: {str(e)}"
-        )
+        logger.error(f"Error fetching failure log: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching failure log: {e!s}")
 
 
 @app.get("/dead-letter-queue")
@@ -1222,10 +1157,8 @@ async def get_dead_letter_queue(limit: int = 50):
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        logger.error(f"Error fetching dead letter queue: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error fetching dead letter queue: {str(e)}"
-        )
+        logger.error(f"Error fetching dead letter queue: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching dead letter queue: {e!s}")
 
 
 @app.get("/fault-statistics")
@@ -1248,10 +1181,8 @@ async def get_fault_statistics():
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        logger.error(f"Error generating fault statistics: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error generating fault statistics: {str(e)}"
-        )
+        logger.error(f"Error generating fault statistics: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error generating fault statistics: {e!s}")
 
 
 @app.post("/detect-failures", dependencies=[Depends(require_token)])
@@ -1307,10 +1238,8 @@ async def detect_and_handle_failures():
         return results
 
     except Exception as e:
-        logger.error(f"Error during failure detection: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error during failure detection: {str(e)}"
-        )
+        logger.error(f"Error during failure detection: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error during failure detection: {e!s}")
 
 
 # ========== Dashboard HTML Endpoint ==========
@@ -1327,26 +1256,21 @@ async def get_dashboard():
     try:
         import os
 
-        dashboard_path = os.path.join(
-            os.path.dirname(__file__), "..", "monitoring", "dashboard.html"
-        )
+        dashboard_path = os.path.join(os.path.dirname(__file__), "..", "monitoring", "dashboard.html")
 
         if os.path.exists(dashboard_path):
-            with open(dashboard_path, "r", encoding="utf-8") as f:
+            with open(dashboard_path, encoding="utf-8") as f:
                 html_content = f.read()
 
             from fastapi.responses import HTMLResponse
 
             return HTMLResponse(content=html_content)
-        else:
-            raise HTTPException(status_code=404, detail="Dashboard HTML not found")
+        raise HTTPException(status_code=404, detail="Dashboard HTML not found")
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error serving dashboard: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error serving dashboard: {str(e)}"
-        )
+        logger.error(f"Error serving dashboard: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error serving dashboard: {e!s}")
 
 
 if __name__ == "__main__":

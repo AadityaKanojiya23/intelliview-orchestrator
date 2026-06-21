@@ -10,12 +10,14 @@ Responsibilities:
 - Manage retry metadata and state
 """
 
-import logging
-import redis
 import json
+import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
 from enum import Enum
+from typing import Any
+
+import redis
+
 from config import REDIS_URL
 
 logger = logging.getLogger(__name__)
@@ -73,7 +75,7 @@ class RetryManager:
             f"strategy={strategy.value}, base_delay={base_delay}s"
         )
 
-    def _connect_redis(self) -> Optional[redis.Redis]:
+    def _connect_redis(self) -> redis.Redis | None:
         """Connect to Redis server"""
         try:
             client = redis.from_url(self.redis_url, decode_responses=True)
@@ -81,7 +83,7 @@ class RetryManager:
             logger.info("Connected to Redis for retry management")
             return client
         except Exception as e:
-            logger.error(f"Failed to connect to Redis: {str(e)}")
+            logger.error(f"Failed to connect to Redis: {e!s}")
             return None
 
     def can_retry(self, session_id: str) -> bool:
@@ -99,9 +101,7 @@ class RetryManager:
             can_retry = retry_count < self.max_retries
 
             if can_retry:
-                logger.debug(
-                    f"Session {session_id} can retry ({retry_count}/{self.max_retries})"
-                )
+                logger.debug(f"Session {session_id} can retry ({retry_count}/{self.max_retries})")
             else:
                 logger.warning(
                     f"Session {session_id} max retries exceeded ({retry_count}/{self.max_retries})"
@@ -110,12 +110,10 @@ class RetryManager:
             return can_retry
 
         except Exception as e:
-            logger.error(f"Error checking if can retry: {str(e)}")
+            logger.error(f"Error checking if can retry: {e!s}")
             return False
 
-    def schedule_retry(
-        self, session_id: str, delay_seconds: Optional[int] = None
-    ) -> bool:
+    def schedule_retry(self, session_id: str, delay_seconds: int | None = None) -> bool:
         """
         Schedule a retry for a failed task
 
@@ -132,9 +130,7 @@ class RetryManager:
         try:
             # Check if can retry
             if not self.can_retry(session_id):
-                logger.warning(
-                    f"Cannot retry session {session_id}: max retries exceeded"
-                )
+                logger.warning(f"Cannot retry session {session_id}: max retries exceeded")
                 return False
 
             # Get current retry count and increment
@@ -146,18 +142,14 @@ class RetryManager:
             else:
                 delay_seconds = min(delay_seconds, self.max_delay)
 
-            logger.info(
-                f"Scheduling retry for {session_id}: attempt {retry_count}, delay {delay_seconds}s"
-            )
+            logger.info(f"Scheduling retry for {session_id}: attempt {retry_count}, delay {delay_seconds}s")
 
             # Create retry record
             retry_data = {
                 "session_id": session_id,
                 "retry_count": retry_count,
                 "scheduled_at": datetime.utcnow().isoformat(),
-                "retry_after": (
-                    datetime.utcnow() + timedelta(seconds=delay_seconds)
-                ).isoformat(),
+                "retry_after": (datetime.utcnow() + timedelta(seconds=delay_seconds)).isoformat(),
                 "delay_seconds": delay_seconds,
                 "strategy": self.strategy.value,
             }
@@ -173,16 +165,14 @@ class RetryManager:
 
                 # Add to scheduled retry set (expire based on retry time)
                 scheduled_key = f"{self.retry_scheduled_key}{session_id}"
-                self.redis_client.setex(
-                    scheduled_key, delay_seconds, json.dumps(retry_data)
-                )
+                self.redis_client.setex(scheduled_key, delay_seconds, json.dumps(retry_data))
 
                 logger.debug(f"Retry scheduled for {session_id} in {delay_seconds}s")
 
             return True
 
         except Exception as e:
-            logger.error(f"Error scheduling retry for {session_id}: {str(e)}")
+            logger.error(f"Error scheduling retry for {session_id}: {e!s}")
             return False
 
     def _calculate_delay(self, retry_count: int) -> int:
@@ -207,9 +197,7 @@ class RetryManager:
         # Cap at max_delay
         delay = min(delay, self.max_delay)
 
-        logger.debug(
-            f"Calculated delay for retry {retry_count}: {delay}s using {self.strategy.value}"
-        )
+        logger.debug(f"Calculated delay for retry {retry_count}: {delay}s using {self.strategy.value}")
 
         return delay
 
@@ -233,7 +221,7 @@ class RetryManager:
             return int(count) if count else 0
 
         except Exception as e:
-            logger.warning(f"Error getting retry count: {str(e)}")
+            logger.warning(f"Error getting retry count: {e!s}")
             return 0
 
     def increment_retry(self, session_id: str) -> int:
@@ -261,7 +249,7 @@ class RetryManager:
             return count
 
         except Exception as e:
-            logger.error(f"Error incrementing retry count: {str(e)}")
+            logger.error(f"Error incrementing retry count: {e!s}")
             return 1
 
     def reset_retry_count(self, session_id: str) -> bool:
@@ -284,10 +272,10 @@ class RetryManager:
             return True
 
         except Exception as e:
-            logger.error(f"Error resetting retry count: {str(e)}")
+            logger.error(f"Error resetting retry count: {e!s}")
             return False
 
-    def get_retry_info(self, session_id: str) -> Dict[str, Any]:
+    def get_retry_info(self, session_id: str) -> dict[str, Any]:
         """
         Get detailed retry information for a session
 
@@ -314,9 +302,7 @@ class RetryManager:
                 "max_retries": self.max_retries,
                 "can_retry": can_retry,
                 "retry_strategy": self.strategy.value,
-                "next_delay": self._calculate_delay(retry_count + 1)
-                if can_retry
-                else None,
+                "next_delay": self._calculate_delay(retry_count + 1) if can_retry else None,
             }
 
             if retry_data:
@@ -325,7 +311,7 @@ class RetryManager:
             return info
 
         except Exception as e:
-            logger.error(f"Error getting retry info: {str(e)}")
+            logger.error(f"Error getting retry info: {e!s}")
             return {}
 
     def get_scheduled_retries(self, limit: int = 100) -> list:
@@ -347,9 +333,7 @@ class RetryManager:
             count = 0
 
             while count < limit:
-                cursor, keys = self.redis_client.scan(
-                    cursor, match=f"{self.retry_scheduled_key}*", count=100
-                )
+                cursor, keys = self.redis_client.scan(cursor, match=f"{self.retry_scheduled_key}*", count=100)
 
                 for key in keys:
                     if count >= limit:
@@ -369,10 +353,10 @@ class RetryManager:
             return retries
 
         except Exception as e:
-            logger.error(f"Error getting scheduled retries: {str(e)}")
+            logger.error(f"Error getting scheduled retries: {e!s}")
             return []
 
-    def get_retry_statistics(self) -> Dict[str, Any]:
+    def get_retry_statistics(self) -> dict[str, Any]:
         """
         Get aggregate retry statistics for the system
 
@@ -393,5 +377,5 @@ class RetryManager:
             }
 
         except Exception as e:
-            logger.error(f"Error getting retry statistics: {str(e)}")
+            logger.error(f"Error getting retry statistics: {e!s}")
             return {}

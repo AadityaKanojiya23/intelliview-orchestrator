@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from unittest.mock import patch
 
-from orchestrator.fault_manager import FaultManager, FailureType
+from orchestrator.fault_manager import FailureType, FaultManager
 
 
 def _manager():

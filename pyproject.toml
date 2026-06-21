@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-interview-orchestrator"
-version = "0.2.0"
+version = "0.3.0"
 description = "Distributed AI interview orchestration framework with Celery, Redis, and PostgreSQL."
 requires-python = ">=3.10"
 dynamic = ["dependencies"]
@@ -13,4 +13,72 @@ dynamic = ["dependencies"]
 dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.packages.find]
-include = ["orchestrator*", "workers*", "monitoring*", "database*"]
+include = ["orchestrator*", "workers*", "monitoring*", "database*", "scripts*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "PIE", "RET", "SIM", "TID", "RUF"]
+ignore = [
+    "E501",
+    "B008",
+    "S101",
+    "S104",
+    "S301",
+    "S311",
+    "S324",
+    "RUF012",
+    "PT011",
+    "PT012",
+    "S112",
+    "BLE001",
+    "EM101",
+    "EM102",
+    "TRY003",
+    "G004",
+    "ERA001",
+    "B904",  # raise from — FastAPI handlers intentionally re-raise
+    "SIM102", # nested-if — readability over micro-optimisation
+    "SIM108", # ternary — readability
+    "SIM117", # nested-with — kept grouped in some places
+    "RET504", # unnecessary assignment before return
+    "PLR2004", # magic values used in comparisons
+    "PLR0911", # too many return statements
+    "PLR0912", # too many branches
+    "PLR0913", # too many arguments
+    "PLR0915", # too many statements
+    "C901",   # complexity
+    "N803",   # uppercase arg names (Kafka/DLQ keys)
+    "N806",   # mixed-case variable
+    "N815",   # mixedCase in class scope
+    "N818",   # exception naming
+    "UP031",  # % formatting — kept for log clarity
+    "UP038",  # isinstance tuple syntax
+    "RUF002", # ambiguous dashes in docstrings
+    "ASYNC230",
+    "ASYNC240",
+] 
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S106", "ARG", "FBT", "B011"]
+"scripts/*" = ["T201", "INP001"]
+"workers/*" = ["N802", "N803"]
+"orchestrator/*" = ["N802", "N803"]
+"monitoring/*" = ["N802", "N803"] 
+
+[tool.ruff.lint.isort]
+known-first-party = ["orchestrator", "workers", "monitoring", "database", "scripts"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "unit: pure-logic unit tests",
+    "contract: API contract tests",
+    "e2e: end-to-end smoke tests (require a running stack)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:celery.*",
+]

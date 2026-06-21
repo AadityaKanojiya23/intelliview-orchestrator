@@ -10,10 +10,11 @@ import os
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("POSTGRES_HOST", "localhost")
 
+from datetime import datetime, timedelta
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime, timedelta
 
 from database.db import Base
 from database.models import InterviewSession
@@ -46,9 +47,7 @@ def _make_session(
         candidate_id=f"cand-{session_id}",
         status=status,
         risk_score=risk,
-        start_time=now - timedelta(minutes=started_minutes_ago)
-        if started_minutes_ago
-        else None,
+        start_time=now - timedelta(minutes=started_minutes_ago) if started_minutes_ago else None,
         end_time=now if status == "COMPLETED" else None,
         created_at=now,
         updated_at=now,
@@ -113,9 +112,7 @@ def test_session_tracker_statistics(db_session):
     assert stats["completed_sessions"] == 2
     assert stats["failed_sessions"] == 1
     assert stats["risk_score_stats"]["high_risk_sessions"] == 1
-    assert stats["risk_score_stats"]["average_risk_score"] == pytest.approx(
-        0.5, abs=1e-9
-    )
+    assert stats["risk_score_stats"]["average_risk_score"] == pytest.approx(0.5, abs=1e-9)
 
 
 def test_session_manager_state_machine(db_session):

@@ -11,11 +11,13 @@ Every important update:
 2. Sync to PostgreSQL (persistent)
 """
 
-import logging
 import json
+import logging
+from typing import Any
+
 import redis
-from typing import Optional, Dict, Any
 from sqlalchemy import select
+
 from config import REDIS_URL
 
 logger = logging.getLogger(__name__)
@@ -40,10 +42,10 @@ class StateSynchronizer:
             if self.redis_client:
                 logger.info("Connected to Redis for state caching")
         except Exception as e:
-            logger.error(f"Error initializing Redis connection: {str(e)}")
+            logger.error(f"Error initializing Redis connection: {e!s}")
             self.redis_client = None
 
-    def _connect_redis(self) -> Optional[redis.Redis]:
+    def _connect_redis(self) -> redis.Redis | None:
         """
         Establish Redis connection
 
@@ -56,10 +58,10 @@ class StateSynchronizer:
             redis_client.ping()
             return redis_client
         except Exception as e:
-            logger.warning(f"Could not connect to Redis: {str(e)}")
+            logger.warning(f"Could not connect to Redis: {e!s}")
             return None
 
-    def set_session_state(self, session_id: str, session_data: Dict[str, Any]) -> bool:
+    def set_session_state(self, session_id: str, session_data: dict[str, Any]) -> bool:
         """
         Store session state in Redis cache
 
@@ -71,9 +73,7 @@ class StateSynchronizer:
             bool: True if successful
         """
         if not self.redis_client:
-            logger.warning(
-                f"Redis not available, skipping cache for session {session_id}"
-            )
+            logger.warning(f"Redis not available, skipping cache for session {session_id}")
             return False
 
         try:
@@ -90,10 +90,10 @@ class StateSynchronizer:
             return True
 
         except Exception as e:
-            logger.error(f"Error setting session state in Redis: {str(e)}")
+            logger.error(f"Error setting session state in Redis: {e!s}")
             return False
 
-    def get_session_state(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def get_session_state(self, session_id: str) -> dict[str, Any] | None:
         """
         Retrieve session state from Redis cache
 
@@ -119,7 +119,7 @@ class StateSynchronizer:
             return session_data
 
         except Exception as e:
-            logger.error(f"Error getting session state from Redis: {str(e)}")
+            logger.error(f"Error getting session state from Redis: {e!s}")
             return None
 
     def delete_session_state(self, session_id: str) -> bool:
@@ -143,7 +143,7 @@ class StateSynchronizer:
             return True
 
         except Exception as e:
-            logger.error(f"Error deleting session state from Redis: {str(e)}")
+            logger.error(f"Error deleting session state from Redis: {e!s}")
             return False
 
     def get_active_sessions(self) -> list:
@@ -162,10 +162,10 @@ class StateSynchronizer:
             return list(active_sessions)
 
         except Exception as e:
-            logger.error(f"Error getting active sessions: {str(e)}")
+            logger.error(f"Error getting active sessions: {e!s}")
             return []
 
-    def sync_state_to_db(self, session_id: str, session_data: Dict[str, Any]) -> bool:
+    def sync_state_to_db(self, session_id: str, session_data: dict[str, Any]) -> bool:
         """
         Sync session state from cache to database
 
@@ -177,16 +177,15 @@ class StateSynchronizer:
             bool: True if successful
         """
         try:
+            from datetime import datetime
+
             from database.db import SessionLocal
             from database.models import InterviewSession
-            from datetime import datetime
 
             session_db = SessionLocal()
             try:
                 interview = session_db.execute(
-                    select(InterviewSession).where(
-                        InterviewSession.session_id == session_id
-                    )
+                    select(InterviewSession).where(InterviewSession.session_id == session_id)
                 ).scalar_one_or_none()
 
                 if not interview:
@@ -197,10 +196,7 @@ class StateSynchronizer:
                 if "status" in session_data:
                     interview.status = session_data["status"]
 
-                if (
-                    "risk_score" in session_data
-                    and session_data["risk_score"] is not None
-                ):
+                if "risk_score" in session_data and session_data["risk_score"] is not None:
                     interview.risk_score = session_data["risk_score"]
 
                 if "video_analysis" in session_data:
@@ -219,14 +215,14 @@ class StateSynchronizer:
                 return True
 
             except Exception as e:
-                logger.error(f"Error syncing to database: {str(e)}")
+                logger.error(f"Error syncing to database: {e!s}")
                 session_db.rollback()
                 return False
             finally:
                 session_db.close()
 
         except Exception as e:
-            logger.error(f"Error in sync_state_to_db: {str(e)}")
+            logger.error(f"Error in sync_state_to_db: {e!s}")
             return False
 
     def clear_cache(self) -> bool:
@@ -255,10 +251,10 @@ class StateSynchronizer:
             return True
 
         except Exception as e:
-            logger.error(f"Error clearing cache: {str(e)}")
+            logger.error(f"Error clearing cache: {e!s}")
             return False
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """
         Get cache statistics
 
@@ -280,5 +276,5 @@ class StateSynchronizer:
             }
 
         except Exception as e:
-            logger.error(f"Error getting cache stats: {str(e)}")
+            logger.error(f"Error getting cache stats: {e!s}")
             return {"status": "error", "error": str(e)}

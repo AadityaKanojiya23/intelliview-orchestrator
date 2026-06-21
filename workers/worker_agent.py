@@ -55,9 +55,7 @@ class WorkerAgent:
         return False
 
     def register(self) -> bool:
-        ok = self._post(
-            "/register-worker", {"worker_id": self.worker_id, "capacity": self.capacity}
-        )
+        ok = self._post("/register-worker", {"worker_id": self.worker_id, "capacity": self.capacity})
         if ok:
             logger.info("Worker %s registered with %s", self.worker_id, self.api_url)
         else:
@@ -98,9 +96,7 @@ class WorkerAgent:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     api_url = os.getenv("API_URL", "http://fastapi:8000")
     worker_id = os.getenv("WORKER_ID", f"worker-{os.getpid()}")

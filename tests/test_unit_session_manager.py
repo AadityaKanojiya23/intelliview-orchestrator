@@ -2,6 +2,8 @@
 Unit tests for the SessionManager state machine.
 """
 
+import itertools
+
 from orchestrator.session_manager import SessionManager
 
 
@@ -17,7 +19,7 @@ def test_valid_transitions_cover_full_pipeline():
         sm.EVALUATING,
         sm.COMPLETED,
     ]
-    for prev, nxt in zip(pipeline, pipeline[1:]):
+    for prev, nxt in itertools.pairwise(pipeline):
         assert sm._is_valid_transition(prev, nxt), f"{prev} -> {nxt} should be valid"
 
 

@@ -15,7 +15,7 @@ thresholds exercise without external services.
 
 import hashlib
 import logging
-from typing import Dict, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +28,11 @@ _EVAL_RISK_WEIGHTS = {
 
 def _seeded_unit(session_id: str, salt: str) -> float:
     """Stable pseudo-random in [0, 1) derived from session_id + salt."""
-    digest = hashlib.sha256(f"{session_id}:{salt}".encode("utf-8")).digest()
+    digest = hashlib.sha256(f"{session_id}:{salt}".encode()).digest()
     return int.from_bytes(digest[:4], "big") / 0xFFFFFFFF
 
 
-def evaluate_answers(session_id: str) -> Dict[str, Any]:
+def evaluate_answers(session_id: str) -> dict[str, Any]:
     """Execute answer evaluation pipeline for an interview session."""
     logger.info(f"Starting answer evaluation for session {session_id}")
 
@@ -55,7 +55,7 @@ def evaluate_answers(session_id: str) -> Dict[str, Any]:
     return results
 
 
-def evaluate_answer_quality(session_id: str) -> Dict[str, Any]:
+def evaluate_answer_quality(session_id: str) -> dict[str, Any]:
     """Evaluate the quality and relevance of answers using LLM."""
     logger.info(f"Evaluating answer quality for session {session_id}")
     base = 0.55 + _seeded_unit(session_id, "quality") * 0.45
@@ -68,7 +68,7 @@ def evaluate_answer_quality(session_id: str) -> Dict[str, Any]:
     }
 
 
-def evaluate_technical_accuracy(session_id: str) -> Dict[str, Any]:
+def evaluate_technical_accuracy(session_id: str) -> dict[str, Any]:
     """Evaluate technical accuracy and correctness of answers."""
     logger.info(f"Evaluating technical accuracy for session {session_id}")
     base = 0.5 + _seeded_unit(session_id, "accuracy") * 0.5
@@ -80,7 +80,7 @@ def evaluate_technical_accuracy(session_id: str) -> Dict[str, Any]:
     }
 
 
-def evaluate_communication(session_id: str) -> Dict[str, Any]:
+def evaluate_communication(session_id: str) -> dict[str, Any]:
     """Evaluate communication clarity and professional presentation."""
     logger.info(f"Evaluating communication clarity for session {session_id}")
     base = 0.55 + _seeded_unit(session_id, "comms") * 0.45
@@ -92,7 +92,7 @@ def evaluate_communication(session_id: str) -> Dict[str, Any]:
     }
 
 
-def generate_feedback(session_id: str) -> Dict[str, Any]:
+def generate_feedback(session_id: str) -> dict[str, Any]:
     """Generate comprehensive feedback based on evaluation."""
     logger.info(f"Generating feedback for session {session_id}")
     return {
@@ -103,11 +103,9 @@ def generate_feedback(session_id: str) -> Dict[str, Any]:
     }
 
 
-def calculate_evaluation_risk_score(results: Dict[str, Any]) -> float:
+def calculate_evaluation_risk_score(results: dict[str, Any]) -> float:
     """Calculate a 0–1 risk score (inverse of performance)."""
-    quality = (
-        results.get("answer_quality_score", {}).get("overall_quality_score", 50) / 100.0
-    )
+    quality = results.get("answer_quality_score", {}).get("overall_quality_score", 50) / 100.0
     accuracy = results.get("technical_accuracy", {}).get("accuracy_score", 50) / 100.0
     clarity = results.get("communication_clarity", {}).get("clarity_score", 50) / 100.0
 

@@ -31,9 +31,7 @@ def test_can_retry_within_bounds_then_blocks():
 
 
 def test_calculate_delay_exponential_caps_at_max_delay():
-    rm = _manager(
-        strategy=RetryStrategy.EXPONENTIAL_BACKOFF, base_delay=2, max_delay=60
-    )
+    rm = _manager(strategy=RetryStrategy.EXPONENTIAL_BACKOFF, base_delay=2, max_delay=60)
     # 2 ** 1 = 2, 2 ** 3 = 8, 2 ** 10 = 1024 -> capped at 60
     assert rm._calculate_delay(1) == 2
     assert rm._calculate_delay(3) == 8

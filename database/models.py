@@ -3,10 +3,12 @@ SQLAlchemy ORM Models for AI Interview Orchestrator
 Defines database models using declarative base
 """
 
-from sqlalchemy import Column, String, Float, DateTime, JSON
-from sqlalchemy.sql import func  # noqa: F401  (re-exported for ORM consumers)
-from database.db import Base
 from datetime import datetime
+
+from sqlalchemy import JSON, Column, DateTime, Float, String
+from sqlalchemy.sql import func  # noqa: F401  (re-exported for ORM consumers)
+
+from database.db import Base
 
 
 class InterviewSession(Base):
@@ -31,9 +33,7 @@ class InterviewSession(Base):
     evaluation_analysis = Column(JSON, nullable=True)
 
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(
-        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def __repr__(self):
         return f"<InterviewSession(session_id='{self.session_id}', candidate_id='{self.candidate_id}', status='{self.status}', risk_score={self.risk_score})>"

@@ -31,9 +31,7 @@ def test_calculate_final_risk_weighted_and_clamped():
 
 
 def test_video_risk_no_face_is_high():
-    risk = RiskScoringEngine.calculate_video_risk(
-        {"face_detected": {"faces_found": False}}
-    )
+    risk = RiskScoringEngine.calculate_video_risk({"face_detected": {"faces_found": False}})
     assert risk >= 0.4
 
 

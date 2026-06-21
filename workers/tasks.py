@@ -19,15 +19,15 @@ from datetime import datetime
 
 from sqlalchemy import select
 
-from workers.celery_app import celery_app
-from workers.video_pipeline import run_video_analysis
-from workers.audio_pipeline import run_audio_analysis
-from workers.evaluation_pipeline import evaluate_answers
-from workers.risk_engine import RiskScoringEngine
-from orchestrator.session_manager import SessionManager
-from orchestrator.state_sync import StateSynchronizer
 from database.db import SessionLocal
 from database.models import InterviewSession
+from orchestrator.session_manager import SessionManager
+from orchestrator.state_sync import StateSynchronizer
+from workers.audio_pipeline import run_audio_analysis
+from workers.celery_app import celery_app
+from workers.evaluation_pipeline import evaluate_answers
+from workers.risk_engine import RiskScoringEngine
+from workers.video_pipeline import run_video_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +63,7 @@ def process_interview_session(self, session_id):
     worker_hostname = socket.gethostname()
 
     try:
-        logger.info(
-            f"Worker {worker_hostname} starting interview session: {session_id}"
-        )
+        logger.info(f"Worker {worker_hostname} starting interview session: {session_id}")
 
         # Update status to PROCESSING
         logger.info(f"Updating session {session_id} to PROCESSING status")
@@ -77,9 +75,7 @@ def process_interview_session(self, session_id):
         db_session = SessionLocal()
         try:
             interview = db_session.execute(
-                select(InterviewSession).where(
-                    InterviewSession.session_id == session_id
-                )
+                select(InterviewSession).where(InterviewSession.session_id == session_id)
             ).scalar_one_or_none()
 
             if interview:
@@ -112,9 +108,7 @@ def process_interview_session(self, session_id):
         # ========== STAGE 3: ANSWER EVALUATION ==========
 
         logger.info(f"Stage 3/4: Answer evaluation for session {session_id}")
-        session_manager.update_session_status(
-            session_id, session_manager.EVALUATING, {"stage": "evaluation"}
-        )
+        session_manager.update_session_status(session_id, session_manager.EVALUATING, {"stage": "evaluation"})
 
         evaluation_result = evaluate_answers(session_id)
         logger.info(f"Answer evaluation completed for session {session_id}")
@@ -136,9 +130,7 @@ def process_interview_session(self, session_id):
         db_session = SessionLocal()
         try:
             interview = db_session.execute(
-                select(InterviewSession).where(
-                    InterviewSession.session_id == session_id
-                )
+                select(InterviewSession).where(InterviewSession.session_id == session_id)
             ).scalar_one_or_none()
 
             if interview:
@@ -154,9 +146,7 @@ def process_interview_session(self, session_id):
 
         # Mark session as completed via session manager
         session_manager.mark_session_completed(session_id, final_risk_score)
-        logger.info(
-            f"Session {session_id} marked COMPLETED with risk score {final_risk_score}"
-        )
+        logger.info(f"Session {session_id} marked COMPLETED with risk score {final_risk_score}")
 
         # Update cache
         session_data = state_sync.get_session_state(session_id)
@@ -185,24 +175,18 @@ def process_interview_session(self, session_id):
         return result
 
     except Exception as exc:
-        logger.error(
-            f"Error processing session {session_id}: {str(exc)}", exc_info=True
-        )
+        logger.error(f"Error processing session {session_id}: {exc!s}", exc_info=True)
 
         # Mark session as failed via session manager
         try:
-            session_manager.mark_session_failed(
-                session_id, f"Processing failed: {str(exc)}"
-            )
+            session_manager.mark_session_failed(session_id, f"Processing failed: {exc!s}")
             logger.info(f"Session {session_id} marked FAILED")
         except Exception as e:
-            logger.error(f"Error marking session failed: {str(e)}")
+            logger.error(f"Error marking session failed: {e!s}")
 
         # Retry with exponential backoff (2^retries seconds)
         retry_delay = 2**self.request.retries
-        logger.info(
-            f"Retrying task in {retry_delay}s (attempt {self.request.retries + 1}/3)"
-        )
+        logger.info(f"Retrying task in {retry_delay}s (attempt {self.request.retries + 1}/3)")
         raise self.retry(exc=exc, countdown=retry_delay)
 
 
@@ -222,5 +206,5 @@ def sync_session_cache_to_db(session_id: str) -> bool:
             return state_sync.sync_state_to_db(session_id, session_data)
         return False
     except Exception as e:
-        logger.error(f"Error syncing session cache: {str(e)}")
+        logger.error(f"Error syncing session cache: {e!s}")
         return False

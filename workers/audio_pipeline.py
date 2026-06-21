@@ -15,7 +15,7 @@ HIGH/CRITICAL thresholds fire correctly without GPU dependencies.
 
 import hashlib
 import logging
-from typing import Dict, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +28,11 @@ _AUDIO_RISK_WEIGHTS = {
 
 def _seeded_unit(session_id: str, salt: str) -> float:
     """Stable pseudo-random in [0, 1) derived from session_id + salt."""
-    digest = hashlib.sha256(f"{session_id}:{salt}".encode("utf-8")).digest()
+    digest = hashlib.sha256(f"{session_id}:{salt}".encode()).digest()
     return int.from_bytes(digest[:4], "big") / 0xFFFFFFFF
 
 
-def run_audio_analysis(session_id: str) -> Dict[str, Any]:
+def run_audio_analysis(session_id: str) -> dict[str, Any]:
     """Execute audio analysis pipeline for an interview session."""
     logger.info(f"Starting audio analysis for session {session_id}")
 
@@ -53,7 +53,7 @@ def run_audio_analysis(session_id: str) -> Dict[str, Any]:
     return results
 
 
-def transcribe_speech(session_id: str) -> Dict[str, Any]:
+def transcribe_speech(session_id: str) -> dict[str, Any]:
     """Convert speech to text using Whisper (or compatible) model."""
     logger.info(f"Transcribing audio for session {session_id}")
     silence = _seeded_unit(session_id, "silence") > 0.92
@@ -74,7 +74,7 @@ def transcribe_speech(session_id: str) -> Dict[str, Any]:
     }
 
 
-def detect_background_voices(session_id: str) -> Dict[str, Any]:
+def detect_background_voices(session_id: str) -> dict[str, Any]:
     """Detect background voices or multiple speakers."""
     logger.info(f"Detecting background voices for session {session_id}")
     multi = _seeded_unit(session_id, "bg_voices") > 0.85
@@ -86,14 +86,12 @@ def detect_background_voices(session_id: str) -> Dict[str, Any]:
     }
 
 
-def detect_suspicious_conversation(session_id: str) -> Dict[str, Any]:
+def detect_suspicious_conversation(session_id: str) -> dict[str, Any]:
     """Detect suspicious conversation patterns."""
     logger.info(f"Detecting suspicious conversations for session {session_id}")
     suspicious = _seeded_unit(session_id, "suspicious") > 0.80
     pattern = (
-        "robotic_response"
-        if suspicious and _seeded_unit(session_id, "p1") > 0.5
-        else "reading_from_script"
+        "robotic_response" if suspicious and _seeded_unit(session_id, "p1") > 0.5 else "reading_from_script"
     )
     return {
         "suspicious_pattern_detected": suspicious,
@@ -103,7 +101,7 @@ def detect_suspicious_conversation(session_id: str) -> Dict[str, Any]:
     }
 
 
-def calculate_audio_risk_score(results: Dict[str, Any]) -> float:
+def calculate_audio_risk_score(results: dict[str, Any]) -> float:
     """Calculate a 0–1 risk score from audio detection results."""
     score = 0.0
     if results.get("background_voices", {}).get("background_voices_detected"):
