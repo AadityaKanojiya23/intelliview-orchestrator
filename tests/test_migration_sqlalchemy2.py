@@ -4,6 +4,7 @@ Tests for the SQLAlchemy 2.0 migration.
 Runs the refactored query paths against an in-memory SQLite database to
 verify the new `select()`-based syntax produces correct results.
 """
+
 import os
 
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
@@ -33,14 +34,21 @@ def db_session():
         engine.dispose()
 
 
-def _make_session(session_id: str, status: str, risk: float | None = None, started_minutes_ago: int = 0):
+def _make_session(
+    session_id: str,
+    status: str,
+    risk: float | None = None,
+    started_minutes_ago: int = 0,
+):
     now = datetime.utcnow()
     return InterviewSession(
         session_id=session_id,
         candidate_id=f"cand-{session_id}",
         status=status,
         risk_score=risk,
-        start_time=now - timedelta(minutes=started_minutes_ago) if started_minutes_ago else None,
+        start_time=now - timedelta(minutes=started_minutes_ago)
+        if started_minutes_ago
+        else None,
         end_time=now if status == "COMPLETED" else None,
         created_at=now,
         updated_at=now,
@@ -48,69 +56,83 @@ def _make_session(session_id: str, status: str, risk: float | None = None, start
 
 
 def test_session_tracker_active_sessions(db_session):
-    db_session.add_all([
-        _make_session("s1", "QUEUED"),
-        _make_session("s2", "PROCESSING"),
-        _make_session("s3", "COMPLETED", risk=0.1),
-        _make_session("s4", "FAILED"),
-    ])
+    db_session.add_all(
+        [
+            _make_session("s1", "QUEUED"),
+            _make_session("s2", "PROCESSING"),
+            _make_session("s3", "COMPLETED", risk=0.1),
+            _make_session("s4", "FAILED"),
+        ]
+    )
     db_session.commit()
 
     tracker = SessionTracker()
     # Patch SessionLocal to use our test session
     import orchestrator.session_tracker as st
+
     st.SessionLocal = lambda: db_session
     active = tracker.get_active_sessions()
     assert {s["session_id"] for s in active} == {"s1", "s2"}
 
 
 def test_session_tracker_high_risk(db_session):
-    db_session.add_all([
-        _make_session("s1", "COMPLETED", risk=0.9),
-        _make_session("s2", "COMPLETED", risk=0.5),
-        _make_session("s3", "COMPLETED", risk=0.1),
-    ])
+    db_session.add_all(
+        [
+            _make_session("s1", "COMPLETED", risk=0.9),
+            _make_session("s2", "COMPLETED", risk=0.5),
+            _make_session("s3", "COMPLETED", risk=0.1),
+        ]
+    )
     db_session.commit()
 
     tracker = SessionTracker()
     import orchestrator.session_tracker as st
+
     st.SessionLocal = lambda: db_session
     high = tracker.get_high_risk_sessions(threshold=0.8, limit=10)
     assert [s["session_id"] for s in high] == ["s1"]
 
 
 def test_session_tracker_statistics(db_session):
-    db_session.add_all([
-        _make_session("s1", "COMPLETED", risk=0.1, started_minutes_ago=10),
-        _make_session("s2", "COMPLETED", risk=0.9, started_minutes_ago=20),
-        _make_session("s3", "FAILED"),
-        _make_session("s4", "QUEUED"),
-    ])
+    db_session.add_all(
+        [
+            _make_session("s1", "COMPLETED", risk=0.1, started_minutes_ago=10),
+            _make_session("s2", "COMPLETED", risk=0.9, started_minutes_ago=20),
+            _make_session("s3", "FAILED"),
+            _make_session("s4", "QUEUED"),
+        ]
+    )
     db_session.commit()
 
     tracker = SessionTracker()
     import orchestrator.session_tracker as st
+
     st.SessionLocal = lambda: db_session
     stats = tracker.get_session_statistics()
     assert stats["total_sessions"] == 4
     assert stats["completed_sessions"] == 2
     assert stats["failed_sessions"] == 1
     assert stats["risk_score_stats"]["high_risk_sessions"] == 1
-    assert stats["risk_score_stats"]["average_risk_score"] == pytest.approx(0.5, abs=1e-9)
+    assert stats["risk_score_stats"]["average_risk_score"] == pytest.approx(
+        0.5, abs=1e-9
+    )
 
 
 def test_session_manager_state_machine(db_session):
     sm = SessionManager()
     import orchestrator.session_manager as smod
+
     smod.SessionLocal = lambda: db_session
 
-    db_session.add(InterviewSession(
-        session_id="s1",
-        candidate_id="c1",
-        status=sm.CREATED,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-    ))
+    db_session.add(
+        InterviewSession(
+            session_id="s1",
+            candidate_id="c1",
+            status=sm.CREATED,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+    )
     db_session.commit()
 
     assert sm.update_session_status("s1", sm.QUEUED) is True
@@ -123,15 +145,18 @@ def test_session_manager_state_machine(db_session):
 def test_session_manager_rejects_invalid_transition(db_session):
     sm = SessionManager()
     import orchestrator.session_manager as smod
+
     smod.SessionLocal = lambda: db_session
 
-    db_session.add(InterviewSession(
-        session_id="s2",
-        candidate_id="c2",
-        status=sm.COMPLETED,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
-    ))
+    db_session.add(
+        InterviewSession(
+            session_id="s2",
+            candidate_id="c2",
+            status=sm.COMPLETED,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+    )
     db_session.commit()
 
     # COMPLETED is terminal — no further transitions allowed

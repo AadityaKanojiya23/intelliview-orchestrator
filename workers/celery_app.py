@@ -7,11 +7,7 @@ from celery import Celery
 from config import REDIS_URL
 
 # Initialize Celery app
-celery_app = Celery(
-    "interview_tasks",
-    broker=REDIS_URL,
-    backend=REDIS_URL
-)
+celery_app = Celery("interview_tasks", broker=REDIS_URL, backend=REDIS_URL)
 
 # Configure Celery settings
 celery_app.conf.update(

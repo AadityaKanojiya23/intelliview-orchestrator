@@ -23,46 +23,64 @@ class SessionTracker:
     """
     Tracks and monitors interview sessions across the system
     """
-    
+
     def __init__(self):
         """Initialize session tracker"""
         pass
-    
+
     def get_active_sessions(self) -> List[Dict[str, Any]]:
         """
         Get all currently active sessions (CREATED, QUEUED, PROCESSING)
-        
+
         Returns:
             list: List of active session details
         """
         session_db = SessionLocal()
         try:
-            active_statuses = ["CREATED", "QUEUED", "PROCESSING", "VIDEO_PROCESSING", 
-                              "AUDIO_PROCESSING", "EVALUATING"]
-            sessions = session_db.execute(
-                select(InterviewSession).where(InterviewSession.status.in_(active_statuses))
-            ).scalars().all()
-            
+            active_statuses = [
+                "CREATED",
+                "QUEUED",
+                "PROCESSING",
+                "VIDEO_PROCESSING",
+                "AUDIO_PROCESSING",
+                "EVALUATING",
+            ]
+            sessions = (
+                session_db.execute(
+                    select(InterviewSession).where(
+                        InterviewSession.status.in_(active_statuses)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
             result = []
             for s in sessions:
-                result.append({
-                    "session_id": s.session_id,
-                    "candidate_id": s.candidate_id,
-                    "status": s.status,
-                    "assigned_node": s.assigned_node,
-                    "created_at": s.created_at.isoformat() if s.created_at else None,
-                    "updated_at": s.updated_at.isoformat() if s.updated_at else None
-                })
-            
+                result.append(
+                    {
+                        "session_id": s.session_id,
+                        "candidate_id": s.candidate_id,
+                        "status": s.status,
+                        "assigned_node": s.assigned_node,
+                        "created_at": s.created_at.isoformat()
+                        if s.created_at
+                        else None,
+                        "updated_at": s.updated_at.isoformat()
+                        if s.updated_at
+                        else None,
+                    }
+                )
+
             logger.debug(f"Retrieved {len(result)} active sessions")
             return result
-            
+
         except Exception as e:
             logger.error(f"Error getting active sessions: {str(e)}")
             return []
         finally:
             session_db.close()
-    
+
     def get_completed_sessions(self, limit: int = 100) -> List[Dict[str, Any]]:
         """
         Get recently completed sessions
@@ -75,12 +93,16 @@ class SessionTracker:
         """
         session_db = SessionLocal()
         try:
-            rows = session_db.execute(
-                select(InterviewSession)
-                .where(InterviewSession.status == "COMPLETED")
-                .order_by(InterviewSession.end_time.desc().nullslast())
-                .limit(limit)
-            ).scalars().all()
+            rows = (
+                session_db.execute(
+                    select(InterviewSession)
+                    .where(InterviewSession.status == "COMPLETED")
+                    .order_by(InterviewSession.end_time.desc().nullslast())
+                    .limit(limit)
+                )
+                .scalars()
+                .all()
+            )
 
             return [
                 {
@@ -113,22 +135,31 @@ class SessionTracker:
         """
         session_db = SessionLocal()
         try:
-            total_sessions = session_db.execute(
-                select(func.count()).select_from(InterviewSession)
-            ).scalar() or 0
+            total_sessions = (
+                session_db.execute(
+                    select(func.count()).select_from(InterviewSession)
+                ).scalar()
+                or 0
+            )
 
             status_rows = session_db.execute(
-                select(InterviewSession.status, func.count()).group_by(InterviewSession.status)
+                select(InterviewSession.status, func.count()).group_by(
+                    InterviewSession.status
+                )
             ).all()
             status_counts: Dict[str, int] = {row[0]: row[1] for row in status_rows}
 
-            completed_sessions = session_db.execute(
-                select(InterviewSession).where(
-                    InterviewSession.status == "COMPLETED",
-                    InterviewSession.start_time.isnot(None),
-                    InterviewSession.end_time.isnot(None),
+            completed_sessions = (
+                session_db.execute(
+                    select(InterviewSession).where(
+                        InterviewSession.status == "COMPLETED",
+                        InterviewSession.start_time.isnot(None),
+                        InterviewSession.end_time.isnot(None),
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
 
             durations = [
                 (s.end_time - s.start_time).total_seconds() for s in completed_sessions
@@ -137,20 +168,34 @@ class SessionTracker:
 
             risk_scores_list = list(
                 session_db.execute(
-                    select(InterviewSession.risk_score).where(InterviewSession.risk_score.isnot(None))
-                ).scalars().all()
+                    select(InterviewSession.risk_score).where(
+                        InterviewSession.risk_score.isnot(None)
+                    )
+                )
+                .scalars()
+                .all()
             )
-            avg_risk = sum(risk_scores_list) / len(risk_scores_list) if risk_scores_list else 0
+            avg_risk = (
+                sum(risk_scores_list) / len(risk_scores_list) if risk_scores_list else 0
+            )
             max_risk = max(risk_scores_list) if risk_scores_list else 0
             min_risk = min(risk_scores_list) if risk_scores_list else 0
 
-            high_risk_count = session_db.execute(
-                select(func.count()).select_from(InterviewSession).where(InterviewSession.risk_score >= 0.8)
-            ).scalar() or 0
+            high_risk_count = (
+                session_db.execute(
+                    select(func.count())
+                    .select_from(InterviewSession)
+                    .where(InterviewSession.risk_score >= 0.8)
+                ).scalar()
+                or 0
+            )
 
             active_states = (
-                "PROCESSING", "QUEUED", "VIDEO_PROCESSING",
-                "AUDIO_PROCESSING", "EVALUATING",
+                "PROCESSING",
+                "QUEUED",
+                "VIDEO_PROCESSING",
+                "AUDIO_PROCESSING",
+                "EVALUATING",
             )
             active_sessions = sum(status_counts.get(s, 0) for s in active_states)
 
@@ -176,136 +221,167 @@ class SessionTracker:
             return {}
         finally:
             session_db.close()
-    
+
     def get_stuck_sessions(self, timeout_minutes: int = 30) -> List[Dict[str, Any]]:
         """
         Detect sessions that are stuck (in PROCESSING state beyond timeout)
-        
+
         Args:
             timeout_minutes: Timeout threshold in minutes
-            
+
         Returns:
             list: List of stuck session details
         """
         session_db = SessionLocal()
         try:
             cutoff_time = datetime.utcnow() - timedelta(minutes=timeout_minutes)
-            
-            stuck_sessions = session_db.execute(
-                select(InterviewSession).where(
-                    InterviewSession.status == "PROCESSING",
-                    InterviewSession.start_time < cutoff_time,
+
+            stuck_sessions = (
+                session_db.execute(
+                    select(InterviewSession).where(
+                        InterviewSession.status == "PROCESSING",
+                        InterviewSession.start_time < cutoff_time,
+                    )
                 )
-            ).scalars().all()
-            
+                .scalars()
+                .all()
+            )
+
             result = []
             for s in stuck_sessions:
                 elapsed_time = (datetime.utcnow() - s.start_time).total_seconds()
-                result.append({
-                    "session_id": s.session_id,
-                    "candidate_id": s.candidate_id,
-                    "status": s.status,
-                    "assigned_node": s.assigned_node,
-                    "start_time": s.start_time.isoformat() if s.start_time else None,
-                    "elapsed_seconds": round(elapsed_time, 2)
-                })
-            
+                result.append(
+                    {
+                        "session_id": s.session_id,
+                        "candidate_id": s.candidate_id,
+                        "status": s.status,
+                        "assigned_node": s.assigned_node,
+                        "start_time": s.start_time.isoformat()
+                        if s.start_time
+                        else None,
+                        "elapsed_seconds": round(elapsed_time, 2),
+                    }
+                )
+
             if result:
-                logger.warning(f"Found {len(result)} stuck sessions (timeout > {timeout_minutes} minutes)")
-            
+                logger.warning(
+                    f"Found {len(result)} stuck sessions (timeout > {timeout_minutes} minutes)"
+                )
+
             return result
-            
+
         except Exception as e:
             logger.error(f"Error detecting stuck sessions: {str(e)}")
             return []
         finally:
             session_db.close()
-    
+
     def get_worker_distribution(self) -> Dict[str, int]:
         """
         Get distribution of active sessions across worker nodes
-        
+
         Returns:
             dict: Worker node -> active session count mapping
         """
         session_db = SessionLocal()
         try:
-            active_statuses = ["PROCESSING", "VIDEO_PROCESSING", "AUDIO_PROCESSING", "EVALUATING"]
-            sessions = session_db.execute(
-                select(InterviewSession).where(InterviewSession.status.in_(active_statuses))
-            ).scalars().all()
-            
+            active_statuses = [
+                "PROCESSING",
+                "VIDEO_PROCESSING",
+                "AUDIO_PROCESSING",
+                "EVALUATING",
+            ]
+            sessions = (
+                session_db.execute(
+                    select(InterviewSession).where(
+                        InterviewSession.status.in_(active_statuses)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
             distribution = {}
             for s in sessions:
                 node = s.assigned_node or "unassigned"
                 distribution[node] = distribution.get(node, 0) + 1
-            
+
             logger.debug(f"Worker distribution: {distribution}")
             return distribution
-            
+
         except Exception as e:
             logger.error(f"Error getting worker distribution: {str(e)}")
             return {}
         finally:
             session_db.close()
-    
-    def get_high_risk_sessions(self, threshold: float = 0.8, limit: int = 50) -> List[Dict[str, Any]]:
+
+    def get_high_risk_sessions(
+        self, threshold: float = 0.8, limit: int = 50
+    ) -> List[Dict[str, Any]]:
         """
         Get high-risk sessions that completed
-        
+
         Args:
             threshold: Risk score threshold (0-1)
             limit: Maximum number of sessions to retrieve
-            
+
         Returns:
             list: List of high-risk sessions
         """
         session_db = SessionLocal()
         try:
-            sessions = session_db.execute(
-                select(InterviewSession)
-                .where(
-                    InterviewSession.risk_score >= threshold,
-                    InterviewSession.status == "COMPLETED",
+            sessions = (
+                session_db.execute(
+                    select(InterviewSession)
+                    .where(
+                        InterviewSession.risk_score >= threshold,
+                        InterviewSession.status == "COMPLETED",
+                    )
+                    .order_by(InterviewSession.risk_score.desc())
+                    .limit(limit)
                 )
-                .order_by(InterviewSession.risk_score.desc())
-                .limit(limit)
-            ).scalars().all()
-            
+                .scalars()
+                .all()
+            )
+
             result = []
             for s in sessions:
-                result.append({
-                    "session_id": s.session_id,
-                    "candidate_id": s.candidate_id,
-                    "risk_score": s.risk_score,
-                    "status": s.status,
-                    "completed_at": s.end_time.isoformat() if s.end_time else None
-                })
-            
-            logger.debug(f"Retrieved {len(result)} high-risk sessions (threshold: {threshold})")
+                result.append(
+                    {
+                        "session_id": s.session_id,
+                        "candidate_id": s.candidate_id,
+                        "risk_score": s.risk_score,
+                        "status": s.status,
+                        "completed_at": s.end_time.isoformat() if s.end_time else None,
+                    }
+                )
+
+            logger.debug(
+                f"Retrieved {len(result)} high-risk sessions (threshold: {threshold})"
+            )
             return result
-            
+
         except Exception as e:
             logger.error(f"Error getting high-risk sessions: {str(e)}")
             return []
         finally:
             session_db.close()
-    
+
     @staticmethod
     def _calculate_duration(start_time, end_time) -> Optional[float]:
         """
         Calculate duration between two timestamps
-        
+
         Args:
             start_time: Start timestamp
             end_time: End timestamp
-            
+
         Returns:
             float: Duration in seconds or None
         """
         if not start_time or not end_time:
             return None
-        
+
         try:
             duration = (end_time - start_time).total_seconds()
             return round(duration, 2)

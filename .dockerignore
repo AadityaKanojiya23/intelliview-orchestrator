@@ -1,0 +1,44 @@
+# --- VCS / IDE ---
+.git
+.gitignore
+.gitattributes
+.github
+
+# --- Local virtualenvs / caches ---
+.venv
+venv
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
+**/.coverage
+**/htmlcov
+
+# --- Frontend build artefacts (we install inside the image; no need to copy source) ---
+frontend/node_modules
+frontend/.next
+frontend/.turbo
+frontend/out
+frontend/coverage
+
+# --- Editor / OS ---
+.DS_Store
+.idea
+.vscode
+*.swp
+
+# --- Compose / env files (do NOT bake secrets into the image) ---
+.env
+.env.local
+
+# --- Tests / docs (kept in repo for CI, but not needed at runtime) ---
+tests
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+SECURITY.md
+LICENSE
+SETUP_COMPLETE.md

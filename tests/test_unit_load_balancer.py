@@ -1,6 +1,7 @@
 """
 Unit tests for the LoadBalancer selection strategies.
 """
+
 from orchestrator.load_balancer import LoadBalancer, BalancingStrategy
 
 
@@ -9,7 +10,11 @@ class FakeRegistry:
         self._workers = workers
 
     def get_available_workers(self):
-        return [w for w in self._workers if w["status"] == "healthy" and w["active_tasks"] < w["capacity"]]
+        return [
+            w
+            for w in self._workers
+            if w["status"] == "healthy" and w["active_tasks"] < w["capacity"]
+        ]
 
     def get_least_loaded_worker(self):
         available = self.get_available_workers()

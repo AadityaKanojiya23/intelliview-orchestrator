@@ -10,12 +10,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Create SQLAlchemy engine
+# Create SQLAlchemy engine with connection-recycling and pre-ping so that
+# stale connections (e.g., after a Postgres restart) are dropped instead of
+# surfacing as "connection reset" errors to callers.
 engine = create_engine(
     DATABASE_URL,
     echo=False,  # Set to True for SQL debugging
     pool_size=10,
-    max_overflow=20
+    max_overflow=20,
+    pool_pre_ping=True,
+    pool_recycle=1800,
 )
 
 # Session factory

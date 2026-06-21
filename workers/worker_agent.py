@@ -6,6 +6,7 @@ Responsibilities:
 - Periodically send heartbeats with the current active task count.
 - Deregister on graceful shutdown.
 """
+
 import logging
 import os
 import signal
@@ -50,11 +51,13 @@ class WorkerAgent:
                 logger.warning("API %s returned %s, retrying", path, r.status_code)
             except Exception as exc:
                 logger.warning("API %s failed (%s), retrying", path, exc)
-            time.sleep(min(2 ** attempt, 15))
+            time.sleep(min(2**attempt, 15))
         return False
 
     def register(self) -> bool:
-        ok = self._post("/register-worker", {"worker_id": self.worker_id, "capacity": self.capacity})
+        ok = self._post(
+            "/register-worker", {"worker_id": self.worker_id, "capacity": self.capacity}
+        )
         if ok:
             logger.info("Worker %s registered with %s", self.worker_id, self.api_url)
         else:
@@ -73,7 +76,10 @@ class WorkerAgent:
 
     def heartbeat_loop(self) -> None:
         while not self._stop:
-            self._post("/worker/heartbeat", {"worker_id": self.worker_id, "active_tasks": self.active_tasks})
+            self._post(
+                "/worker/heartbeat",
+                {"worker_id": self.worker_id, "active_tasks": self.active_tasks},
+            )
             time.sleep(self.heartbeat_interval)
 
     def start(self) -> None:
@@ -92,7 +98,9 @@ class WorkerAgent:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
 
     api_url = os.getenv("API_URL", "http://fastapi:8000")
     worker_id = os.getenv("WORKER_ID", f"worker-{os.getpid()}")

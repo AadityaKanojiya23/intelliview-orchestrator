@@ -2,6 +2,7 @@
 Worker entrypoint — runs the worker agent (registration + heartbeats) alongside
 the Celery worker, with active task count tracked via Celery signals.
 """
+
 import logging
 import os
 import signal
@@ -19,7 +20,8 @@ logger = logging.getLogger(__name__)
 
 def _run_celery() -> None:
     argv = [
-        "-A", "workers.celery_app",
+        "-A",
+        "workers.celery_app",
         "worker",
         "--loglevel=info",
         f"--concurrency={os.getenv('WORKER_CONCURRENCY', WORKER_CONCURRENCY)}",
@@ -38,7 +40,9 @@ def main() -> int:
     api_url = os.getenv("API_URL", "http://fastapi:8000")
     worker_id = os.getenv("WORKER_ID", f"worker-{os.uname().nodename}-{os.getpid()}")
 
-    agent = WorkerAgent(api_url=api_url, worker_id=worker_id, capacity=WORKER_CONCURRENCY)
+    agent = WorkerAgent(
+        api_url=api_url, worker_id=worker_id, capacity=WORKER_CONCURRENCY
+    )
     if not agent.register():
         logger.error("Could not register worker; exiting")
         return 1
@@ -58,10 +62,13 @@ def main() -> int:
     def _hb_loop():
         while not stop_event.is_set():
             try:
-                agent._post("/worker/heartbeat", {
-                    "worker_id": agent.worker_id,
-                    "active_tasks": agent.active_tasks,
-                })
+                agent._post(
+                    "/worker/heartbeat",
+                    {
+                        "worker_id": agent.worker_id,
+                        "active_tasks": agent.active_tasks,
+                    },
+                )
             except Exception as exc:
                 logger.debug("Heartbeat error: %s", exc)
             stop_event.wait(agent.heartbeat_interval)

@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 class RetryStrategy(Enum):
     """Retry strategy options"""
+
     EXPONENTIAL_BACKOFF = "exponential_backoff"
     LINEAR_BACKOFF = "linear_backoff"
     IMMEDIATE = "immediate"
@@ -31,23 +32,25 @@ class RetryStrategy(Enum):
 class RetryManager:
     """
     Manages automatic retry logic for failed tasks with backoff strategies.
-    
+
     Handles:
     - Tracking retry attempts per session
     - Calculating retry delays using exponential backoff
     - Limiting maximum retries to prevent infinite loops
     - Scheduling retry execution
     """
-    
-    def __init__(self, 
-                 redis_url: str = REDIS_URL,
-                 max_retries: int = 3,
-                 base_delay: int = 2,
-                 max_delay: int = 3600,
-                 strategy: RetryStrategy = RetryStrategy.EXPONENTIAL_BACKOFF):
+
+    def __init__(
+        self,
+        redis_url: str = REDIS_URL,
+        max_retries: int = 3,
+        base_delay: int = 2,
+        max_delay: int = 3600,
+        strategy: RetryStrategy = RetryStrategy.EXPONENTIAL_BACKOFF,
+    ):
         """
         Initialize RetryManager
-        
+
         Args:
             redis_url: Redis connection URL
             max_retries: Maximum number of retry attempts (default: 3)
@@ -64,12 +67,12 @@ class RetryManager:
         self.retry_key_prefix = "retry:"
         self.retry_count_key = "retry_count:"
         self.retry_scheduled_key = "retry_scheduled:"
-        
+
         logger.info(
             f"RetryManager initialized: max_retries={max_retries}, "
             f"strategy={strategy.value}, base_delay={base_delay}s"
         )
-    
+
     def _connect_redis(self) -> Optional[redis.Redis]:
         """Connect to Redis server"""
         try:
@@ -80,182 +83,194 @@ class RetryManager:
         except Exception as e:
             logger.error(f"Failed to connect to Redis: {str(e)}")
             return None
-    
+
     def can_retry(self, session_id: str) -> bool:
         """
         Check if a session can be retried (hasn't exceeded max attempts)
-        
+
         Args:
             session_id: ID of session to check
-            
+
         Returns:
             True if session can be retried, False if max attempts exceeded
         """
         try:
             retry_count = self.get_retry_count(session_id)
             can_retry = retry_count < self.max_retries
-            
+
             if can_retry:
-                logger.debug(f"Session {session_id} can retry ({retry_count}/{self.max_retries})")
+                logger.debug(
+                    f"Session {session_id} can retry ({retry_count}/{self.max_retries})"
+                )
             else:
-                logger.warning(f"Session {session_id} max retries exceeded ({retry_count}/{self.max_retries})")
-            
+                logger.warning(
+                    f"Session {session_id} max retries exceeded ({retry_count}/{self.max_retries})"
+                )
+
             return can_retry
-            
+
         except Exception as e:
             logger.error(f"Error checking if can retry: {str(e)}")
             return False
-    
-    def schedule_retry(self, session_id: str, delay_seconds: Optional[int] = None) -> bool:
+
+    def schedule_retry(
+        self, session_id: str, delay_seconds: Optional[int] = None
+    ) -> bool:
         """
         Schedule a retry for a failed task
-        
+
         Calculates appropriate delay based on retry attempt count and strategy,
         then schedules the task for retry after that delay.
-        
+
         Args:
             session_id: ID of session to retry
             delay_seconds: Optional override for delay (uses calculated if None)
-            
+
         Returns:
             True if retry was scheduled, False otherwise
         """
         try:
             # Check if can retry
             if not self.can_retry(session_id):
-                logger.warning(f"Cannot retry session {session_id}: max retries exceeded")
+                logger.warning(
+                    f"Cannot retry session {session_id}: max retries exceeded"
+                )
                 return False
-            
+
             # Get current retry count and increment
             retry_count = self.increment_retry(session_id)
-            
+
             # Calculate delay if not provided
             if delay_seconds is None:
                 delay_seconds = self._calculate_delay(retry_count)
             else:
                 delay_seconds = min(delay_seconds, self.max_delay)
-            
-            logger.info(f"Scheduling retry for {session_id}: attempt {retry_count}, delay {delay_seconds}s")
-            
+
+            logger.info(
+                f"Scheduling retry for {session_id}: attempt {retry_count}, delay {delay_seconds}s"
+            )
+
             # Create retry record
             retry_data = {
                 "session_id": session_id,
                 "retry_count": retry_count,
                 "scheduled_at": datetime.utcnow().isoformat(),
-                "retry_after": (datetime.utcnow() + timedelta(seconds=delay_seconds)).isoformat(),
+                "retry_after": (
+                    datetime.utcnow() + timedelta(seconds=delay_seconds)
+                ).isoformat(),
                 "delay_seconds": delay_seconds,
-                "strategy": self.strategy.value
+                "strategy": self.strategy.value,
             }
-            
+
             if self.redis_client:
                 # Store retry metadata
                 retry_key = f"{self.retry_key_prefix}{session_id}"
                 self.redis_client.setex(
                     retry_key,
                     delay_seconds + 600,  # TTL: delay + 10 minutes
-                    json.dumps(retry_data)
+                    json.dumps(retry_data),
                 )
-                
+
                 # Add to scheduled retry set (expire based on retry time)
                 scheduled_key = f"{self.retry_scheduled_key}{session_id}"
                 self.redis_client.setex(
-                    scheduled_key,
-                    delay_seconds,
-                    json.dumps(retry_data)
+                    scheduled_key, delay_seconds, json.dumps(retry_data)
                 )
-                
+
                 logger.debug(f"Retry scheduled for {session_id} in {delay_seconds}s")
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Error scheduling retry for {session_id}: {str(e)}")
             return False
-    
+
     def _calculate_delay(self, retry_count: int) -> int:
         """
         Calculate delay for next retry based on strategy and attempt count
-        
+
         Args:
             retry_count: Current retry attempt number (1-based)
-            
+
         Returns:
             Delay in seconds
         """
         if self.strategy == RetryStrategy.EXPONENTIAL_BACKOFF:
             # Exponential: 2^retry_count seconds
-            delay = self.base_delay ** retry_count
+            delay = self.base_delay**retry_count
         elif self.strategy == RetryStrategy.LINEAR_BACKOFF:
             # Linear: base_delay * retry_count seconds
             delay = self.base_delay * retry_count
         else:  # IMMEDIATE
             delay = 0
-        
+
         # Cap at max_delay
         delay = min(delay, self.max_delay)
-        
-        logger.debug(f"Calculated delay for retry {retry_count}: {delay}s using {self.strategy.value}")
-        
+
+        logger.debug(
+            f"Calculated delay for retry {retry_count}: {delay}s using {self.strategy.value}"
+        )
+
         return delay
-    
+
     def get_retry_count(self, session_id: str) -> int:
         """
         Get current retry attempt count for a session
-        
+
         Args:
             session_id: ID of session
-            
+
         Returns:
             Number of retry attempts (0 if no retries scheduled)
         """
         try:
             if not self.redis_client:
                 return 0
-            
+
             count_key = f"{self.retry_count_key}{session_id}"
             count = self.redis_client.get(count_key)
-            
+
             return int(count) if count else 0
-            
+
         except Exception as e:
             logger.warning(f"Error getting retry count: {str(e)}")
             return 0
-    
+
     def increment_retry(self, session_id: str) -> int:
         """
         Increment retry attempt count for a session
-        
+
         Args:
             session_id: ID of session
-            
+
         Returns:
             New retry count after increment
         """
         try:
             if not self.redis_client:
                 return 1
-            
+
             count_key = f"{self.retry_count_key}{session_id}"
             count = self.redis_client.incr(count_key)
-            
+
             # Set TTL to 7 days
             self.redis_client.expire(count_key, 604800)
-            
+
             logger.debug(f"Incremented retry count for {session_id} to {count}")
-            
+
             return count
-            
+
         except Exception as e:
             logger.error(f"Error incrementing retry count: {str(e)}")
             return 1
-    
+
     def reset_retry_count(self, session_id: str) -> bool:
         """
         Reset retry count for a session (after successful completion)
-        
+
         Args:
             session_id: ID of session
-            
+
         Returns:
             True if reset successfully
         """
@@ -263,83 +278,83 @@ class RetryManager:
             if self.redis_client:
                 count_key = f"{self.retry_count_key}{session_id}"
                 self.redis_client.delete(count_key)
-                
+
                 logger.debug(f"Reset retry count for {session_id}")
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Error resetting retry count: {str(e)}")
             return False
-    
+
     def get_retry_info(self, session_id: str) -> Dict[str, Any]:
         """
         Get detailed retry information for a session
-        
+
         Args:
             session_id: ID of session
-            
+
         Returns:
             Dict with retry metadata and scheduling info
         """
         try:
             retry_count = self.get_retry_count(session_id)
             can_retry = self.can_retry(session_id)
-            
+
             retry_data = None
             if self.redis_client:
                 retry_key = f"{self.retry_key_prefix}{session_id}"
                 retry_json = self.redis_client.get(retry_key)
                 if retry_json:
                     retry_data = json.loads(retry_json)
-            
+
             info = {
                 "session_id": session_id,
                 "current_retry_count": retry_count,
                 "max_retries": self.max_retries,
                 "can_retry": can_retry,
                 "retry_strategy": self.strategy.value,
-                "next_delay": self._calculate_delay(retry_count + 1) if can_retry else None
+                "next_delay": self._calculate_delay(retry_count + 1)
+                if can_retry
+                else None,
             }
-            
+
             if retry_data:
                 info["scheduled_retry"] = retry_data
-            
+
             return info
-            
+
         except Exception as e:
             logger.error(f"Error getting retry info: {str(e)}")
             return {}
-    
+
     def get_scheduled_retries(self, limit: int = 100) -> list:
         """
         Get list of tasks scheduled for retry
-        
+
         Args:
             limit: Maximum number to return
-            
+
         Returns:
             List of retry scheduled entries
         """
         try:
             if not self.redis_client:
                 return []
-            
+
             retries = []
             cursor = 0
             count = 0
-            
+
             while count < limit:
                 cursor, keys = self.redis_client.scan(
-                    cursor,
-                    match=f"{self.retry_scheduled_key}*",
-                    count=100
+                    cursor, match=f"{self.retry_scheduled_key}*", count=100
                 )
-                
+
                 for key in keys:
                     if count >= limit:
                         break
-                    
+
                     try:
                         data = self.redis_client.get(key)
                         if data:
@@ -347,26 +362,26 @@ class RetryManager:
                             count += 1
                     except Exception:
                         continue
-                
+
                 if cursor == 0:
                     break
-            
+
             return retries
-            
+
         except Exception as e:
             logger.error(f"Error getting scheduled retries: {str(e)}")
             return []
-    
+
     def get_retry_statistics(self) -> Dict[str, Any]:
         """
         Get aggregate retry statistics for the system
-        
+
         Returns:
             Dict with retry metrics
         """
         try:
             scheduled = self.get_scheduled_retries(500)
-            
+
             return {
                 "total_scheduled_retries": len(scheduled),
                 "scheduled_retries": scheduled[:10],
@@ -374,9 +389,9 @@ class RetryManager:
                 "max_retries": self.max_retries,
                 "base_delay": self.base_delay,
                 "max_delay": self.max_delay,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
-            
+
         except Exception as e:
             logger.error(f"Error getting retry statistics: {str(e)}")
             return {}

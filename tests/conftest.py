@@ -4,6 +4,7 @@ Shared pytest fixtures and configuration for the test suite.
 These tests are designed to run against a live local stack (see docker-compose).
 For unit tests that don't need Redis/Postgres, see test_unit_*.py.
 """
+
 import os
 import sys
 import pathlib

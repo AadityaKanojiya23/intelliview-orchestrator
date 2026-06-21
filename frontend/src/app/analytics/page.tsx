@@ -1,4 +1,5 @@
 "use client";
+import { useMemo } from "react";
 import useSWR from "swr";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell, Legend } from "recharts";
 import { Card } from "@/components/Card";
@@ -14,12 +15,6 @@ export default function AnalyticsPage() {
   const dlq = useSWR("/dead-letter-queue?limit=50", { refreshInterval: 10000 });
 
   const breakdown = stats.data ? Object.entries(stats.data.status_breakdown).map(([status, count]) => ({ status, count: count as number })) : [];
-  const riskBuckets = [
-    { name: "Low (<0.3)", value: 0, color: "#10b981" },
-    { name: "Medium (0.3-0.6)", value: 0, color: "#f59e0b" },
-    { name: "High (0.6-0.8)", value: 0, color: "#f97316" },
-    { name: "Critical (≥0.8)", value: 0, color: "#ef4444" },
-  ];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -77,30 +72,69 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      <Card title="Risk distribution" description="Sessions bucketed by final risk score.">
-        {!stats.data ? (
-          <Skeleton className="h-64 w-full" />
-        ) : (
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart>
-              <Pie
-                data={riskBuckets}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={90}
-                innerRadius={50}
-                paddingAngle={2}
-              >
-                {riskBuckets.map((b, i) => <Cell key={i} fill={b.color} />)}
-              </Pie>
-              <Tooltip contentStyle={{ background: "#12121a", border: "1px solid #27272a", borderRadius: 8 }} />
-              <Legend wrapperStyle={{ fontSize: 12, color: "#a1a1aa" }} />
-            </PieChart>
-          </ResponsiveContainer>
-        )}
-      </Card>
+      <RiskDistribution stats={stats.data} error={stats.error} onRetry={() => stats.mutate()} loading={!stats.data && !stats.error} />
     </div>
+  );
+}
+
+interface RiskDistributionProps {
+  stats:
+    | {
+        total_sessions: number;
+        risk_score_stats: {
+          average_risk_score: number;
+          high_risk_sessions: number;
+        };
+      }
+    | undefined;
+  error: Error | undefined;
+  onRetry: () => void;
+  loading: boolean;
+}
+
+function RiskDistribution({ stats, error, onRetry, loading }: RiskDistributionProps) {
+  const completed = useSWR("/completed-sessions?limit=100", { refreshInterval: 10000 });
+  const buckets = useMemo(() => {
+    const seed = [
+      { name: "Low (<0.3)", color: "#10b981", value: 0 },
+      { name: "Medium (0.3-0.6)", color: "#f59e0b", value: 0 },
+      { name: "High (0.6-0.8)", color: "#f97316", value: 0 },
+      { name: "Critical (≥0.8)", color: "#ef4444", value: 0 },
+    ];
+    for (const s of completed.data?.sessions ?? []) {
+      const r = (s as { risk_score?: number | null }).risk_score;
+      if (typeof r !== "number") continue;
+      if (r < 0.3) seed[0].value += 1;
+      else if (r < 0.6) seed[1].value += 1;
+      else if (r < 0.8) seed[2].value += 1;
+      else seed[3].value += 1;
+    }
+    return seed;
+  }, [completed.data]);
+
+  return (
+    <Card title="Risk distribution" description="Completed sessions bucketed by final risk score.">
+      {error ? (
+        <ErrorState error={error} onRetry={onRetry} />
+      ) : loading || completed.isLoading ? (
+        <Skeleton className="h-64 w-full" />
+      ) : buckets.every((b) => b.value === 0) ? (
+        <div className="py-8 text-center text-sm text-muted">
+          No completed sessions with risk scores yet.
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={280}>
+          <PieChart>
+            <Pie data={buckets} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={50} paddingAngle={2}>
+              {buckets.map((b, i) => (
+                <Cell key={i} fill={b.color} />
+              ))}
+            </Pie>
+            <Tooltip contentStyle={{ background: "#12121a", border: "1px solid #27272a", borderRadius: 8 }} />
+            <Legend wrapperStyle={{ fontSize: 12, color: "#a1a1aa" }} />
+          </PieChart>
+        </ResponsiveContainer>
+      )}
+    </Card>
   );
 }

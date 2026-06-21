@@ -8,6 +8,7 @@ Two output modes:
 Activated via the \`JSON_LOGGING\` env var. Safe to call \`configure_logging()\`
 multiple times — it replaces existing handlers.
 """
+
 import json
 import logging
 import os
@@ -24,10 +25,29 @@ class JsonFormatter(logging.Formatter):
     """
 
     RESERVED = {
-        "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
-        "module", "exc_info", "exc_text", "stack_info", "lineno", "funcName",
-        "created", "msecs", "relativeCreated", "thread", "threadName",
-        "processName", "process", "message", "asctime", "taskName",
+        "name",
+        "msg",
+        "args",
+        "levelname",
+        "levelno",
+        "pathname",
+        "filename",
+        "module",
+        "exc_info",
+        "exc_text",
+        "stack_info",
+        "lineno",
+        "funcName",
+        "created",
+        "msecs",
+        "relativeCreated",
+        "thread",
+        "threadName",
+        "processName",
+        "process",
+        "message",
+        "asctime",
+        "taskName",
     }
 
     def format(self, record: logging.LogRecord) -> str:

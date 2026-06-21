@@ -12,5 +12,5 @@ __all__ = [
     "MetricsCollector",
     "WebSocketManager",
     "ws_manager",
-    "create_dashboard_routes"
+    "create_dashboard_routes",
 ]

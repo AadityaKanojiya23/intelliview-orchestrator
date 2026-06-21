@@ -8,6 +8,7 @@ Run the stack first:
 
 Set API_BASE_URL to override the default http://localhost:8000.
 """
+
 import time
 import uuid
 
@@ -53,8 +54,16 @@ def test_start_interview_and_get_status(api_base_url):
     assert r.status_code == 200
     body = r.json()
     assert body["session_id"] == session_id
-    assert body["status"] in {"CREATED", "QUEUED", "PROCESSING", "VIDEO_PROCESSING",
-                              "AUDIO_PROCESSING", "EVALUATING", "COMPLETED", "FAILED"}
+    assert body["status"] in {
+        "CREATED",
+        "QUEUED",
+        "PROCESSING",
+        "VIDEO_PROCESSING",
+        "AUDIO_PROCESSING",
+        "EVALUATING",
+        "COMPLETED",
+        "FAILED",
+    }
 
 
 def test_system_health(api_base_url):
@@ -70,13 +79,19 @@ def test_system_health(api_base_url):
 def test_worker_register_requires_token(api_base_url):
     _wait_for_api(api_base_url)
     # Without token — should be 401
-    r = httpx.post(f"{api_base_url}/register-worker",
-                   json={"worker_id": "test-w", "capacity": 2}, timeout=5.0)
+    r = httpx.post(
+        f"{api_base_url}/register-worker",
+        json={"worker_id": "test-w", "capacity": 2},
+        timeout=5.0,
+    )
     assert r.status_code == 401
     # With token — should succeed
-    r = httpx.post(f"{api_base_url}/register-worker",
-                   json={"worker_id": "test-w", "capacity": 2},
-                   headers={"X-API-Token": "test-token"}, timeout=5.0)
+    r = httpx.post(
+        f"{api_base_url}/register-worker",
+        json={"worker_id": "test-w", "capacity": 2},
+        headers={"X-API-Token": "test-token"},
+        timeout=5.0,
+    )
     assert r.status_code == 200, r.text
 
 
@@ -102,4 +117,6 @@ def test_full_pipeline_completes(api_base_url):
             break
         time.sleep(1.0)
     assert last is not None
-    assert last["status"] in {"COMPLETED", "FAILED"}, f"Session stuck in {last['status']}"
+    assert last["status"] in {"COMPLETED", "FAILED"}, (
+        f"Session stuck in {last['status']}"
+    )

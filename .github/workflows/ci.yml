@@ -56,6 +56,11 @@ jobs:
           pip install pytest pytest-asyncio ruff mypy
       - name: Ruff lint
         run: ruff check orchestrator workers monitoring database tests
+      - name: Ruff format check
+        run: ruff format --check orchestrator workers monitoring database tests
+      - name: Mypy
+        run: mypy --ignore-missing-imports --no-incremental orchestrator workers monitoring database
+        continue-on-error: true
       - name: Pytest
         run: pytest tests/ --ignore=tests/test_e2e_smoke.py -v
       - name: E2E smoke
@@ -81,3 +86,5 @@ jobs:
         run: npx tsc --noEmit
       - name: Lint
         run: npm run lint --if-present
+      - name: Build
+        run: npx next build

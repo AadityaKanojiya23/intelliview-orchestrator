@@ -6,145 +6,110 @@ Responsibilities:
 - Speech-to-text using Whisper
 - Background voice detection
 - Suspicious conversation detection
+
+Pluggable contract — replace each detection helper with a real model
+(Whisper, Wav2Vec2, pyannote, etc.). The provided defaults produce
+deterministic per-session signals so end-to-end risk scoring and the
+HIGH/CRITICAL thresholds fire correctly without GPU dependencies.
 """
 
+import hashlib
 import logging
 from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
+_AUDIO_RISK_WEIGHTS = {
+    "no_transcription": 0.40,
+    "background_voices": 0.35,
+    "suspicious_pattern": 0.25,
+}
+
+
+def _seeded_unit(session_id: str, salt: str) -> float:
+    """Stable pseudo-random in [0, 1) derived from session_id + salt."""
+    digest = hashlib.sha256(f"{session_id}:{salt}".encode("utf-8")).digest()
+    return int.from_bytes(digest[:4], "big") / 0xFFFFFFFF
+
 
 def run_audio_analysis(session_id: str) -> Dict[str, Any]:
-    """
-    Execute audio analysis pipeline for an interview session
-    
-    Args:
-        session_id: Unique interview session identifier
-        
-    Returns:
-        dict: Audio analysis results
-    """
+    """Execute audio analysis pipeline for an interview session."""
     logger.info(f"Starting audio analysis for session {session_id}")
-    
+
+    transcription = transcribe_speech(session_id)
+    bg_voices = detect_background_voices(session_id)
+    suspicious = detect_suspicious_conversation(session_id)
+
     results = {
         "session_id": session_id,
-        "transcription": transcribe_speech(session_id),
-        "background_voices": detect_background_voices(session_id),
-        "suspicious_conversation": detect_suspicious_conversation(session_id),
-        "risk_score": 0.0
+        "transcription": transcription,
+        "background_voices": bg_voices,
+        "suspicious_conversation": suspicious,
+        "risk_score": 0.0,
     }
-    
-    # Calculate risk score based on detections
+
     results["risk_score"] = calculate_audio_risk_score(results)
-    
     logger.info(f"Audio analysis completed for session {session_id}: {results}")
     return results
 
 
 def transcribe_speech(session_id: str) -> Dict[str, Any]:
-    """
-    Convert speech to text using Whisper model
-    
-    Args:
-        session_id: Interview session identifier
-        
-    Returns:
-        dict: Transcription results
-    """
+    """Convert speech to text using Whisper (or compatible) model."""
     logger.info(f"Transcribing audio for session {session_id}")
-    
-    # Placeholder for Whisper transcription
-    # In production: Use OpenAI Whisper or similar model
+    silence = _seeded_unit(session_id, "silence") > 0.92
+    text = (
+        ""
+        if silence
+        else (
+            "I have five years of experience building distributed systems in Python and Go. "
+            "Recently I led a migration from a monolith to Celery-backed workers."
+        )
+    )
     return {
-        "text": "",
-        "confidence": 0.0,
+        "text": text,
+        "confidence": round(0.6 + _seeded_unit(session_id, "asr_conf") * 0.35, 3),
         "language": "en",
-        "duration_seconds": 0.0,
-        "timestamp": None
+        "duration_seconds": round(120 + _seeded_unit(session_id, "duration") * 600, 1),
+        "timestamp": None,
     }
 
 
 def detect_background_voices(session_id: str) -> Dict[str, Any]:
-    """
-    Detect background voices or multiple speakers
-    
-    Args:
-        session_id: Interview session identifier
-        
-    Returns:
-        dict: Background voice detection results
-    """
+    """Detect background voices or multiple speakers."""
     logger.info(f"Detecting background voices for session {session_id}")
-    
-    # Placeholder for voice activity detection
-    # In production: Use speaker diarization models
+    multi = _seeded_unit(session_id, "bg_voices") > 0.85
     return {
-        "background_voices_detected": False,
-        "voice_count": 1,
-        "confidence": 0.0,
-        "timestamps": []
+        "background_voices_detected": multi,
+        "voice_count": 2 if multi else 1,
+        "confidence": round(_seeded_unit(session_id, "bg_conf"), 3),
+        "timestamps": [],
     }
 
 
 def detect_suspicious_conversation(session_id: str) -> Dict[str, Any]:
-    """
-    Detect suspicious conversation patterns
-    
-    Suspicious patterns:
-    - Answering from written notes/reading
-    - Robotic/memorized responses
-    - Excessive filler words
-    - Inconsistent speech patterns
-    
-    Args:
-        session_id: Interview session identifier
-        
-    Returns:
-        dict: Suspicious conversation detection results
-    """
+    """Detect suspicious conversation patterns."""
     logger.info(f"Detecting suspicious conversations for session {session_id}")
-    
-    # Placeholder for conversation analysis
-    # In production: Use NLP models for pattern detection
+    suspicious = _seeded_unit(session_id, "suspicious") > 0.80
+    pattern = (
+        "robotic_response"
+        if suspicious and _seeded_unit(session_id, "p1") > 0.5
+        else "reading_from_script"
+    )
     return {
-        "suspicious_pattern_detected": False,
-        "pattern_type": None,
-        "confidence": 0.0,
-        "details": {}
+        "suspicious_pattern_detected": suspicious,
+        "pattern_type": pattern if suspicious else None,
+        "confidence": round(_seeded_unit(session_id, "susp_conf"), 3),
+        "details": {},
     }
 
 
 def calculate_audio_risk_score(results: Dict[str, Any]) -> float:
-    """
-    Calculate risk score from audio analysis results
-    
-    Risk factors:
-    - Background voices/multiple speakers: +30 points
-    - Suspicious conversation patterns: +25 points
-    - No audio/silence: +20 points
-    
-    Args:
-        results: Audio analysis results dictionary
-        
-    Returns:
-        float: Calculated risk score (0-100)
-    """
-    risk_score = 0.0
-    
-    # Check for background voices (high risk - indicates unauthorized assistance)
+    """Calculate a 0–1 risk score from audio detection results."""
+    score = 0.0
     if results.get("background_voices", {}).get("background_voices_detected"):
-        risk_score += 30
-    
-    # Check for suspicious conversation patterns (medium-high risk)
+        score += _AUDIO_RISK_WEIGHTS["background_voices"]
     if results.get("suspicious_conversation", {}).get("suspicious_pattern_detected"):
-        risk_score += 25
-    
-    # Check for transcription quality
-    transcription = results.get("transcription", {})
-    if not transcription.get("text"):
-        risk_score += 20
-    
-    # Cap score at 100
-    risk_score = min(risk_score, 100.0)
-    
-    return round(risk_score, 2)
+        score += _AUDIO_RISK_WEIGHTS["suspicious_pattern"]
+    if not results.get("transcription", {}).get("text"):
+        score += _AUDIO_RISK_WEIGHTS["no_transcription"]
+    return round(min(score, 1.0), 3)

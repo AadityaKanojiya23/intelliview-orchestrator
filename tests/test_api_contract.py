@@ -5,6 +5,7 @@ documented HTTP method.
 
 These are static checks (no live server required).
 """
+
 import pytest
 from fastapi import FastAPI
 

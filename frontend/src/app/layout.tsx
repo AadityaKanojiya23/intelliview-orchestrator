@@ -16,12 +16,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={inter.variable + " font-sans"}>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[100] focus:rounded focus:bg-accent focus:px-3 focus:py-2 focus:text-sm focus:text-white"
+        >
+          Skip to main content
+        </a>
         <ClientProviders>
           <div className="flex min-h-screen bg-bg">
             <Sidebar />
             <div className="flex min-w-0 flex-1 flex-col">
               <Topbar />
-              <main className="flex-1 overflow-y-auto p-6">{children}</main>
+              <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-6 focus:outline-none">
+                {children}
+              </main>
             </div>
           </div>
         </ClientProviders>

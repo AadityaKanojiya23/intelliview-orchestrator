@@ -14,6 +14,7 @@ class InterviewSession(Base):
     InterviewSession ORM Model
     Represents an interview session with candidate and processing details
     """
+
     __tablename__ = "interview_sessions"
 
     session_id = Column(String(255), primary_key=True, index=True, nullable=False)
@@ -23,14 +24,16 @@ class InterviewSession(Base):
     start_time = Column(DateTime, nullable=True, default=datetime.utcnow)
     end_time = Column(DateTime, nullable=True)
     risk_score = Column(Float, nullable=True)
-    
+
     # Analysis results stored as JSON
     video_analysis = Column(JSON, nullable=True)
     audio_analysis = Column(JSON, nullable=True)
     evaluation_analysis = Column(JSON, nullable=True)
-    
+
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     def __repr__(self):
         return f"<InterviewSession(session_id='{self.session_id}', candidate_id='{self.candidate_id}', status='{self.status}', risk_score={self.risk_score})>"

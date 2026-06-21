@@ -1,6 +1,7 @@
 """
 Tests for the structured logging configuration.
 """
+
 import io
 import json
 import logging
@@ -11,8 +12,13 @@ from orchestrator.logging_config import JsonFormatter, configure_logging, log_ev
 def test_json_formatter_emits_valid_json():
     formatter = JsonFormatter()
     record = logging.LogRecord(
-        name="test", level=logging.INFO, pathname="x.py", lineno=1,
-        msg="hello %s", args=("world",), exc_info=None,
+        name="test",
+        level=logging.INFO,
+        pathname="x.py",
+        lineno=1,
+        msg="hello %s",
+        args=("world",),
+        exc_info=None,
     )
     out = formatter.format(record)
     data = json.loads(out)
@@ -25,8 +31,13 @@ def test_json_formatter_emits_valid_json():
 def test_json_formatter_includes_extra_fields():
     formatter = JsonFormatter()
     record = logging.LogRecord(
-        name="test", level=logging.INFO, pathname="x.py", lineno=1,
-        msg="session_completed", args=(), exc_info=None,
+        name="test",
+        level=logging.INFO,
+        pathname="x.py",
+        lineno=1,
+        msg="session_completed",
+        args=(),
+        exc_info=None,
     )
     record.session_id = "abc123"
     record.risk_score = 0.42
@@ -68,9 +79,15 @@ def test_json_formatter_handles_exception():
         raise ValueError("boom")
     except ValueError:
         import sys
+
         record = logging.LogRecord(
-            name="t", level=logging.ERROR, pathname="x.py", lineno=1,
-            msg="failed", args=(), exc_info=sys.exc_info(),
+            name="t",
+            level=logging.ERROR,
+            pathname="x.py",
+            lineno=1,
+            msg="failed",
+            args=(),
+            exc_info=sys.exc_info(),
         )
     data = json.loads(formatter.format(record))
     assert data["level"] == "ERROR"
