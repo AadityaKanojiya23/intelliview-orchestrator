@@ -5,6 +5,7 @@ and a `session_failed` signal that lets us mark the DB session as
 FAILED only after Celery has exhausted its retries (rather than on
 every transient exception).
 """
+
 from celery import Celery, signals
 
 from config import REDIS_URL
@@ -41,15 +42,15 @@ def _on_task_failure(task_id, exception, args, kwargs, traceback, einfo, **_extr
     """
     try:
         from orchestrator.session_manager import SessionManager
+
         session_id = args[0] if args else None
         if not session_id:
             return
-        SessionManager().mark_session_failed(
-            session_id, f"Celery task exhausted retries: {exception!s}"
-        )
+        SessionManager().mark_session_failed(session_id, f"Celery task exhausted retries: {exception!s}")
     except Exception as exc:
         # Don't let a signal handler crash the worker.
         import logging
+
         logging.getLogger(__name__).warning("task_failure handler failed: %s", exc)
 
 

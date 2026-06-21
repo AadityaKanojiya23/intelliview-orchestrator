@@ -31,6 +31,7 @@ from database.models import Base
 from monitoring.dashboard_api import create_dashboard_routes
 from monitoring.metrics_collector import MetricsCollector
 from monitoring.websocket_manager import ws_manager
+from orchestrator import http_cache
 from orchestrator.fault_manager import FaultManager
 from orchestrator.health_monitor import HealthMonitor
 from orchestrator.load_balancer import BalancingStrategy, LoadBalancer
@@ -345,6 +346,10 @@ async def start_interview(request: StartInterviewRequest):
         # Get estimated wait time
         wait_time = scheduler.get_estimated_wait_time(priority)
 
+        # Invalidate the read caches so the next poll reflects the new
+        # session immediately instead of waiting for the TTL.
+        http_cache.invalidate("active-sessions", "session-statistics", "workers", "worker-statistics")
+
         # Retrieve and return session details
         session_data = session_manager.get_session(session_id)
 
@@ -441,6 +446,7 @@ async def get_task_status(task_id: str):
 
 
 @app.get("/active-sessions")
+@http_cache.cached("active-sessions", ttl=2)
 async def get_active_sessions():
     """
     Get all currently active sessions
@@ -459,6 +465,7 @@ async def get_active_sessions():
 
 
 @app.get("/completed-sessions")
+@http_cache.cached("completed-sessions", ttl=3)
 async def get_completed_sessions(limit: int = 100):
     """
     Get recently completed sessions
@@ -504,6 +511,7 @@ async def get_stuck_sessions(timeout_minutes: int = 30):
 
 
 @app.get("/session-statistics")
+@http_cache.cached("session-statistics", ttl=2)
 async def get_session_statistics():
     """
     Get comprehensive session statistics
@@ -733,6 +741,9 @@ async def worker_heartbeat(request: WorkerHeartbeatRequest):
         # Update worker heartbeat in registry
         worker_registry.heartbeat(worker_id=request.worker_id, active_tasks=request.active_tasks)
 
+        # Invalidate the workers + load caches so the next dashboard poll is fresh.
+        http_cache.invalidate("workers", "worker-statistics", "load-status")
+
         # Get worker health status
         worker_status = worker_registry.get_worker(request.worker_id)
         health_status = (
@@ -753,6 +764,7 @@ async def worker_heartbeat(request: WorkerHeartbeatRequest):
 
 
 @app.get("/workers")
+@http_cache.cached("workers", ttl=2)
 async def list_workers():
     """
     Get list of all registered workers with status
@@ -798,6 +810,7 @@ async def list_workers():
 
 
 @app.get("/worker-statistics")
+@http_cache.cached("worker-statistics", ttl=2)
 async def get_worker_stats():
     """
     Get detailed worker statistics and utilization metrics
@@ -985,6 +998,7 @@ async def deregister_worker(worker_id: str):
 
 
 @app.get("/failed-sessions")
+@http_cache.cached("failed-sessions", ttl=3)
 async def get_failed_sessions(limit: int = 100):
     """
     Get sessions that failed during processing
@@ -1259,6 +1273,9 @@ async def detect_and_handle_failures():
             f"Failure detection complete: {len(failed_sessions)} failed, "
             f"{len(unhealthy_workers)} unhealthy workers, {len(stuck_sessions)} stuck"
         )
+
+        # Drop every cache so dashboards reflect the recovery pass.
+        http_cache.invalidate()
 
         return results
 

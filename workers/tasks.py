@@ -8,6 +8,7 @@ Pipeline:
      Celery. The session is NOT marked FAILED here — only after Celery
      has exhausted retries (see `celery_app.task_failure` signal).
 """
+
 from __future__ import annotations
 
 import logging
@@ -90,9 +91,7 @@ def process_interview_session(self, session_id):
         logger.info("Audio analysis completed for session %s", session_id)
 
         # Stage 3: evaluation
-        session_manager.update_session_status(
-            session_id, session_manager.EVALUATING, {"stage": "evaluation"}
-        )
+        session_manager.update_session_status(session_id, session_manager.EVALUATING, {"stage": "evaluation"})
         evaluation_result = evaluate_answers(session_id)
         logger.info("Answer evaluation completed for session %s", session_id)
 
