@@ -6,6 +6,7 @@ to show on first boot.
 Run with:
     python scripts/seed.py            # idempotent: only inserts missing rows
     python scripts/seed.py --reset    # wipe & reseed
+    python scripts/seed.py --keepalive  # keep demo workers alive in foreground
     AUTO_SEED_DEMO_DATA=true           # automatic on app startup
 
 What gets seeded:
@@ -20,6 +21,7 @@ from __future__ import annotations
 import argparse
 import random
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -154,12 +156,26 @@ def seed_sessions(reset: bool = False) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Seed the demo dataset.")
     parser.add_argument("--reset", action="store_true", help="wipe existing rows first")
+    parser.add_argument(
+        "--keepalive",
+        action="store_true",
+        help="after seeding, periodically heartbeat the demo workers so they stay healthy (blocks)",
+    )
     args = parser.parse_args()
 
     print(f"Seeding demo data into {get_settings().database_url} …")
     seed_workers()
     seed_sessions(reset=args.reset)
     print("Done.")
+
+    if args.keepalive:
+        print("Keeping demo workers alive (Ctrl-C to exit) …")
+        registry = WorkerRegistry()
+        while True:
+            for spec in WORKER_FIXTURES:
+                registry.heartbeat(spec["worker_id"], active_tasks=spec["active_tasks"])
+            time.sleep(15)
+
     return 0
 
 
