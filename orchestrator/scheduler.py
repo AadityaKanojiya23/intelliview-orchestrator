@@ -11,7 +11,7 @@ Responsibilities:
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -161,7 +161,7 @@ class Scheduler:
             "available_workers": load_status["available_workers"],
             "system_overloaded": is_overloaded,
             "recommendation": recommendation,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     def can_accept_task(self) -> bool:

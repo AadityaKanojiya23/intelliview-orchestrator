@@ -10,7 +10,7 @@ import os
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("POSTGRES_HOST", "localhost")
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import create_engine
@@ -41,7 +41,7 @@ def _make_session(
     risk: float | None = None,
     started_minutes_ago: int = 0,
 ):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return InterviewSession(
         session_id=session_id,
         candidate_id=f"cand-{session_id}",
@@ -126,8 +126,8 @@ def test_session_manager_state_machine(db_session):
             session_id="s1",
             candidate_id="c1",
             status=sm.CREATED,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
     )
     db_session.commit()
@@ -150,8 +150,8 @@ def test_session_manager_rejects_invalid_transition(db_session):
             session_id="s2",
             candidate_id="c2",
             status=sm.COMPLETED,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
     )
     db_session.commit()

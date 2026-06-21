@@ -12,7 +12,7 @@ Responsibilities:
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 
@@ -148,8 +148,8 @@ class RetryManager:
             retry_data = {
                 "session_id": session_id,
                 "retry_count": retry_count,
-                "scheduled_at": datetime.utcnow().isoformat(),
-                "retry_after": (datetime.utcnow() + timedelta(seconds=delay_seconds)).isoformat(),
+                "scheduled_at": datetime.now(timezone.utc).isoformat(),
+                "retry_after": (datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)).isoformat(),
                 "delay_seconds": delay_seconds,
                 "strategy": self.strategy.value,
             }
@@ -157,15 +157,19 @@ class RetryManager:
             if self.redis_client:
                 # Store retry metadata
                 retry_key = f"{self.retry_key_prefix}{session_id}"
-                self.redis_client.setex(
+                self.redis_client.set(
                     retry_key,
-                    delay_seconds + 600,  # TTL: delay + 10 minutes
                     json.dumps(retry_data),
+                    ex=delay_seconds + 600,
                 )
 
                 # Add to scheduled retry set (expire based on retry time)
                 scheduled_key = f"{self.retry_scheduled_key}{session_id}"
-                self.redis_client.setex(scheduled_key, delay_seconds, json.dumps(retry_data))
+                self.redis_client.set(
+                    scheduled_key,
+                    json.dumps(retry_data),
+                    ex=delay_seconds,
+                )
 
                 logger.debug(f"Retry scheduled for {session_id} in {delay_seconds}s")
 
@@ -350,7 +354,7 @@ class RetryManager:
                 "max_retries": self.max_retries,
                 "base_delay": self.base_delay,
                 "max_delay": self.max_delay,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
         except Exception as e:

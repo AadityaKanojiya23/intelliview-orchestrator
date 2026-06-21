@@ -16,7 +16,7 @@ import logging
 import re
 import time as _time
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -281,7 +281,7 @@ async def health_check():
     Health check endpoint
     Returns system status
     """
-    return {"status": "system running", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "system running", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 # ========== Interview Session Endpoints ==========
@@ -706,7 +706,7 @@ async def register_worker(request: WorkerRegistrationRequest):
             "message": f"Worker {request.worker_id} registered",
             "worker_id": request.worker_id,
             "capacity": request.capacity,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Error registering worker: {e!s}")
@@ -745,7 +745,7 @@ async def worker_heartbeat(request: WorkerHeartbeatRequest):
             "worker_id": request.worker_id,
             "health": health_status,
             "active_tasks": request.active_tasks,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Error processing heartbeat: {e!s}")
@@ -790,7 +790,7 @@ async def list_workers():
             "healthy_workers": len(all_workers) - len(unhealthy),
             "unhealthy_workers": len(unhealthy),
             "workers": workers_list,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Error fetching worker list: {e!s}")
@@ -826,7 +826,7 @@ async def get_worker_stats():
             "max_worker_load": stats.get("max_active_tasks", 0),
             "idle_workers": stats.get("idle_workers", 0),
             "worker_details": stats.get("workers", []),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Error generating worker statistics: {e!s}")
@@ -862,7 +862,7 @@ async def get_load_status():
             "system_at_capacity": load_status.get("system_at_capacity", False),
             "system_overloaded": load_status.get("system_overloaded", False),
             "recommended_strategy": load_status.get("recommended_strategy", "LEAST_LOADED"),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Error fetching load status: {e!s}")
@@ -890,7 +890,7 @@ async def get_scheduling_status():
             "available_workers": status_info.get("available_workers", 0),
             "can_accept_tasks": scheduler.can_accept_task(),
             "recommendation": status_info.get("recommendation"),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Error fetching scheduling status: {e!s}")
@@ -940,7 +940,7 @@ async def switch_load_balancing_strategy(strategy: str):
             "message": f"Strategy switched to {strategy}",
             "previous_strategy": load_balancer.strategy.name,
             "new_strategy": strategy,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except HTTPException:
         raise
@@ -974,7 +974,7 @@ async def deregister_worker(worker_id: str):
             "status": "success",
             "message": f"Worker {worker_id} deregistered",
             "worker_id": worker_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Error deregistering worker: {e!s}")
@@ -1004,7 +1004,7 @@ async def get_failed_sessions(limit: int = 100):
         return {
             "count": len(failed),
             "failed_sessions": failed,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Error fetching failed sessions: {e!s}")
@@ -1053,7 +1053,7 @@ async def retry_failed_session(session_id: str):
             "message": f"Session {session_id} scheduled for retry",
             "session_id": session_id,
             "retry_info": retry_info,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except HTTPException:
         raise
@@ -1127,7 +1127,7 @@ async def get_recovery_queue(limit: int = 50):
         return {
             "count": len(recovery_queue),
             "recovery_queue": recovery_queue,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Error fetching recovery queue: {e!s}")
@@ -1153,7 +1153,7 @@ async def get_failure_log(limit: int = 100):
         return {
             "count": len(failures),
             "failures": failures,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Error fetching failure log: {e!s}")
@@ -1179,7 +1179,7 @@ async def get_dead_letter_queue(limit: int = 50):
         return {
             "count": len(dlq),
             "dead_letter_queue": dlq,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Error fetching dead letter queue: {e!s}")
@@ -1203,7 +1203,7 @@ async def get_fault_statistics():
         return {
             "fault_statistics": fault_stats,
             "retry_statistics": retry_stats,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Error generating fault statistics: {e!s}")
@@ -1252,7 +1252,7 @@ async def detect_and_handle_failures():
             "workers_handled": handled,
             "stuck_sessions_detected": len(stuck_sessions),
             "stuck_sessions": stuck_sessions,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         logger.info(

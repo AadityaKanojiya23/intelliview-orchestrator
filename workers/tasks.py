@@ -15,7 +15,7 @@ Execution Flow:
 
 import logging
 import socket
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 
@@ -80,7 +80,7 @@ def process_interview_session(self, session_id):
 
             if interview:
                 interview.assigned_node = worker_hostname
-                interview.start_time = datetime.utcnow()
+                interview.start_time = datetime.now(timezone.utc)
                 db_session.commit()
         finally:
             db_session.close()
@@ -138,7 +138,7 @@ def process_interview_session(self, session_id):
                 interview.video_analysis = video_result
                 interview.audio_analysis = audio_result
                 interview.evaluation_analysis = evaluation_result
-                interview.end_time = datetime.utcnow()
+                interview.end_time = datetime.now(timezone.utc)
                 db_session.commit()
                 logger.info(f"Stored results for session {session_id}")
         finally:
@@ -154,7 +154,7 @@ def process_interview_session(self, session_id):
             session_data["status"] = session_manager.COMPLETED
             session_data["risk_score"] = final_risk_score
             session_data["risk_classification"] = risk_classification
-            session_data["end_time"] = datetime.utcnow().isoformat()
+            session_data["end_time"] = datetime.now(timezone.utc).isoformat()
             state_sync.set_session_state(session_id, session_data)
 
         # Prepare result
@@ -168,7 +168,7 @@ def process_interview_session(self, session_id):
             "final_risk_score": final_risk_score,
             "risk_classification": risk_classification,
             "processed_by": worker_hostname,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         logger.info(f"Successfully completed processing for session {session_id}")

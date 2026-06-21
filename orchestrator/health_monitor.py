@@ -12,7 +12,7 @@ Responsibilities:
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import redis
@@ -97,7 +97,7 @@ class HealthMonitor:
             logger.debug("Performing comprehensive system health check")
 
             health_status = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "overall_status": HealthStatus.HEALTHY,
                 "components": {},
             }
@@ -147,12 +147,12 @@ class HealthMonitor:
 
             # Store health status
             if self.redis_client:
-                self.redis_client.setex(
+                self.redis_client.set(
                     self.health_status_key,
-                    300,  # 5 minute TTL
                     json.dumps(health_status),
+                    ex=300,
                 )
-                self.redis_client.set(self.last_check_key, datetime.utcnow().isoformat())
+                self.redis_client.set(self.last_check_key, datetime.now(timezone.utc).isoformat())
 
             logger.info(f"System health check complete: {health_status['overall_status']}")
 
@@ -161,7 +161,7 @@ class HealthMonitor:
         except Exception as e:
             logger.error(f"Error checking system health: {e!s}")
             return {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "overall_status": HealthStatus.UNHEALTHY,
                 "error": str(e),
             }
@@ -231,7 +231,7 @@ class HealthMonitor:
                     if start_time:
                         try:
                             start_dt = datetime.fromisoformat(start_time)
-                            elapsed = (datetime.utcnow() - start_dt).total_seconds()
+                            elapsed = (datetime.now(timezone.utc) - start_dt).total_seconds()
 
                             if elapsed > self.session_timeout:
                                 stuck_sessions.append(
@@ -381,7 +381,7 @@ class HealthMonitor:
                     if start_time:
                         try:
                             start_dt = datetime.fromisoformat(start_time)
-                            elapsed = (datetime.utcnow() - start_dt).total_seconds()
+                            elapsed = (datetime.now(timezone.utc) - start_dt).total_seconds()
 
                             if elapsed > self.session_timeout:
                                 stuck_sessions.append(session.get("session_id"))

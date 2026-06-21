@@ -10,7 +10,7 @@ Responsibilities:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Any
 
@@ -99,8 +99,8 @@ class WorkerRegistry:
                 "status": "healthy",
                 "active_tasks": 0,
                 "capacity": capacity,
-                "registered_at": datetime.utcnow().isoformat(),
-                "last_heartbeat": datetime.utcnow().isoformat(),
+                "registered_at": datetime.now(timezone.utc).isoformat(),
+                "last_heartbeat": datetime.now(timezone.utc).isoformat(),
                 "total_tasks_processed": 0,
                 "failed_tasks": 0,
             }
@@ -156,13 +156,13 @@ class WorkerRegistry:
                     return False
 
                 self.local_workers[worker_id]["status"] = status
-                self.local_workers[worker_id]["updated_at"] = datetime.utcnow().isoformat()
+                self.local_workers[worker_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
 
             # Update in Redis
             if self.redis_client:
                 key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
                 self.redis_client.hset(key, "status", status)
-                self.redis_client.hset(key, "updated_at", datetime.utcnow().isoformat())
+                self.redis_client.hset(key, "updated_at", datetime.now(timezone.utc).isoformat())
 
             logger.info(f"Updated worker {worker_id} status to {status}")
             return True
@@ -189,19 +189,19 @@ class WorkerRegistry:
                     return False
 
                 self.local_workers[worker_id]["active_tasks"] = active_tasks
-                self.local_workers[worker_id]["last_heartbeat"] = datetime.utcnow().isoformat()
+                self.local_workers[worker_id]["last_heartbeat"] = datetime.now(timezone.utc).isoformat()
                 self.local_workers[worker_id]["status"] = "healthy"
 
             # Update in Redis
             if self.redis_client:
                 key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
                 self.redis_client.hset(key, "active_tasks", active_tasks)
-                self.redis_client.hset(key, "last_heartbeat", datetime.utcnow().isoformat())
+                self.redis_client.hset(key, "last_heartbeat", datetime.now(timezone.utc).isoformat())
                 self.redis_client.hset(key, "status", "healthy")
 
                 # Also store heartbeat timestamp
                 hb_key = f"{self.WORKER_HEARTBEAT_KEY}{worker_id}"
-                self.redis_client.setex(hb_key, self.HEARTBEAT_TIMEOUT, "ok")
+                self.redis_client.set(hb_key, "ok", ex=self.HEARTBEAT_TIMEOUT)
 
             logger.debug(f"Heartbeat from {worker_id}: {active_tasks} active tasks")
             return True
@@ -336,12 +336,19 @@ class WorkerRegistry:
         Returns:
             list: List of unhealthy worker IDs
         """
-        unhealthy = []
-        timeout_threshold = datetime.utcnow() - timedelta(seconds=self.HEARTBEAT_TIMEOUT)
+        from orchestrator.time_utils import utcnow
+
+        unhealthy: list[str] = []
+        timeout_threshold = utcnow() - timedelta(seconds=self.HEARTBEAT_TIMEOUT)
 
         with self.lock:
             for worker_id, worker in self.local_workers.items():
-                last_hb = datetime.fromisoformat(worker["last_heartbeat"])
+                last_hb_raw = worker.get("last_heartbeat")
+                if not last_hb_raw:
+                    continue
+                last_hb = datetime.fromisoformat(last_hb_raw)
+                if last_hb.tzinfo is None:
+                    last_hb = last_hb.replace(tzinfo=timezone.utc)
                 if last_hb < timeout_threshold:
                     unhealthy.append(worker_id)
                     worker["status"] = "unhealthy"

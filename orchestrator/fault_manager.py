@@ -12,7 +12,7 @@ Responsibilities:
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 
@@ -107,7 +107,7 @@ class FaultManager:
                             start_time = session.get("start_time")
                             if start_time:
                                 start_dt = datetime.fromisoformat(start_time)
-                                elapsed = (datetime.utcnow() - start_dt).total_seconds()
+                                elapsed = (datetime.now(timezone.utc) - start_dt).total_seconds()
 
                                 if elapsed > timeout_seconds:
                                     failed_sessions.append(session.get("session_id"))
@@ -195,16 +195,16 @@ class FaultManager:
 
             recovery_data = {
                 "session_id": session_id,
-                "reassigned_at": datetime.utcnow().isoformat(),
+                "reassigned_at": datetime.now(timezone.utc).isoformat(),
                 "original_worker": original_worker,
                 "reassignment_count": self._increment_reassignment_count(session_id),
             }
 
             if self.redis_client:
-                self.redis_client.setex(
+                self.redis_client.set(
                     recovery_key,
-                    86400,  # 24 hour TTL
                     json.dumps(recovery_data),
+                    ex=86400,
                 )
                 logger.info(f"Task {session_id} added to recovery queue")
 
@@ -280,7 +280,7 @@ class FaultManager:
         """
         try:
             log_entry = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "session_id": session_id,
                 "failure_type": failure_type.value,
                 "error_message": error_message,
@@ -289,7 +289,7 @@ class FaultManager:
 
             if self.redis_client:
                 # Add to failure log list (keep last 1000 failures)
-                log_key = f"{self.failure_log_prefix}{datetime.utcnow().strftime('%Y-%m-%d')}"
+                log_key = f"{self.failure_log_prefix}{datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
                 self.redis_client.lpush(log_key, json.dumps(log_entry))
                 self.redis_client.ltrim(log_key, 0, 999)
                 self.redis_client.expire(log_key, 604800)  # 7 day TTL
@@ -315,7 +315,7 @@ class FaultManager:
         try:
             dlq_entry = {
                 "session_id": session_id,
-                "moved_at": datetime.utcnow().isoformat(),
+                "moved_at": datetime.now(timezone.utc).isoformat(),
                 "reason": reason,
             }
 
@@ -390,7 +390,7 @@ class FaultManager:
             entries = []
 
             # Get today's and yesterday's logs
-            today = datetime.utcnow()
+            today = datetime.now(timezone.utc)
             for days_back in range(7):
                 log_date = (today - timedelta(days=days_back)).strftime("%Y-%m-%d")
                 log_key = f"{self.failure_log_prefix}{log_date}"

@@ -6,6 +6,7 @@ Exits 0 only if every check passes. Prints a single PASS/FAIL line per check.
 Run while the stack is up:
     python scripts/audit_e2e.py
 """
+
 from __future__ import annotations
 
 import json
@@ -62,6 +63,7 @@ def section(title: str) -> None:
 
 
 # ----------------------- Backend endpoints ----------------------------------
+
 
 def backend() -> None:
     section("Backend — read endpoints")
@@ -124,22 +126,27 @@ def backend() -> None:
         # Wait for processing
         for _ in range(10):
             s, _, body = request("GET", f"{API}/session-status/{sid}")
-            if s == 200 and isinstance(body, dict) and body.get("status") in (
-                "COMPLETED",
-                "FAILED",
+            if (
+                s == 200
+                and isinstance(body, dict)
+                and body.get("status")
+                in (
+                    "COMPLETED",
+                    "FAILED",
+                )
             ):
                 break
             time.sleep(1)
-        check("GET /session-status/{id}", s == 200, f"final status={body.get('status') if isinstance(body, dict) else 'n/a'}")
+        check(
+            "GET /session-status/{id}",
+            s == 200,
+            f"final status={body.get('status') if isinstance(body, dict) else 'n/a'}",
+        )
 
-    s, _, _ = request(
-        "POST", f"{API}/switch-strategy?strategy=QUEUE_BASED", headers=hdr
-    )
+    s, _, _ = request("POST", f"{API}/switch-strategy?strategy=QUEUE_BASED", headers=hdr)
     check("POST /switch-strategy", s == 200, f"HTTP {s}")
 
-    s, _, _ = request(
-        "POST", f"{API}/switch-strategy?strategy=LEAST_LOADED", headers=hdr
-    )
+    s, _, _ = request("POST", f"{API}/switch-strategy?strategy=LEAST_LOADED", headers=hdr)
     check("POST /switch-strategy reset", s == 200, f"HTTP {s}")
 
     s, _, _ = request("POST", f"{API}/detect-failures", headers=hdr)
@@ -185,9 +192,7 @@ def backend() -> None:
     check("POST /start-interview bad priority", s == 422, f"HTTP {s}")
 
     # Invalid switch strategy → 400
-    s, _, _ = request(
-        "POST", f"{API}/switch-strategy?strategy=NOPE", headers=hdr
-    )
+    s, _, _ = request("POST", f"{API}/switch-strategy?strategy=NOPE", headers=hdr)
     check("POST /switch-strategy invalid strategy", s == 400, f"HTTP {s}")
 
     # Invalid worker_id heartbeat → 200 (returns success but is no-op for unknown)
@@ -201,6 +206,7 @@ def backend() -> None:
 
 
 # ----------------------- Monitoring router ----------------------------------
+
 
 def monitoring() -> None:
     section("Monitoring router (/monitoring/*)")
@@ -222,6 +228,7 @@ def monitoring() -> None:
 
 # ----------------------- Frontend pages --------------------------------------
 
+
 def frontend() -> None:
     section("Frontend pages")
     for path in [
@@ -233,9 +240,11 @@ def frontend() -> None:
         "/not-a-real-page",  # 404
     ]:
         s, _, _ = request("GET", f"{WEB}{path}")
-        check(f"GET {path} ({'page' if path != '/not-a-real-page' else '404'})",
-              s == 200 if path != "/not-a-real-page" else s == 404,
-              f"HTTP {s}")
+        check(
+            f"GET {path} ({'page' if path != '/not-a-real-page' else '404'})",
+            s == 200 if path != "/not-a-real-page" else s == 404,
+            f"HTTP {s}",
+        )
 
     section("Frontend — static assets")
     for path in ["/_next/static/chunks/", "/favicon.ico"]:
@@ -244,6 +253,7 @@ def frontend() -> None:
 
 
 # ----------------------- WebSocket ------------------------------------------
+
 
 def websocket() -> None:
     section("WebSocket /monitoring/ws/metrics")
@@ -268,7 +278,9 @@ def websocket() -> None:
                     pass
                 check("WS connects", True, "")
                 check("WS receives hello", any(m.get("type") == "hello" for m in msgs), f"{len(msgs)} msgs")
-                check("WS receives metrics", any(m.get("type") == "metrics" for m in msgs), f"{len(msgs)} msgs")
+                check(
+                    "WS receives metrics", any(m.get("type") == "metrics" for m in msgs), f"{len(msgs)} msgs"
+                )
         except Exception as exc:
             check("WS connects", False, str(exc))
 

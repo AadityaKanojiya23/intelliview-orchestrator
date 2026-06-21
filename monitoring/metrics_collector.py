@@ -12,7 +12,7 @@ Responsibilities:
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import redis
@@ -75,7 +75,7 @@ class MetricsCollector:
                 health_status = "degraded"
 
             return {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "system_health": health_status,
                 "session_metrics": session_metrics,
                 "worker_metrics": worker_metrics,
@@ -241,7 +241,7 @@ class MetricsCollector:
             return {
                 "total_workers": len(workers_list),
                 "workers": workers_list,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
         except Exception as e:
@@ -270,7 +270,7 @@ class MetricsCollector:
                 "max_risk_score": session_stats.get("max_risk_score", 0),
                 "avg_risk_score": session_stats.get("avg_risk_score", 0),
                 "high_risk_count": session_stats.get("high_risk_count", 0),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
         except Exception as e:
@@ -296,7 +296,7 @@ class MetricsCollector:
                 "recovery_queue_size": fault_stats.get("recovery_queue_size", 0),
                 "dead_letter_queue_size": fault_stats.get("dead_letter_queue_size", 0),
                 "last_failures": fault_stats.get("last_failures", [])[:5],
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
         except Exception as e:
@@ -321,7 +321,7 @@ class MetricsCollector:
                 "retry_strategy": retry_stats.get("retry_strategy", "unknown"),
                 "max_retries": retry_stats.get("max_retries", 0),
                 "recent_retries": retry_stats.get("scheduled_retries", [])[:5],
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
         except Exception as e:
@@ -346,7 +346,7 @@ class MetricsCollector:
                 "total_sessions": stats.get("active_count", 0) + stats.get("completed_count", 0),
                 "throughput_per_minute": self._calculate_throughput(),
                 "peak_concurrent_sessions": stats.get("peak_concurrent", 0),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
         except Exception as e:
@@ -360,7 +360,7 @@ class MetricsCollector:
                 return 0.0
 
             # Get completed sessions from last minute
-            one_minute_ago = (datetime.utcnow() - timedelta(minutes=1)).isoformat()
+            one_minute_ago = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
 
             count = 0
             cursor = 0
@@ -399,7 +399,7 @@ class MetricsCollector:
 
             if start_time_str:
                 start_time = datetime.fromisoformat(start_time_str)
-                uptime = (datetime.utcnow() - start_time).total_seconds()
+                uptime = (datetime.now(timezone.utc) - start_time).total_seconds()
                 return int(uptime)
 
             return 0

@@ -13,6 +13,7 @@ Every important update:
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 import redis
@@ -81,7 +82,7 @@ class StateSynchronizer:
             value = json.dumps(session_data)
 
             # Set with TTL
-            self.redis_client.setex(key, self.SESSION_TTL, value)
+            self.redis_client.set(key, value, ex=self.SESSION_TTL)
 
             # Add to active sessions set
             self.redis_client.sadd(self.ACTIVE_SESSIONS_KEY, session_id)
@@ -177,7 +178,7 @@ class StateSynchronizer:
             bool: True if successful
         """
         try:
-            from datetime import datetime
+            # Force-load the session row into the DB if it's only in Redis.
 
             from database.db import SessionLocal
             from database.models import InterviewSession
@@ -208,7 +209,7 @@ class StateSynchronizer:
                 if "evaluation_analysis" in session_data:
                     interview.evaluation_analysis = session_data["evaluation_analysis"]
 
-                interview.updated_at = datetime.utcnow()
+                interview.updated_at = datetime.now(timezone.utc)
                 session_db.commit()
 
                 logger.info(f"Synced session {session_id} state to database")

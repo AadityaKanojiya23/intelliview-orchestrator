@@ -10,7 +10,7 @@ Responsibilities:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import func, select
@@ -216,7 +216,7 @@ class SessionTracker:
         """
         session_db = SessionLocal()
         try:
-            cutoff_time = datetime.utcnow() - timedelta(minutes=timeout_minutes)
+            cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
 
             stuck_sessions = (
                 session_db.execute(
@@ -231,7 +231,7 @@ class SessionTracker:
 
             result = []
             for s in stuck_sessions:
-                elapsed_time = (datetime.utcnow() - s.start_time).total_seconds()
+                elapsed_time = (datetime.now(timezone.utc) - s.start_time).total_seconds()
                 result.append(
                     {
                         "session_id": s.session_id,

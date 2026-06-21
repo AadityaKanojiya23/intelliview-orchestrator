@@ -70,4 +70,6 @@ def test_reassign_increments_counter_and_persists():
     fm = _manager()
     fm.redis_client.incr.return_value = 2
     assert fm.reassign_task("s3", original_worker="w_dead") is True
-    fm.redis_client.setex.assert_called()
+    # The modern redis-py uses `set(key, value, ex=ttl)` instead of the
+    # deprecated `setex(key, ttl, value)`.
+    fm.redis_client.set.assert_called()
