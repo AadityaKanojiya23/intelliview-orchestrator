@@ -3,7 +3,7 @@ import { Suspense, lazy, useEffect, useState, useCallback } from "react";
 import { SWRConfig } from "swr";
 import { swrFetcher } from "@/lib/fetcher";
 import { useHydrateToken } from "@/hooks/useHydrateToken";
-import { useThemeStore, hydrateTheme } from "@/lib/theme";
+import { hydrateTheme } from "@/lib/theme";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useKeyboardNav } from "@/hooks/useKeyboardNav";
 import { useUIStore } from "@/lib/ui-store";
@@ -11,27 +11,37 @@ import { endpoints, api } from "@/lib/api";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
 
-const CommandPalette = lazy(() => import("@/components/CommandPalette").then((m) => ({ default: m.CommandPalette })));
-const Toaster = lazy(() => import("@/components/Toaster").then((m) => ({ default: m.Toaster })));
-const ShortcutsHelp = lazy(() => import("@/components/ShortcutsHelp").then((m) => ({ default: m.ShortcutsHelp })));
-const MobileSidebar = lazy(() => import("@/components/MobileSidebar").then((m) => ({ default: m.MobileSidebar })));
-const Sidebar = lazy(() => import("@/components/Sidebar").then((m) => ({ default: m.Sidebar })));
+const CommandPalette = lazy(() =>
+  import("@/components/CommandPalette").then((m) => ({ default: m.CommandPalette })),
+);
+const Toaster = lazy(() =>
+  import("@/components/Toaster").then((m) => ({ default: m.Toaster })),
+);
+const ShortcutsHelp = lazy(() =>
+  import("@/components/ShortcutsHelp").then((m) => ({ default: m.ShortcutsHelp })),
+);
+const MobileSidebar = lazy(() =>
+  import("@/components/MobileSidebar").then((m) => ({ default: m.MobileSidebar })),
+);
+const SidebarMobile = lazy(() =>
+  import("@/components/Sidebar").then((m) => ({ default: m.Sidebar })),
+);
 
 function NullFallback() {
   return null;
 }
 
 export function ClientProviders({ children }) {
+  // Hydrate persisted stores once on mount. Don't gate the tree on this —
+  // the SSR pass already renders the full layout, and the only side-effect
+  // is reading localStorage.
   useHydrateToken();
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-
   useEffect(() => {
     hydrateTheme();
-    setHydrated(true);
   }, []);
 
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const mobileOpen = useUIStore((s) => s.mobileSidebarOpen);
@@ -90,10 +100,6 @@ export function ClientProviders({ children }) {
     [router],
   );
 
-  if (!hydrated) {
-    return <div className="min-h-screen bg-bg" />;
-  }
-
   return (
     <SWRConfig
       value={{
@@ -116,7 +122,7 @@ export function ClientProviders({ children }) {
         <Toaster />
         <MobileSidebar open={mobileOpen} onClose={() => setMobileOpen(false)}>
           <Suspense fallback={<NullFallback />}>
-            <Sidebar mobile onNavigate={() => setMobileOpen(false)} />
+            <SidebarMobile mobile onNavigate={() => setMobileOpen(false)} />
           </Suspense>
         </MobileSidebar>
       </Suspense>

@@ -578,7 +578,7 @@ async def get_cache_stats():
         raise HTTPException(status_code=500, detail="Error fetching cache stats")
 
 
-@app.post("/sync-to-database")
+@app.post("/sync-to-database", dependencies=[Depends(require_token)])
 async def sync_cache_to_database(session_id: str | None = None):
     """
     Manually sync cache to database
