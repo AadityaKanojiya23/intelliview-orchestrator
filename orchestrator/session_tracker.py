@@ -339,23 +339,46 @@ class SessionTracker:
         finally:
             session_db.close()
 
-    @staticmethod
-    def _calculate_duration(start_time, end_time) -> float | None:
+    def get_failed_sessions(self, limit: int = 100) -> list[dict[str, Any]]:
         """
-        Calculate duration between two timestamps
+        Get sessions that ended in a non-success terminal state
+        (FAILED, TIMEOUT, or CANCELLED), newest first.
 
         Args:
-            start_time: Start timestamp
-            end_time: End timestamp
+            limit: Maximum number of sessions to retrieve.
 
         Returns:
-            float: Duration in seconds or None
+            list: Failed session summaries.
         """
-        if not start_time or not end_time:
-            return None
-
+        session_db = SessionLocal()
         try:
-            duration = (end_time - start_time).total_seconds()
-            return round(duration, 2)
-        except Exception:
-            return None
+            sessions = (
+                session_db.execute(
+                    select(InterviewSession)
+                    .where(InterviewSession.status.in_(["FAILED", "TIMEOUT", "CANCELLED"]))
+                    .order_by(InterviewSession.updated_at.desc().nullslast())
+                    .limit(limit)
+                )
+                .scalars()
+                .all()
+            )
+
+            result = [
+                {
+                    "session_id": s.session_id,
+                    "candidate_id": s.candidate_id,
+                    "status": s.status,
+                    "risk_score": s.risk_score,
+                    "assigned_node": s.assigned_node,
+                    "start_time": s.start_time.isoformat() if s.start_time else None,
+                    "end_time": s.end_time.isoformat() if s.end_time else None,
+                    "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+                }
+                for s in sessions
+            ]
+            return result
+        except Exception as e:
+            logger.error(f"Error getting failed sessions: {e!s}")
+            return []
+        finally:
+            session_db.close()

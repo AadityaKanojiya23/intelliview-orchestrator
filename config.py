@@ -12,6 +12,12 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+class _CsvList(list):
+    """Marker type that prevents pydantic-settings from JSON-parsing."""
+
+    pass
+
+
 class Settings(BaseSettings):
     """Application configuration loaded from the environment."""
 
@@ -43,8 +49,9 @@ class Settings(BaseSettings):
     # /worker/heartbeat. **Change `dev-token-change-me` in production.**
     api_token: str = "dev-token-change-me"
 
-    # Comma-separated origin list for CORS. Use "*" to allow all (dev only).
-    cors_allow_origins: List[str] = Field(default_factory=lambda: ["*"])
+    # Comma-separated origin list for CORS (raw string to avoid JSON-decode
+    # pitfalls). `*` is allowed in dev only; production must list origins.
+    cors_allow_origins_raw: str = Field(default="*", alias="cors_allow_origins")
 
     # --- Feature flags ---
     enable_celery_broker: bool = True
@@ -63,16 +70,12 @@ class Settings(BaseSettings):
     def is_default_token(self) -> bool:
         return self.api_token == "dev-token-change-me"
 
-    @field_validator("cors_allow_origins", mode="before")
-    @classmethod
-    def _parse_cors(cls, value):
-        """Accept comma-separated strings or lists for CORS origins."""
-        if value is None or value == "":
+    @property
+    def cors_allow_origins(self) -> List[str]:
+        raw = (self.cors_allow_origins_raw or "").strip()
+        if not raw or raw == "*":
             return ["*"]
-        if isinstance(value, str):
-            parts = [v.strip() for v in value.split(",") if v.strip()]
-            return parts if parts else ["*"]
-        return value
+        return [v.strip() for v in raw.split(",") if v.strip()]
 
 
 @lru_cache(maxsize=1)

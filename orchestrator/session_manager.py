@@ -10,17 +10,23 @@ Responsibilities:
 - Maintain consistency between Redis and PostgreSQL
 """
 
+import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import select
 
 from database.db import SessionLocal
 from database.models import InterviewSession
+from monitoring.websocket_manager import ws_manager
 from orchestrator.state_sync import StateSynchronizer
 
 logger = logging.getLogger(__name__)
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class SessionManager:
@@ -90,9 +96,7 @@ class SessionManager:
         session_db = SessionLocal()
         try:
             # Generate unique session ID
-            session_id = (
-                f"session_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{hash(candidate_id) % 100000:05d}"
-            )
+            session_id = f"session_{_utcnow().strftime('%Y%m%d%H%M%S')}_{hash(candidate_id) % 100000:05d}"
 
             logger.info(f"Creating new interview session: {session_id} for candidate {candidate_id}")
 
@@ -101,8 +105,8 @@ class SessionManager:
                 session_id=session_id,
                 candidate_id=candidate_id,
                 status=self.CREATED,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=_utcnow(),
+                updated_at=_utcnow(),
             )
 
             session_db.add(interview_session)
@@ -115,8 +119,8 @@ class SessionManager:
                 "candidate_name": candidate_name or "Unknown",
                 "position": position or "Unknown",
                 "status": self.CREATED,
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
+                "created_at": _utcnow().isoformat(),
+                "updated_at": _utcnow().isoformat(),
                 "risk_score": None,
             }
             self.state_sync.set_session_state(session_id, session_data)
@@ -172,19 +176,23 @@ class SessionManager:
 
             # Update database
             interview.status = new_status
-            interview.updated_at = datetime.utcnow()
+            interview.updated_at = _utcnow()
             session_db.commit()
 
             # Update Redis cache
             session_data = self.state_sync.get_session_state(session_id)
             if session_data:
                 session_data["status"] = new_status
-                session_data["updated_at"] = datetime.utcnow().isoformat()
+                session_data["updated_at"] = _utcnow().isoformat()
                 if metadata:
                     session_data.update(metadata)
                 self.state_sync.set_session_state(session_id, session_data)
 
             logger.info(f"Session {session_id} status updated to {new_status}")
+
+            # Broadcast the transition to dashboard WebSocket clients (non-blocking).
+            self._broadcast_status(session_id, new_status, interview.risk_score, metadata or {})
+
             return True
 
         except Exception as e:
@@ -290,8 +298,8 @@ class SessionManager:
 
             interview.status = self.COMPLETED
             interview.risk_score = risk_score
-            interview.end_time = datetime.utcnow()
-            interview.updated_at = datetime.utcnow()
+            interview.end_time = _utcnow()
+            interview.updated_at = _utcnow()
             session_db.commit()
 
             # Update Redis
@@ -299,8 +307,8 @@ class SessionManager:
             if session_data:
                 session_data["status"] = self.COMPLETED
                 session_data["risk_score"] = risk_score
-                session_data["end_time"] = datetime.utcnow().isoformat()
-                session_data["updated_at"] = datetime.utcnow().isoformat()
+                session_data["end_time"] = _utcnow().isoformat()
+                session_data["updated_at"] = _utcnow().isoformat()
                 self.state_sync.set_session_state(session_id, session_data)
 
             logger.info(f"Session {session_id} marked as completed")
@@ -312,20 +320,6 @@ class SessionManager:
             return False
         finally:
             session_db.close()
-
-    def cancel_session(self, session_id: str, reason: str) -> bool:
-        """
-        Cancel an ongoing session
-
-        Args:
-            session_id: Session identifier
-            reason: Reason for cancellation
-
-        Returns:
-            bool: True if successful
-        """
-        logger.info(f"Cancelling session {session_id}: {reason}")
-        return self.update_session_status(session_id, self.CANCELLED, {"cancellation_reason": reason})
 
     def _is_valid_transition(self, current_status: str, new_status: str) -> bool:
         """
@@ -343,51 +337,29 @@ class SessionManager:
 
         return new_status in self.VALID_TRANSITIONS[current_status]
 
-    def detect_timeout_sessions(self) -> list:
-        """
-        Detect sessions that have timed out and mark as failed
-
-        Returns:
-            list: List of session_ids that timed out
-        """
-        session_db = SessionLocal()
-        timed_out_sessions = []
-
+    @staticmethod
+    def _broadcast_status(
+        session_id: str, status: str, risk_score: float | None, details: dict[str, Any]
+    ) -> None:
+        """Schedule a non-blocking WebSocket broadcast (fire-and-forget)."""
         try:
-            now = datetime.utcnow()
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return  # no loop in tests / scripts — silently skip
 
-            # Check for PROCESSING sessions that have exceeded timeout
-            processing_sessions = (
-                session_db.execute(select(InterviewSession).where(InterviewSession.status == self.PROCESSING))
-                .scalars()
-                .all()
-            )
+        async def _emit() -> None:
+            try:
+                await ws_manager.broadcast_session_update(
+                    session_id=session_id,
+                    status=status,
+                    details=details,
+                    risk_score=risk_score,
+                )
+            except Exception as exc:
+                logger.debug("ws broadcast failed for %s: %s", session_id, exc)
 
-            for session in processing_sessions:
-                elapsed_time = (now - session.start_time).total_seconds()
-                if elapsed_time > self.PROCESSING_TIMEOUT:
-                    logger.warning(f"Session {session.session_id} timed out after {elapsed_time}s")
-                    self.mark_session_failed(session.session_id, f"Processing timeout after {elapsed_time}s")
-                    timed_out_sessions.append(session.session_id)
-
-            # Check for QUEUED sessions that have exceeded timeout
-            queued_sessions = (
-                session_db.execute(select(InterviewSession).where(InterviewSession.status == self.QUEUED))
-                .scalars()
-                .all()
-            )
-
-            for session in queued_sessions:
-                elapsed_time = (now - session.created_at).total_seconds()
-                if elapsed_time > self.QUEUED_TIMEOUT:
-                    logger.warning(f"Session {session.session_id} stuck in QUEUED for {elapsed_time}s")
-                    self.mark_session_failed(session.session_id, f"Queued timeout after {elapsed_time}s")
-                    timed_out_sessions.append(session.session_id)
-
-            return timed_out_sessions
-
-        except Exception as e:
-            logger.error(f"Error detecting timeout sessions: {e!s}")
-            return []
-        finally:
-            session_db.close()
+        # The task is intentionally fire-and-forget; we keep a reference to
+        # avoid RUF006 ("Store a reference to the return value") but don't
+        # await it because callers don't block on broadcasts.
+        task = loop.create_task(_emit())
+        task.add_done_callback(lambda _t: None)

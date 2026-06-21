@@ -143,68 +143,6 @@ class Scheduler:
             logger.error(f"Error queuing task: {e!s}")
             return False
 
-    def reschedule_failed_task(self, session_id: str, retry_delay: int = 60) -> bool:
-        """
-        Reschedule a failed task for retry
-
-        Args:
-            session_id: Session ID
-            retry_delay: Delay before retry in seconds
-
-        Returns:
-            bool: True if rescheduled successfully
-        """
-        try:
-            logger.info(f"Rescheduling failed task: {session_id} (retry in {retry_delay}s)")
-
-            # Verify session exists
-            session_data = self.session_manager.get_session(session_id)
-            if not session_data:
-                logger.error(f"Session {session_id} not found for retry")
-                return False
-
-            # Check retry count
-            retry_count = session_data.get("retry_count", 0)
-            max_retries = 3
-
-            if retry_count >= max_retries:
-                logger.warning(f"Max retries exceeded for session {session_id}")
-                self.session_manager.mark_session_failed(session_id, f"Max retries exceeded ({max_retries})")
-                return False
-
-            # Queue task with delay
-            process_interview_session.apply_async(args=[session_id], countdown=retry_delay)
-
-            logger.info(f"Task rescheduled: {session_id} (attempt {retry_count + 1}/{max_retries})")
-            return True
-
-        except Exception as e:
-            logger.error(f"Error rescheduling task: {e!s}")
-            return False
-
-    def schedule_batch_tasks(
-        self, session_ids: list, priority: TaskPriority = TaskPriority.MEDIUM
-    ) -> dict[str, bool]:
-        """
-        Schedule multiple tasks at once
-
-        Args:
-            session_ids: List of session IDs
-            priority: Priority level for all tasks
-
-        Returns:
-            dict: Mapping of session_id -> scheduling success
-        """
-        results = {}
-
-        for session_id in session_ids:
-            results[session_id] = self.schedule_task(session_id, priority)
-
-        successful = sum(1 for v in results.values() if v)
-        logger.info(f"Batch scheduling complete: {successful}/{len(session_ids)} successful")
-
-        return results
-
     def get_scheduling_status(self) -> dict[str, Any]:
         """Get current scheduling and load information"""
         load_status = self.load_balancer.get_load_status()
@@ -225,24 +163,6 @@ class Scheduler:
             "recommendation": recommendation,
             "timestamp": datetime.utcnow().isoformat(),
         }
-
-    def optimize_strategy(self) -> None:
-        """
-        Automatically optimize load balancing strategy based on system state
-        """
-        stats = self.worker_registry.get_worker_statistics()
-        utilization = stats["capacity_utilization"]
-
-        # If utilization > 80%, ensure we're using least loaded
-        if utilization > 80:
-            if self.load_balancer.strategy != BalancingStrategy.LEAST_LOADED:
-                logger.info(f"High utilization ({utilization}%) - switching to LEAST_LOADED strategy")
-                self.load_balancer.switch_strategy(BalancingStrategy.LEAST_LOADED)
-
-        # If utilization < 30%, can use round robin for simplicity
-        elif utilization < 30 and self.load_balancer.strategy != BalancingStrategy.ROUND_ROBIN:
-            logger.info(f"Low utilization ({utilization}%) - switching to ROUND_ROBIN strategy")
-            self.load_balancer.switch_strategy(BalancingStrategy.ROUND_ROBIN)
 
     def can_accept_task(self) -> bool:
         """

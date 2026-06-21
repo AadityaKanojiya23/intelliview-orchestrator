@@ -252,29 +252,6 @@ class RetryManager:
             logger.error(f"Error incrementing retry count: {e!s}")
             return 1
 
-    def reset_retry_count(self, session_id: str) -> bool:
-        """
-        Reset retry count for a session (after successful completion)
-
-        Args:
-            session_id: ID of session
-
-        Returns:
-            True if reset successfully
-        """
-        try:
-            if self.redis_client:
-                count_key = f"{self.retry_count_key}{session_id}"
-                self.redis_client.delete(count_key)
-
-                logger.debug(f"Reset retry count for {session_id}")
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Error resetting retry count: {e!s}")
-            return False
-
     def get_retry_info(self, session_id: str) -> dict[str, Any]:
         """
         Get detailed retry information for a session

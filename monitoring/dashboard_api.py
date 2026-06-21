@@ -316,12 +316,17 @@ def create_dashboard_routes(
             await websocket.close(code=1008, reason="invalid token")
             return
         await ws_manager.connect(websocket)
+        # Send a hello immediately so the client knows the connection is live.
+        await ws_manager.send_to_connection(
+            websocket,
+            {"type": "hello", "timestamp": datetime.utcnow().isoformat()},
+        )
 
         try:
             while True:
                 try:
                     # Receive any client messages (for heartbeat/keep-alive)
-                    data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                    data = await asyncio.wait_for(websocket.receive_text(), timeout=5.0)
 
                     # Echo received message (for ping/pong)
                     if data:
@@ -329,7 +334,7 @@ def create_dashboard_routes(
                             {"type": "pong", "timestamp": datetime.utcnow().isoformat()}
                         )
                 except asyncio.TimeoutError:
-                    # Client timeout - send metrics update to keep connection alive
+                    # Send periodic metrics so dashboards see live updates.
                     try:
                         metrics = {
                             "system": metrics_collector.get_system_metrics(),

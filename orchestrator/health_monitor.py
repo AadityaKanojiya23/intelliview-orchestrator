@@ -397,34 +397,3 @@ class HealthMonitor:
         except Exception as e:
             logger.error(f"Error detecting stuck sessions: {e!s}")
             return []
-
-    def get_health_history(self, limit: int = 20) -> list[dict[str, Any]]:
-        """
-        Get historical health status checks
-
-        Args:
-            limit: Maximum number of history entries to return
-
-        Returns:
-            List of health status entries
-        """
-        try:
-            if not self.redis_client:
-                return []
-
-            history = []
-            history_key = "health:history"
-
-            entries = self.redis_client.lrange(history_key, 0, limit - 1)
-
-            for entry_json in entries:
-                try:
-                    history.append(json.loads(entry_json))
-                except Exception:
-                    continue
-
-            return history
-
-        except Exception as e:
-            logger.error(f"Error getting health history: {e!s}")
-            return []

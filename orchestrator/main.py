@@ -228,13 +228,6 @@ class StartInterviewRequest(BaseModel):
         return v.strip() if isinstance(v, str) else v
 
 
-class ErrorResponse(BaseModel):
-    """Standardised error envelope returned by the API."""
-
-    detail: str
-    request_id: str | None = None
-
-
 class WorkerRegistrationRequest(BaseModel):
     """Request model for worker registration"""
 
@@ -642,15 +635,47 @@ async def clear_session_cache():
 
 
 @app.get("/interviews")
-async def list_interviews():
+async def list_interviews(limit: int = 100, status: str | None = None):
     """
-    List all interview sessions (legacy endpoint)
+    List interview sessions, newest first. Optional `status` filter.
 
     Returns:
-        dict: List of interview sessions
+        dict: List of interview sessions + total count.
     """
-    logger.info("Listing all interview sessions")
-    return {"sessions": [], "total_count": 0}
+    from sqlalchemy import select
+
+    from database.db import SessionLocal
+    from database.models import InterviewSession
+
+    session_db = SessionLocal()
+    try:
+        stmt = select(InterviewSession)
+        if status:
+            stmt = stmt.where(InterviewSession.status == status.upper())
+        stmt = stmt.order_by(InterviewSession.created_at.desc().nullslast()).limit(limit)
+        rows = session_db.execute(stmt).scalars().all()
+        return {
+            "total_count": len(rows),
+            "sessions": [
+                {
+                    "session_id": r.session_id,
+                    "candidate_id": r.candidate_id,
+                    "status": r.status,
+                    "risk_score": r.risk_score,
+                    "assigned_node": r.assigned_node,
+                    "start_time": r.start_time.isoformat() if r.start_time else None,
+                    "end_time": r.end_time.isoformat() if r.end_time else None,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                    "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+                }
+                for r in rows
+            ],
+        }
+    except Exception as e:
+        logger.error(f"Error listing interviews: {e!s}")
+        raise HTTPException(status_code=500, detail="Error listing interviews")
+    finally:
+        session_db.close()
 
 
 # ========== Worker Management Endpoints ==========

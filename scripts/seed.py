@@ -83,12 +83,6 @@ def seed_sessions(reset: bool = False) -> None:
                 InterviewSession(
                     session_id=f"seed-done-{i:03d}",
                     candidate_id=f"cand-{rng.randint(1000, 9999)}",
-                    candidate_name=rng.choice(
-                        ["Ava Patel", "Liam Chen", "Noah Kim", "Mia Rossi", "Yuki Sato", "Omar Hassan"]
-                    ),
-                    position=rng.choice(
-                        ["Senior Backend Engineer", "ML Engineer", "Frontend Engineer", "DevOps Lead"]
-                    ),
                     status="COMPLETED",
                     risk_score=risk,
                     assigned_node=rng.choice([w["worker_id"] for w in WORKER_FIXTURES]),
@@ -97,6 +91,12 @@ def seed_sessions(reset: bool = False) -> None:
                     created_at=end - timedelta(minutes=duration_minutes + 2),
                     updated_at=end,
                     video_analysis={
+                        "candidate_name": rng.choice(
+                            ["Ava Patel", "Liam Chen", "Noah Kim", "Mia Rossi", "Yuki Sato", "Omar Hassan"]
+                        ),
+                        "position": rng.choice(
+                            ["Senior Backend Engineer", "ML Engineer", "Frontend Engineer", "DevOps Lead"]
+                        ),
                         "face_detected": True,
                         "multiple_persons_detected": False,
                         "risk_score": round(risk * 0.7, 3),

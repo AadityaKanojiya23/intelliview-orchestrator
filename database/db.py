@@ -1,7 +1,11 @@
+"""Database connection manager for AI Interview Orchestrator.
+
+Centralises SQLAlchemy connection and session management. Use `SessionLocal()`
+as a context-manager (or close it manually) and prefer the type-hinted
+`with SessionLocal() as db:` pattern in new code.
 """
-Database connection manager for AI Interview Orchestrator
-Centralizes SQLAlchemy connection and session management
-"""
+
+from __future__ import annotations
 
 import logging
 
@@ -12,40 +16,21 @@ from config import DATABASE_URL
 
 logger = logging.getLogger(__name__)
 
-# Create SQLAlchemy engine with connection-recycling and pre-ping so that
-# stale connections (e.g., after a Postgres restart) are dropped instead of
-# surfacing as "connection reset" errors to callers.
+# Connection-recycling + pre-ping so stale Postgres connections (e.g., after
+# a Postgres restart) are dropped instead of surfacing as
+# "connection reset" errors to callers.
 engine = create_engine(
     DATABASE_URL,
-    echo=False,  # Set to True for SQL debugging
+    echo=False,
     pool_size=10,
     max_overflow=20,
     pool_pre_ping=True,
     pool_recycle=1800,
 )
 
-# Session factory
+# Session factory. Use as `with SessionLocal() as db: ...` for automatic
+# cleanup, or call `db.close()` manually.
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Base model for ORM models
+# Base class for ORM models.
 Base = declarative_base()
-
-
-def get_db():
-    """
-    Dependency function for FastAPI to get database session
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def init_db():
-    """
-    Initialize database tables
-    Creates all tables defined in models
-    """
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables initialized")

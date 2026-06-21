@@ -39,10 +39,38 @@ class WorkerRegistry:
             self.redis_client = self._connect_redis()
             self.local_workers: dict[str, dict[str, Any]] = {}
             self.lock = Lock()
+            self._hydrated = False
+            self._hydrate_from_redis()
             logger.info("Worker Registry initialized")
         except Exception as e:
             logger.error(f"Error initializing Worker Registry: {e!s}")
             self.redis_client = None
+
+    def _hydrate_from_redis(self) -> None:
+        """Populate `local_workers` from Redis on first use so workers
+        registered in another process (worker agent / seed script) are
+        visible to this FastAPI process."""
+        if self._hydrated or not self.redis_client:
+            return
+        try:
+            worker_ids = self.redis_client.smembers(self.WORKER_SET_KEY) or set()
+            for wid in worker_ids:
+                raw = self.redis_client.hgetall(f"{self.WORKER_KEY_PREFIX}{wid}")
+                if not raw:
+                    continue
+                self.local_workers[wid] = {
+                    "worker_id": wid,
+                    "status": raw.get("status", "healthy"),
+                    "active_tasks": int(raw.get("active_tasks", 0)),
+                    "capacity": int(raw.get("capacity", 4)),
+                    "registered_at": raw.get("registered_at", ""),
+                    "last_heartbeat": raw.get("last_heartbeat", ""),
+                    "total_tasks_processed": int(raw.get("total_tasks_processed", 0)),
+                    "failed_tasks": int(raw.get("failed_tasks", 0)),
+                }
+            self._hydrated = True
+        except Exception as exc:
+            logger.warning("Could not hydrate worker registry from Redis: %s", exc)
 
     def _connect_redis(self) -> redis.Redis | None:
         """Establish Redis connection"""
