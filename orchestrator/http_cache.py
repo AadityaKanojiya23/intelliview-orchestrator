@@ -80,7 +80,6 @@ def cached(name: str, ttl: int = _DEFAULT_TTL) -> Callable:
 
     def deco(fn: Callable) -> Callable:
         if _is_coro(fn):
-            import asyncio
 
             @wraps(fn)
             async def async_wrapper(*args, **kwargs):

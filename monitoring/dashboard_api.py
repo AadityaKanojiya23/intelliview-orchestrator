@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from config import API_TOKEN
+from orchestrator import http_cache
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,7 @@ def create_dashboard_routes(
     # ========== System Metrics Endpoint ==========
 
     @router.get("/metrics/system")
+    @http_cache.cached("monitoring.metrics.system", ttl=2)
     async def get_system_metrics():
         """
         Get comprehensive system-wide metrics
@@ -89,6 +91,7 @@ def create_dashboard_routes(
     # ========== Worker Metrics Endpoint ==========
 
     @router.get("/metrics/workers")
+    @http_cache.cached("monitoring.metrics.workers", ttl=2)
     async def get_worker_metrics_endpoint():
         """
         Get detailed worker performance metrics
@@ -117,6 +120,7 @@ def create_dashboard_routes(
     # ========== Session Metrics Endpoint ==========
 
     @router.get("/metrics/sessions")
+    @http_cache.cached("monitoring.metrics.sessions", ttl=2)
     async def get_session_metrics_endpoint():
         """
         Get session activity metrics
@@ -145,6 +149,7 @@ def create_dashboard_routes(
     # ========== Queue Metrics Endpoint ==========
 
     @router.get("/metrics/queue")
+    @http_cache.cached("monitoring.metrics.queue", ttl=2)
     async def get_queue_metrics():
         """
         Get queue statistics and backlog information
@@ -173,6 +178,7 @@ def create_dashboard_routes(
     # ========== Failure Metrics Endpoint ==========
 
     @router.get("/metrics/failures")
+    @http_cache.cached("monitoring.metrics.failures", ttl=2)
     async def get_failure_metrics_endpoint():
         """
         Get failure and recovery metrics
@@ -201,6 +207,7 @@ def create_dashboard_routes(
     # ========== Retry Metrics Endpoint ==========
 
     @router.get("/metrics/retries")
+    @http_cache.cached("monitoring.metrics.retries", ttl=2)
     async def get_retry_metrics_endpoint():
         """
         Get retry attempt metrics
@@ -229,6 +236,7 @@ def create_dashboard_routes(
     # ========== Performance Metrics Endpoint ==========
 
     @router.get("/metrics/performance")
+    @http_cache.cached("monitoring.metrics.performance", ttl=2)
     async def get_performance_metrics():
         """
         Get system performance metrics
@@ -257,6 +265,7 @@ def create_dashboard_routes(
     # ========== Dashboard Summary Endpoint ==========
 
     @router.get("/metrics/dashboard")
+    @http_cache.cached("monitoring.metrics.dashboard", ttl=2)
     async def get_dashboard_summary():
         """
         Get comprehensive dashboard summary with all metrics

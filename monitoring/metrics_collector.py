@@ -12,6 +12,7 @@ Responsibilities:
 
 import json
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -20,6 +21,31 @@ import redis
 from config import REDIS_URL
 
 logger = logging.getLogger(__name__)
+
+_METRICS_TTL_SECONDS = 1.0
+
+
+class _TTLCache:
+    """Tiny TTL cache: `(value, expires_at)` per key. No eviction, single
+    process — fine for the small fixed set of metric keys we use."""
+
+    __slots__ = ("_store",)
+
+    def __init__(self) -> None:
+        self._store: dict[str, tuple[float, Any]] = {}
+
+    def get(self, key: str) -> Any | None:
+        entry = self._store.get(key)
+        if entry is None:
+            return None
+        expires_at, value = entry
+        if expires_at < time.monotonic():
+            self._store.pop(key, None)
+            return None
+        return value
+
+    def set(self, key: str, value: Any, ttl: float = _METRICS_TTL_SECONDS) -> None:
+        self._store[key] = (time.monotonic() + ttl, value)
 
 
 class MetricsCollector:
@@ -43,7 +69,7 @@ class MetricsCollector:
         self.redis_url = redis_url
         self.redis_client = self._connect_redis()
         self.metrics_prefix = "metrics:"
-
+        self._system_cache = _TTLCache()
         logger.info("MetricsCollector initialized")
 
     def _connect_redis(self) -> redis.Redis | None:
@@ -64,6 +90,9 @@ class MetricsCollector:
         Returns:
             Dict with system-wide metrics
         """
+        cached = self._system_cache.get("metrics")
+        if cached is not None:
+            return cached
         try:
             session_metrics = self._get_session_metrics()
             worker_metrics = self._get_worker_metrics()
@@ -74,7 +103,7 @@ class MetricsCollector:
             if session_metrics.get("failed_count", 0) > session_metrics.get("completed_count", 0) * 0.1:
                 health_status = "degraded"
 
-            return {
+            payload = {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "system_health": health_status,
                 "session_metrics": session_metrics,
@@ -82,7 +111,8 @@ class MetricsCollector:
                 "queue_metrics": queue_metrics,
                 "uptime_seconds": self._get_uptime(),
             }
-
+            self._system_cache.set("metrics", payload)
+            return payload
         except Exception as e:
             logger.error(f"Error collecting system metrics: {e!s}")
             return {}
