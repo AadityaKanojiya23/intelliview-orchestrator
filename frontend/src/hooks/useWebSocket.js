@@ -1,19 +1,36 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 
-/**
- * Connect to a backend WebSocket endpoint with exponential-backoff reconnect.
- *
- * - Backoff caps at 15 s; resets to 500 ms on successful open.
- * - Cancels cleanly on unmount or when `enabled` flips false.
- * - Never schedules two reconnects in a row for the same onclose.
- */
 export function useWebSocket({ path, onMessage, enabled = true }) {
   const [connected, setConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState(null);
+  const [reconnectCount, setReconnectCount] = useState(0);
   const wsRef = useRef(null);
   const retryRef = useRef(0);
+  const onMessageRef = useRef(onMessage);
+  onMessageRef.current = onMessage;
+
+  const send = useCallback((data) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(typeof data === "string" ? data : JSON.stringify(data));
+      return true;
+    }
+    return false;
+  }, []);
+
+  const disconnect = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+  }, []);
+
+  const reconnect = useCallback(() => {
+    disconnect();
+    retryRef.current = 0;
+    setReconnectCount((c) => c + 1);
+  }, [disconnect]);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -53,15 +70,13 @@ export function useWebSocket({ path, onMessage, enabled = true }) {
           try {
             const data = JSON.parse(event.data);
             setLastMessage(data);
-            onMessage?.(data);
+            onMessageRef.current?.(data);
           } catch {
             // ignore non-JSON frames
           }
         };
 
-        ws.onerror = () => {
-          // Browsers fire onerror before onclose; let onclose handle reconnect.
-        };
+        ws.onerror = () => {};
 
         ws.onclose = () => {
           setConnected(false);
@@ -84,9 +99,55 @@ export function useWebSocket({ path, onMessage, enabled = true }) {
       }
       wsRef.current = null;
     };
-  }, [path, onMessage, enabled]);
+  }, [path, enabled, reconnectCount]);
 
-  return { connected, lastMessage };
+  return { connected, lastMessage, send, disconnect, reconnect };
+}
+
+export function useRealtimeSubscription(path, { enabled = true, onEvent } = {}) {
+  const [events, setEvents] = useState([]);
+  const [isLive, setIsLive] = useState(false);
+  const maxEvents = 100;
+
+  const handleMessage = useCallback(
+    (data) => {
+      setIsLive(true);
+      setEvents((prev) => {
+        const next = [...prev, { ...data, _receivedAt: Date.now() }];
+        return next.slice(-maxEvents);
+      });
+      onEvent?.(data);
+    },
+    [onEvent],
+  );
+
+  const { connected } = useWebSocket({ path, onMessage: handleMessage, enabled });
+
+  const clearEvents = useCallback(() => setEvents([]), []);
+
+  const latestByType = useCallback(
+    (type) => {
+      for (let i = events.length - 1; i >= 0; i--) {
+        if (events[i].type === type) return events[i];
+      }
+      return null;
+    },
+    [events],
+  );
+
+  const filterByType = useCallback(
+    (type) => events.filter((e) => e.type === type),
+    [events],
+  );
+
+  return {
+    connected,
+    isLive,
+    events,
+    clearEvents,
+    latestByType,
+    filterByType,
+  };
 }
 
 export default useWebSocket;
