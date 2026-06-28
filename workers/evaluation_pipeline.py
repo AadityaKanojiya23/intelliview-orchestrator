@@ -13,24 +13,14 @@ deterministic per-session signals so the risk engine's HIGH/CRITICAL
 thresholds exercise without external services.
 """
 
-import hashlib
 import json
 import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_EVAL_RISK_WEIGHTS = {
-    "low_quality": 0.30,
-    "low_accuracy": 0.40,
-    "poor_communication": 0.20,
-}
 
-
-def _seeded_unit(session_id: str, salt: str) -> float:
-    """Stable pseudo-random in [0, 1) derived from session_id + salt."""
-    digest = hashlib.sha256(f"{session_id}:{salt}".encode()).digest()
-    return int.from_bytes(digest[:4], "big") / 0xFFFFFFFF
+from workers._stubs import _seeded_unit  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -321,14 +311,6 @@ def generate_feedback(session_id: str) -> dict[str, Any]:
         "detailed_feedback": "Solid answers overall with room to elaborate on trade-offs.",
         "recommendation": "progress",
     }
-
-
-def generate_dynamic_question(session_id: str, topic: str = "systems_design") -> str:
-    """Generate a dynamic interview question — real LLM with seeded stub fallback."""
-    real = _llm_generate_question(session_id, topic)
-    if real is not None:
-        return real
-    return f"Describe your experience with {topic.replace('_', ' ')}."
 
 
 def calculate_evaluation_risk_score(results: dict[str, Any]) -> float:

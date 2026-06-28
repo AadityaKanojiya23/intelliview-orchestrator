@@ -21,28 +21,6 @@ function IllustrationEmpty({ className }) {
     }
   );
 }
-function IllustrationWorkers({ className }) {
-  return /* @__PURE__ */ jsxs(
-    "svg",
-    {
-      viewBox: "0 0 200 140",
-      className: cn("h-32 w-48 text-muted", className),
-      fill: "none",
-      stroke: "currentColor",
-      strokeWidth: "1.5",
-      children: [
-        /* @__PURE__ */ jsx("rect", { x: "20", y: "40", width: "40", height: "50", rx: "4", strokeOpacity: "0.4" }),
-        /* @__PURE__ */ jsx("rect", { x: "80", y: "30", width: "40", height: "60", rx: "4", strokeOpacity: "0.5" }),
-        /* @__PURE__ */ jsx("rect", { x: "140", y: "50", width: "40", height: "40", rx: "4", strokeOpacity: "0.4" }),
-        /* @__PURE__ */ jsx("circle", { cx: "40", cy: "32", r: "3", fill: "currentColor", opacity: "0.6" }),
-        /* @__PURE__ */ jsx("circle", { cx: "100", cy: "22", r: "3", fill: "currentColor", opacity: "0.8" }),
-        /* @__PURE__ */ jsx("circle", { cx: "160", cy: "42", r: "3", fill: "currentColor", opacity: "0.6" }),
-        /* @__PURE__ */ jsx("line", { x1: "43", y1: "35", x2: "97", y2: "25", strokeOpacity: "0.2" }),
-        /* @__PURE__ */ jsx("line", { x1: "103", y1: "25", x2: "157", y2: "45", strokeOpacity: "0.2" })
-      ]
-    }
-  );
-}
 function IllustrationError({ className }) {
   return /* @__PURE__ */ jsxs(
     "svg",
@@ -62,6 +40,5 @@ function IllustrationError({ className }) {
 }
 export {
   IllustrationEmpty,
-  IllustrationError,
-  IllustrationWorkers
+  IllustrationError
 };

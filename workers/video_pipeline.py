@@ -19,25 +19,14 @@ The provided defaults are deterministic per-session seeds so that:
   * operators can sanity-check the pipeline without GPU dependencies.
 """
 
-import hashlib
 import logging
 import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_VIDEO_RISK_WEIGHTS = {
-    "no_face": 0.45,
-    "multiple_persons": 0.35,
-    "phone": 0.25,
-    "head_movement": 0.20,
-}
 
-
-def _seeded_unit(session_id: str, salt: str) -> float:
-    """Stable pseudo-random in [0, 1) derived from session_id + salt."""
-    digest = hashlib.sha256(f"{session_id}:{salt}".encode()).digest()
-    return int.from_bytes(digest[:4], "big") / 0xFFFFFFFF
+from workers._stubs import _seeded_unit  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

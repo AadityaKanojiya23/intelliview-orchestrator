@@ -13,24 +13,14 @@ deterministic per-session signals so end-to-end risk scoring and the
 HIGH/CRITICAL thresholds fire correctly without GPU dependencies.
 """
 
-import hashlib
 import logging
 import time
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_AUDIO_RISK_WEIGHTS = {
-    "no_transcription": 0.40,
-    "background_voices": 0.35,
-    "suspicious_pattern": 0.25,
-}
 
-
-def _seeded_unit(session_id: str, salt: str) -> float:
-    """Stable pseudo-random in [0, 1) derived from session_id + salt."""
-    digest = hashlib.sha256(f"{session_id}:{salt}".encode()).digest()
-    return int.from_bytes(digest[:4], "big") / 0xFFFFFFFF
+from workers._stubs import _seeded_unit  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

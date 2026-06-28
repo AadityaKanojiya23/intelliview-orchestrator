@@ -5,19 +5,15 @@ Manages interview structure templates, usage tracking, and success rates
 
 import logging
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import select
 
 from database.db import SessionLocal
 from database.models import InterviewTemplate
+from orchestrator.time_utils import utcnow
 
 logger = logging.getLogger(__name__)
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 class InterviewTemplateManager:
@@ -45,7 +41,7 @@ class InterviewTemplateManager:
             raise ValueError(f"Invalid interview type: {interview_type}. Must be one of: {self.INTERVIEW_TYPES}")
 
         template_id = f"tmpl_{uuid.uuid4().hex[:12]}"
-        now = _utcnow()
+        now = utcnow()
 
         db = SessionLocal()
         try:
@@ -161,7 +157,7 @@ class InterviewTemplateManager:
                 t.success_rate = 1.0 if success else 0.0
             else:
                 t.success_rate = ((t.success_rate * (count - 1)) + (1.0 if success else 0.0)) / count
-            t.updated_at = _utcnow()
+            t.updated_at = utcnow()
             db.commit()
             return True
         except Exception as e:

@@ -5,19 +5,15 @@ Manages interview questions by category, difficulty, and usage statistics
 
 import logging
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import select
 
 from database.db import SessionLocal
 from database.models import Question
+from orchestrator.time_utils import utcnow
 
 logger = logging.getLogger(__name__)
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 class QuestionBank:
@@ -46,7 +42,7 @@ class QuestionBank:
             raise ValueError(f"Invalid difficulty: {difficulty}. Must be one of: {self.DIFFICULTIES}")
 
         question_id = f"q_{uuid.uuid4().hex[:12]}"
-        now = _utcnow()
+        now = utcnow()
 
         db = SessionLocal()
         try:
@@ -183,37 +179,13 @@ class QuestionBank:
                 else:
                     count = q.usage_count
                     q.avg_score = ((q.avg_score * (count - 1)) + score) / count
-            q.updated_at = _utcnow()
+            q.updated_at = utcnow()
             db.commit()
             return True
         except Exception as e:
             db.rollback()
             logger.error(f"Error recording usage for {question_id}: {e}")
             return False
-        finally:
-            db.close()
-
-    def get_statistics(self) -> dict[str, Any]:
-        """Get question bank usage statistics"""
-        db = SessionLocal()
-        try:
-            all_q = db.execute(select(Question)).scalars().all()
-            total = len(all_q)
-            by_category: dict[str, int] = {}
-            by_difficulty: dict[str, int] = {}
-            total_usage = 0
-
-            for q in all_q:
-                by_category[q.category] = by_category.get(q.category, 0) + 1
-                by_difficulty[q.difficulty] = by_difficulty.get(q.difficulty, 0) + 1
-                total_usage += q.usage_count or 0
-
-            return {
-                "total_questions": total,
-                "by_category": by_category,
-                "by_difficulty": by_difficulty,
-                "total_usage": total_usage,
-            }
         finally:
             db.close()
 

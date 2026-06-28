@@ -106,17 +106,3 @@ def _is_coro(fn: Callable) -> bool:
     import inspect
 
     return inspect.iscoroutinefunction(fn)
-
-
-def with_cache_header(response: Response, cache_name: str | None = None) -> Response:
-    """Stamp the response with a short Cache-Control + a freshness hint.
-
-    Public so handlers can attach the header even when they don't go
-    through the `cached()` decorator (e.g. handlers that need request
-    parameters in the cache key).
-    """
-    response.headers["Cache-Control"] = "private, max-age=2, must-revalidate"
-    response.headers["X-Cache-Generated-At"] = datetime.now(timezone.utc).isoformat()
-    if cache_name:
-        response.headers["X-Cache-Name"] = cache_name
-    return response

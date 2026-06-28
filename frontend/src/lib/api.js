@@ -44,9 +44,6 @@ class ApiClient {
   post(path, body) {
     return this.request("POST", path, body);
   }
-  put(path, body) {
-    return this.request("PUT", path, body);
-  }
   delete(path) {
     return this.request("DELETE", path);
   }

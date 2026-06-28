@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo, lazy, Suspense, useCallback } from "react";
 import useSWR from "swr";
-import { Play, RefreshCcw, GitCompare, X } from "lucide-react";
+import { Play, RefreshCcw, X } from "lucide-react";
 import Card from "@/components/Card";
 import { StatusBadge, Badge } from "@/components/Badge";
 import { Skeleton, ErrorState, EmptyState } from "@/components/States";
@@ -139,14 +139,6 @@ export default function SessionsPage() {
           <h1 className="text-2xl font-semibold text-zinc-50">Sessions</h1>
           <p className="text-sm text-muted">Start new interviews and review historical results.</p>
         </div>
-        {compareIds.length >= 2 && (
-          <button
-            onClick={() => {}}
-            className="flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-1.5 text-xs text-accent-light hover:bg-accent/10"
-          >
-            <GitCompare size={14} /> Compare ({compareIds.length})
-          </button>
-        )}
       </div>
 
       <StartInterviewForm disabled={!token} />

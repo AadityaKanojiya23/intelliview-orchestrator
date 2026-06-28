@@ -221,10 +221,6 @@ class HealthMonitor:
         self._dep_status["celery_broker"] = dep
         return dep.to_dict()
 
-    def get_dependency_statuses(self) -> dict[str, dict[str, Any]]:
-        """Return the most recent dependency check results without re-probing."""
-        return {name: dep.to_dict() for name, dep in self._dep_status.items()}
-
     # ------------------------------------------------------------------
     # Existing health methods (unchanged API)
     # ------------------------------------------------------------------

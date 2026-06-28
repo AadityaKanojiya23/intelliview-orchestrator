@@ -5,19 +5,15 @@ Manages candidate profiles, interview history, and scoring
 
 import logging
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import select
 
 from database.db import SessionLocal
 from database.models import Candidate, InterviewSession
+from orchestrator.time_utils import utcnow
 
 logger = logging.getLogger(__name__)
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 class CandidateManager:
@@ -35,7 +31,7 @@ class CandidateManager:
     ) -> dict[str, Any]:
         """Create a new candidate profile"""
         candidate_id = f"candidate_{uuid.uuid4().hex[:12]}"
-        now = _utcnow()
+        now = utcnow()
 
         db = SessionLocal()
         try:
@@ -134,7 +130,7 @@ class CandidateManager:
             history.append({
                 "session_id": session_id,
                 "score": score,
-                "completed_at": _utcnow().isoformat(),
+                "completed_at": utcnow().isoformat(),
             })
 
             total = c.total_interviews + 1
@@ -145,7 +141,7 @@ class CandidateManager:
 
             c.interview_history = history
             c.total_interviews = total
-            c.updated_at = _utcnow()
+            c.updated_at = utcnow()
             db.commit()
             return True
         except Exception as e:
@@ -179,15 +175,6 @@ class CandidateManager:
             ]
         finally:
             db.close()
-
-    def compare_candidates(self, candidate_ids: list[str]) -> list[dict[str, Any]]:
-        """Compare multiple candidates side-by-side"""
-        results = []
-        for cid in candidate_ids:
-            c = self.get_candidate(cid)
-            if c:
-                results.append(c)
-        return sorted(results, key=lambda x: x.get("avg_score") or 0, reverse=True)
 
 
 candidate_manager = CandidateManager()

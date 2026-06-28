@@ -114,26 +114,9 @@ def get_settings() -> Settings:
 # `from config import REDIS_URL`. New code should use `get_settings()`.
 settings = get_settings()
 REDIS_URL = settings.redis_url
-POSTGRES_HOST = settings.postgres_host
-POSTGRES_PORT = settings.postgres_port
-POSTGRES_DB = settings.postgres_db
-POSTGRES_USER = settings.postgres_user
-POSTGRES_PASSWORD = settings.postgres_password
 DATABASE_URL = settings.database_url
 WORKER_CONCURRENCY = settings.worker_concurrency
-MAX_RETRIES = settings.max_retries
 API_TOKEN = settings.api_token
 CORS_ALLOW_ORIGINS = ",".join(settings.cors_allow_origins)
-ENABLE_CELERY_BROKER = settings.enable_celery_broker
-JSON_LOGGING = "1" if settings.json_logging else "0"
 MAX_REQUEST_BODY_BYTES = settings.max_request_body_bytes
-AUDIT_LOG_FILE = settings.audit_log_file
 ENABLE_PROMETHEUS = settings.enable_prometheus
-GEMINI_API_KEY = settings.gemini_api_key
-GROK_API_KEY = settings.grok_api_key
-SCREEN_LOCK_TIMEOUT = settings.screen_lock_timeout
-SCREEN_LOCK_PIN = settings.screen_lock_pin
-REALTIME_ENABLED = settings.realtime_enabled
-REALTIME_TICK_INTERVAL = settings.realtime_tick_interval
-MOMENT_TRACKING_ENABLED = settings.moment_tracking_enabled
-DATABASE_SSLMODE = settings.database_sslmode

@@ -107,36 +107,3 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     )
 
         return await call_next(request)
-
-
-class InputSanitizer:
-    """Static helper for sanitizing user input strings."""
-
-    _STRIP_CHARS = "\x00\r"
-    _MAX_LENGTH = 10000
-
-    @classmethod
-    def sanitize_string(cls, value: str, max_length: int = 0) -> str:
-        """Strip dangerous characters and truncate."""
-        max_len = max_length or cls._MAX_LENGTH
-        cleaned = value
-        for ch in cls._STRIP_CHARS:
-            cleaned = cleaned.replace(ch, "")
-        return cleaned[:max_len]
-
-    @classmethod
-    def sanitize_dict(cls, data: dict, max_value_length: int = 5000) -> dict:
-        """Recursively sanitize string values in a dict."""
-        sanitized = {}
-        for key, value in data.items():
-            if isinstance(value, str):
-                sanitized[key] = cls.sanitize_string(value, max_value_length)
-            elif isinstance(value, dict):
-                sanitized[key] = cls.sanitize_dict(value, max_value_length)
-            elif isinstance(value, list):
-                sanitized[key] = [
-                    cls.sanitize_string(v, max_value_length) if isinstance(v, str) else v for v in value
-                ]
-            else:
-                sanitized[key] = value
-        return sanitized

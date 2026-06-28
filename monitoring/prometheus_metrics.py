@@ -15,8 +15,6 @@ Metrics:
 from __future__ import annotations
 
 import logging
-import time
-from typing import Any
 
 from prometheus_client import (
     CollectorRegistry,
@@ -220,85 +218,8 @@ DLQ_SIZE = Gauge(
 
 
 # ---------------------------------------------------------------------------
-# Helper functions
+# Export metrics
 # ---------------------------------------------------------------------------
-
-
-def record_request(method: str, path: str, status: int, duration_seconds: float) -> None:
-    """Record a single HTTP request metric."""
-    REQUEST_COUNT.labels(method=method, path=path, status=str(status)).inc()
-    REQUEST_DURATION.labels(method=method, path=path).observe(duration_seconds)
-
-
-def record_session_created() -> None:
-    SESSIONS_CREATED.inc()
-
-
-def record_session_completed(duration_seconds: float) -> None:
-    SESSIONS_COMPLETED.inc()
-    SESSION_PROCESSING_DURATION.observe(duration_seconds)
-
-
-def record_session_failed() -> None:
-    SESSIONS_FAILED.inc()
-
-
-def record_risk_score(score: float) -> None:
-    RISK_SCORE.observe(score)
-
-
-def record_pipeline_latency(stage: str, duration_seconds: float) -> None:
-    PIPELINE_LATENCY.labels(stage=stage).observe(duration_seconds)
-
-
-def record_pipeline_error(stage: str, error_type: str) -> None:
-    PIPELINE_ERRORS.labels(stage=stage, error_type=error_type).inc()
-
-
-def update_worker_metrics(workers: dict[str, Any]) -> None:
-    """Update worker gauges from a workers dict."""
-    healthy = 0
-    unhealthy = 0
-    now = time.time()
-
-    for worker_id, data in workers.items():
-        is_healthy = data.get("health_status") == "healthy"
-        if is_healthy:
-            healthy += 1
-        else:
-            unhealthy += 1
-
-        WORKER_ACTIVE_TASKS.labels(worker_id=worker_id).set(data.get("active_tasks", 0))
-        WORKER_CAPACITY.labels(worker_id=worker_id).set(data.get("capacity", 0))
-
-        last_hb = data.get("last_heartbeat")
-        if last_hb:
-            try:
-                from datetime import datetime
-
-                hb_dt = datetime.fromisoformat(last_hb)
-                age = now - hb_dt.timestamp()
-                WORKER_HEARTBEAT_AGE_SECONDS.labels(worker_id=worker_id).set(age)
-            except (ValueError, TypeError):
-                WORKER_HEARTBEAT_AGE_SECONDS.labels(worker_id=worker_id).set(-1)
-
-    WORKERS_REGISTERED.set(len(workers))
-    WORKERS_HEALTHY.set(healthy)
-    WORKERS_UNHEALTHY.set(unhealthy)
-
-
-def update_queue_depth(depth: int) -> None:
-    QUEUE_DEPTH.set(depth)
-
-
-def update_system_health(redis_ok: bool, postgres_ok: bool) -> None:
-    REDIS_HEALTH.set(1 if redis_ok else 0)
-    POSTGRES_HEALTH.set(1 if postgres_ok else 0)
-
-
-def update_circuit_breaker(state_value: int) -> None:
-    """state_value: 0=closed, 1=open, 2=half_open"""
-    CIRCUIT_BREAKER_STATE.set(state_value)
 
 
 def get_metrics_text() -> bytes:
