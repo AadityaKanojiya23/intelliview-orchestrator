@@ -66,9 +66,7 @@ def _after_parallel(session_id: str, video_result: dict, audio_result: dict):
     try:
         logger.info("Parallel video+audio done for %s - running evaluation", session_id)
 
-        session_manager.update_session_status(
-            session_id, session_manager.EVALUATING, {"stage": "evaluation"}
-        )
+        session_manager.update_session_status(session_id, session_manager.EVALUATING, {"stage": "evaluation"})
         evaluation_result = evaluate_answers(session_id)
         logger.info("Answer evaluation completed for session %s", session_id)
 
@@ -194,6 +192,7 @@ def process_interview_session(self, session_id):
 # ---------------------------------------------------------------------------
 # Celery Beat: periodic retry scanner
 # ---------------------------------------------------------------------------
+
 
 @celery_app.task(name="workers.tasks.scan_and_dispatch_retries")
 def scan_and_dispatch_retries():

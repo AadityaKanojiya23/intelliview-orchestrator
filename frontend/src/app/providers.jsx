@@ -10,6 +10,7 @@ import { useUIStore } from "@/lib/ui-store";
 import { endpoints, api } from "@/lib/api";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
+import { useScreenLock, ScreenLock } from "@/components/ScreenLock";
 
 const CommandPalette = lazy(() =>
   import("@/components/CommandPalette").then((m) => ({ default: m.CommandPalette })),
@@ -26,44 +27,14 @@ const MobileSidebar = lazy(() =>
 const SidebarMobile = lazy(() =>
   import("@/components/Sidebar").then((m) => ({ default: m.Sidebar })),
 );
-const ScreenLock = lazy(() =>
-  import("@/components/ScreenLock").then((m) => ({ default: m.ScreenLock })),
-);
 
 function NullFallback() {
   return null;
 }
 
-function ScreenLockWrapper() {
-  const [isLocked, setIsLocked] = useState(false);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("intelliview_screen_lock");
-    if (stored === "locked") setIsLocked(true);
-
-    const interval = setInterval(() => {
-      const lockState = localStorage.getItem("intelliview_screen_lock");
-      if (lockState === "locked") {
-        setIsLocked(true);
-      }
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleUnlock = useCallback((pin) => {
-    if (pin === "1234") {
-      setIsLocked(false);
-      localStorage.removeItem("intelliview_screen_lock");
-      return true;
-    }
-    return false;
-  }, []);
-
-  return <ScreenLock isLocked={isLocked} onUnlock={handleUnlock} />;
-}
-
 export function ClientProviders({ children }) {
   useHydrateToken();
+  const { isLocked, lock, unlock } = useScreenLock(300000);
   useEffect(() => {
     hydrateTheme();
   }, []);
@@ -149,7 +120,7 @@ export function ClientProviders({ children }) {
     >
       <ErrorBoundary>{children}</ErrorBoundary>
       <Suspense fallback={null}>
-        <ScreenLockWrapper />
+        <ScreenLock isLocked={isLocked} onUnlock={unlock} />
       </Suspense>
       <Suspense fallback={null}>
         <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} onAction={handleAction} />
