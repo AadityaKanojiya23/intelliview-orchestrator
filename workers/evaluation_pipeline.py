@@ -29,75 +29,139 @@ from workers._stubs import _seeded_unit  # noqa: E402
 
 
 def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
-    """Use GPT-4o to evaluate answer quality and relevance."""
-    try:
-        from workers.ai_client import chat_completion
+    """Use GPT-4o/Gemini/Grok to evaluate answer quality and relevance."""
+    prompt = (
+        "You are an expert technical interviewer. Evaluate this candidate answer. "
+        "Return a JSON object with keys: overall_quality_score (0-100), "
+        "relevance (0-1), completeness (0-1), clarity (0-1), feedback (string)."
+    )
+    user_msg = f"Question: {question}\n\nAnswer: {answer}"
 
-        response = chat_completion(
-            [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an expert technical interviewer. Evaluate this candidate answer. "
-                        "Return a JSON object with keys: overall_quality_score (0-100), "
-                        "relevance (0-1), completeness (0-1), clarity (0-1), feedback (string)."
-                    ),
-                },
-                {"role": "user", "content": f"Question: {question}\n\nAnswer: {answer}"},
-            ],
-            model="gpt-4o",
-            temperature=0.3,
-            max_tokens=512,
-        )
-        if response is None:
-            return None
-        parsed = json.loads(response)
-        return {
-            "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
-            "relevance": round(parsed.get("relevance", 0.5), 2),
-            "completeness": round(parsed.get("completeness", 0.5), 2),
-            "clarity": round(parsed.get("clarity", 0.5), 2),
-            "feedback": parsed.get("feedback", ""),
-        }
+    try:
+        from workers.ai_client import chat_completion, HAS_OPENAI
+        if HAS_OPENAI:
+            response = chat_completion(
+                [{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}],
+                model="gpt-4o", temperature=0.3, max_tokens=512,
+            )
+            if response:
+                parsed = json.loads(response)
+                return {
+                    "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
+                    "relevance": round(parsed.get("relevance", 0.5), 2),
+                    "completeness": round(parsed.get("completeness", 0.5), 2),
+                    "clarity": round(parsed.get("clarity", 0.5), 2),
+                    "feedback": parsed.get("feedback", ""),
+                    "provider": "openai",
+                }
     except Exception as exc:
-        logger.debug("LLM quality evaluation unavailable: %s", exc)
-        return None
+        logger.debug("OpenAI quality evaluation failed: %s", exc)
+
+    try:
+        from workers.ai_client import gemini_generate, HAS_GEMINI
+        if HAS_GEMINI:
+            response = gemini_generate(f"{prompt}\n\n{user_msg}", temperature=0.3, max_output_tokens=512)
+            if response:
+                parsed = json.loads(response)
+                return {
+                    "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
+                    "relevance": round(parsed.get("relevance", 0.5), 2),
+                    "completeness": round(parsed.get("completeness", 0.5), 2),
+                    "clarity": round(parsed.get("clarity", 0.5), 2),
+                    "feedback": parsed.get("feedback", ""),
+                    "provider": "gemini",
+                }
+    except Exception as exc:
+        logger.debug("Gemini quality evaluation failed: %s", exc)
+
+    try:
+        from workers.ai_client import grok_completion, HAS_GROK
+        if HAS_GROK:
+            response = grok_completion(
+                [{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}],
+                temperature=0.3, max_tokens=512,
+            )
+            if response:
+                parsed = json.loads(response)
+                return {
+                    "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
+                    "relevance": round(parsed.get("relevance", 0.5), 2),
+                    "completeness": round(parsed.get("completeness", 0.5), 2),
+                    "clarity": round(parsed.get("clarity", 0.5), 2),
+                    "feedback": parsed.get("feedback", ""),
+                    "provider": "grok",
+                }
+    except Exception as exc:
+        logger.debug("Grok quality evaluation failed: %s", exc)
+
+    return None
 
 
 def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
-    """Use GPT-4o to evaluate technical accuracy."""
-    try:
-        from workers.ai_client import chat_completion
+    """Use GPT-4o/Gemini/Grok to evaluate technical accuracy."""
+    prompt = (
+        "You are a technical interviewer evaluating a candidate's answer. "
+        "Return a JSON object with keys: accuracy_score (0-100), "
+        "correct_concepts_count (int), incorrect_concepts_count (int), "
+        "knowledge_gaps (list of strings)."
+    )
+    user_msg = f"Question: {question}\n\nAnswer: {answer}"
 
-        response = chat_completion(
-            [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a technical interviewer evaluating a candidate's answer. "
-                        "Return a JSON object with keys: accuracy_score (0-100), "
-                        "correct_concepts_count (int), incorrect_concepts_count (int), "
-                        "knowledge_gaps (list of strings)."
-                    ),
-                },
-                {"role": "user", "content": f"Question: {question}\n\nAnswer: {answer}"},
-            ],
-            model="gpt-4o",
-            temperature=0.3,
-            max_tokens=512,
-        )
-        if response is None:
-            return None
-        parsed = json.loads(response)
-        return {
-            "accuracy_score": round(parsed.get("accuracy_score", 50), 2),
-            "correct_concepts_count": parsed.get("correct_concepts_count", 0),
-            "incorrect_concepts_count": parsed.get("incorrect_concepts_count", 0),
-            "knowledge_gaps": parsed.get("knowledge_gaps", []),
-        }
+    try:
+        from workers.ai_client import chat_completion, HAS_OPENAI
+        if HAS_OPENAI:
+            response = chat_completion(
+                [{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}],
+                model="gpt-4o", temperature=0.3, max_tokens=512,
+            )
+            if response:
+                parsed = json.loads(response)
+                return {
+                    "accuracy_score": round(parsed.get("accuracy_score", 50), 2),
+                    "correct_concepts_count": parsed.get("correct_concepts_count", 0),
+                    "incorrect_concepts_count": parsed.get("incorrect_concepts_count", 0),
+                    "knowledge_gaps": parsed.get("knowledge_gaps", []),
+                    "provider": "openai",
+                }
     except Exception as exc:
-        logger.debug("LLM accuracy evaluation unavailable: %s", exc)
-        return None
+        logger.debug("OpenAI accuracy evaluation failed: %s", exc)
+
+    try:
+        from workers.ai_client import gemini_generate, HAS_GEMINI
+        if HAS_GEMINI:
+            response = gemini_generate(f"{prompt}\n\n{user_msg}", temperature=0.3, max_output_tokens=512)
+            if response:
+                parsed = json.loads(response)
+                return {
+                    "accuracy_score": round(parsed.get("accuracy_score", 50), 2),
+                    "correct_concepts_count": parsed.get("correct_concepts_count", 0),
+                    "incorrect_concepts_count": parsed.get("incorrect_concepts_count", 0),
+                    "knowledge_gaps": parsed.get("knowledge_gaps", []),
+                    "provider": "gemini",
+                }
+    except Exception as exc:
+        logger.debug("Gemini accuracy evaluation failed: %s", exc)
+
+    try:
+        from workers.ai_client import grok_completion, HAS_GROK
+        if HAS_GROK:
+            response = grok_completion(
+                [{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}],
+                temperature=0.3, max_tokens=512,
+            )
+            if response:
+                parsed = json.loads(response)
+                return {
+                    "accuracy_score": round(parsed.get("accuracy_score", 50), 2),
+                    "correct_concepts_count": parsed.get("correct_concepts_count", 0),
+                    "incorrect_concepts_count": parsed.get("incorrect_concepts_count", 0),
+                    "knowledge_gaps": parsed.get("knowledge_gaps", []),
+                    "provider": "grok",
+                }
+    except Exception as exc:
+        logger.debug("Grok accuracy evaluation failed: %s", exc)
+
+    return None
 
 
 def _llm_evaluate_communication(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
