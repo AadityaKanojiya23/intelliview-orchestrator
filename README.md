@@ -102,12 +102,23 @@ cluster.
 - See [`SECURITY.md`](./SECURITY.md) for the hardening checklist and
   disclosure policy.
 
+### Real-time Features
+- **Screen lock** with auto-lock after inactivity and PIN unlock.
+- **Moment tracking** for real-time interview event logging.
+- **Live WebSocket** updates with reconnection and event streaming.
+- **Glassmorphism UI** with modern animations and visual effects.
+
+### AI Integration
+- **Multi-provider AI** with OpenAI, Gemini, and Grok support.
+- **Automatic fallback** when API keys are unavailable.
+- **Real-time evaluation** with LLM-powered answer scoring.
+- **Dynamic question generation** from question bank.
+
 ### Developer experience
-- **Type-safe** on both ends: Pydantic v2 request/response models on the
-  backend, a hand-written TS mirror in `frontend/src/lib/types.ts`.
-- **91 automated tests** (unit + contract + e2e smoke) running in CI on
+- **Pure JavaScript** frontend with no TypeScript overhead.
+- **91+ automated tests** (unit + contract + e2e smoke) running in CI on
   every push.
-- **Lint + format + typecheck + production build** all enforced in CI.
+- **Lint + format + production build** all enforced in CI.
 
 ## Architecture
 
