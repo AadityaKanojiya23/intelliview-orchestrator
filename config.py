@@ -5,6 +5,7 @@ Settings are loaded from environment variables (or a `.env` file in dev)
 via `pydantic-settings`. All values have sensible local defaults but
 should be overridden in production.
 """
+
 from functools import lru_cache
 from typing import List
 
@@ -29,8 +30,6 @@ class Settings(BaseSettings):
     )
 
     # --- Service discovery ---
-    # In docker-compose, services are reachable as `redis` / `postgres` on
-    # the default bridge network. In local dev, default to localhost.
     redis_url: str = "redis://localhost:6379/0"
 
     postgres_host: str = "localhost"
@@ -45,13 +44,17 @@ class Settings(BaseSettings):
     worker_id: str = "worker-1"
 
     # --- API / Security ---
-    # Token required by worker agents to call /register-worker and
-    # /worker/heartbeat. **Change `dev-token-change-me` in production.**
     api_token: str = "dev-token-change-me"
-
-    # Comma-separated origin list for CORS (raw string to avoid JSON-decode
-    # pitfalls). `*` is allowed in dev only; production must list origins.
     cors_allow_origins_raw: str = Field(default="*", alias="cors_allow_origins")
+
+    # --- Request validation ---
+    max_request_body_bytes: int = 1048576  # 1 MB
+
+    # --- Audit logging ---
+    audit_log_file: str = ""
+
+    # --- Prometheus ---
+    enable_prometheus: bool = True
 
     # --- Feature flags ---
     enable_celery_broker: bool = True
@@ -100,3 +103,6 @@ API_TOKEN = settings.api_token
 CORS_ALLOW_ORIGINS = ",".join(settings.cors_allow_origins)
 ENABLE_CELERY_BROKER = settings.enable_celery_broker
 JSON_LOGGING = "1" if settings.json_logging else "0"
+MAX_REQUEST_BODY_BYTES = settings.max_request_body_bytes
+AUDIT_LOG_FILE = settings.audit_log_file
+ENABLE_PROMETHEUS = settings.enable_prometheus

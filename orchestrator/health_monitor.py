@@ -8,16 +8,18 @@ Responsibilities:
 - Detect stuck/failed sessions
 - Monitor queue backlog
 - Trigger alerts and recovery actions
+- Deep dependency health checks (Redis, Postgres, Celery)
+- Kubernetes-style readiness and liveness probes
+- Dependency status tracking with latency measurements
 """
 
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Any
 
-import redis
-
-from config import REDIS_URL
+from orchestrator.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,30 @@ class HealthStatus(str):
     CRITICAL = "critical"
 
 
+class DependencyStatus:
+    """Tracks the health and latency of a single dependency."""
+
+    __slots__ = ("error", "healthy", "last_check", "latency_ms", "metadata", "name")
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.healthy = False
+        self.latency_ms = 0.0
+        self.last_check: str = ""
+        self.error: str | None = None
+        self.metadata: dict[str, Any] = {}
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "healthy": self.healthy,
+            "latency_ms": round(self.latency_ms, 2),
+            "last_check": self.last_check,
+            "error": self.error,
+            "metadata": self.metadata,
+        }
+
+
 class HealthMonitor:
     """
     Monitors system and component health to detect failures and trigger recovery.
@@ -40,59 +66,171 @@ class HealthMonitor:
     - Session processing timeouts
     - Queue backlog and delays
     - System resource utilization
+    - Deep dependency checks (Redis, Postgres, Celery broker)
     """
 
     def __init__(
         self,
-        redis_url: str = REDIS_URL,
         heartbeat_timeout: int = 60,
         session_timeout: int = 1800,
         queue_threshold: int = 1000,
     ):
-        """
-        Initialize HealthMonitor
-
-        Args:
-            redis_url: Redis connection URL
-            heartbeat_timeout: Seconds without heartbeat to mark worker unhealthy (default: 60)
-            session_timeout: Seconds in PROCESSING state to mark stuck (default: 1800 = 30 min)
-            queue_threshold: Queue size threshold for alerting (default: 1000)
-        """
-        self.redis_url = redis_url
         self.heartbeat_timeout = heartbeat_timeout
         self.session_timeout = session_timeout
         self.queue_threshold = queue_threshold
-        self.redis_client = self._connect_redis()
+        self.redis_client = get_redis_client()
         self.health_status_key = "system:health_status"
         self.last_check_key = "system:last_health_check"
+        self._dep_status: dict[str, DependencyStatus] = {}
 
         logger.info(
-            f"HealthMonitor initialized: heartbeat_timeout={heartbeat_timeout}s, "
-            f"session_timeout={session_timeout}s, queue_threshold={queue_threshold}"
+            "HealthMonitor initialized: heartbeat_timeout=%ds, session_timeout=%ds, queue_threshold=%d",
+            heartbeat_timeout,
+            session_timeout,
+            queue_threshold,
         )
 
-    def _connect_redis(self) -> redis.Redis | None:
-        """Connect to Redis server"""
+    # ------------------------------------------------------------------
+    # Readiness probe (Kubernetes-style)
+    # ------------------------------------------------------------------
+
+    def readiness_check(self) -> dict[str, Any]:
+        """Return true readiness — all critical dependencies must be up.
+
+        Use this for k8s readinessProbe: the service only receives
+        traffic when this returns ready=True.
+        """
+        deps = self._check_all_dependencies()
+        ready = all(d["healthy"] for d in deps.values())
+        return {
+            "ready": ready,
+            "status": HealthStatus.HEALTHY if ready else HealthStatus.UNHEALTHY,
+            "dependencies": deps,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+    # ------------------------------------------------------------------
+    # Liveness probe (Kubernetes-style)
+    # ------------------------------------------------------------------
+
+    def liveness_check(self) -> dict[str, Any]:
+        """Return whether the process itself is alive and responsive.
+
+        This only checks that the Python process can respond — it does
+        NOT check downstream dependencies. Use for k8s livenessProbe.
+        """
+        return {
+            "alive": True,
+            "status": HealthStatus.HEALTHY,
+            "uptime_seconds": self._get_uptime(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+    # ------------------------------------------------------------------
+    # Deep dependency health checks
+    # ------------------------------------------------------------------
+
+    def _check_all_dependencies(self) -> dict[str, dict[str, Any]]:
+        """Check every critical dependency and return its status."""
+        results: dict[str, dict[str, Any]] = {}
+
+        # Redis
+        results["redis"] = self._deep_check_redis()
+
+        # PostgreSQL
+        results["postgres"] = self._deep_check_postgres()
+
+        # Celery broker (Redis-backed)
+        results["celery_broker"] = self._deep_check_celery_broker()
+
+        return results
+
+    def _deep_check_redis(self) -> dict[str, Any]:
+        """Ping Redis, measure latency, and report server info."""
+        dep = DependencyStatus("redis")
+        start = time.monotonic()
         try:
-            client = redis.from_url(self.redis_url, decode_responses=True)
-            client.ping()
-            logger.info("Connected to Redis for health monitoring")
-            return client
-        except Exception as e:
-            logger.error(f"Failed to connect to Redis: {e!s}")
-            return None
+            if not self.redis_client:
+                dep.error = "Redis client not initialized"
+                self._dep_status["redis"] = dep
+                return dep.to_dict()
+
+            self.redis_client.ping()
+            dep.latency_ms = (time.monotonic() - start) * 1000
+            dep.healthy = True
+
+            info = self.redis_client.info()
+            dep.metadata = {
+                "connected_clients": info.get("connected_clients", 0),
+                "used_memory_human": info.get("used_memory_human", "unknown"),
+                "redis_version": info.get("redis_version", "unknown"),
+                "uptime_seconds": info.get("uptime_in_seconds", 0),
+            }
+            dep.last_check = datetime.now(timezone.utc).isoformat()
+        except Exception as exc:
+            dep.healthy = False
+            dep.error = str(exc)
+            dep.latency_ms = (time.monotonic() - start) * 1000
+            logger.warning("Redis deep check failed: %s", exc)
+
+        self._dep_status["redis"] = dep
+        return dep.to_dict()
+
+    def _deep_check_postgres(self) -> dict[str, Any]:
+        """Execute a lightweight query against Postgres."""
+        dep = DependencyStatus("postgres")
+        start = time.monotonic()
+        try:
+            from database.db import engine
+
+            with engine.connect() as conn:
+                result = conn.execute(__import__("sqlalchemy").text("SELECT 1 AS ok"))
+                row = result.fetchone()
+                dep.healthy = row is not None and row[0] == 1
+            dep.latency_ms = (time.monotonic() - start) * 1000
+            dep.last_check = datetime.now(timezone.utc).isoformat()
+        except Exception as exc:
+            dep.healthy = False
+            dep.error = str(exc)
+            dep.latency_ms = (time.monotonic() - start) * 1000
+            logger.warning("Postgres deep check failed: %s", exc)
+
+        self._dep_status["postgres"] = dep
+        return dep.to_dict()
+
+    def _deep_check_celery_broker(self) -> dict[str, Any]:
+        """Check that the Celery broker (Redis) is accepting connections."""
+        dep = DependencyStatus("celery_broker")
+        start = time.monotonic()
+        try:
+            if not self.redis_client:
+                dep.error = "Redis client not available"
+                self._dep_status["celery_broker"] = dep
+                return dep.to_dict()
+
+            self.redis_client.ping()
+            dep.latency_ms = (time.monotonic() - start) * 1000
+            dep.healthy = True
+            dep.last_check = datetime.now(timezone.utc).isoformat()
+        except Exception as exc:
+            dep.healthy = False
+            dep.error = str(exc)
+            dep.latency_ms = (time.monotonic() - start) * 1000
+            logger.warning("Celery broker deep check failed: %s", exc)
+
+        self._dep_status["celery_broker"] = dep
+        return dep.to_dict()
+
+    def get_dependency_statuses(self) -> dict[str, dict[str, Any]]:
+        """Return the most recent dependency check results without re-probing."""
+        return {name: dep.to_dict() for name, dep in self._dep_status.items()}
+
+    # ------------------------------------------------------------------
+    # Existing health methods (unchanged API)
+    # ------------------------------------------------------------------
 
     def check_system_health(self, worker_registry=None, session_manager=None) -> dict[str, Any]:
-        """
-        Perform comprehensive system health check
-
-        Args:
-            worker_registry: Optional WorkerRegistry instance for worker checks
-            session_manager: Optional SessionManager instance for session checks
-
-        Returns:
-            Dict with health status and detailed metrics
-        """
+        """Perform comprehensive system health check."""
         try:
             logger.debug("Performing comprehensive system health check")
 
@@ -102,41 +240,29 @@ class HealthMonitor:
                 "components": {},
             }
 
-            # Check Redis connectivity
             redis_status = self._check_redis_health()
             health_status["components"]["redis"] = redis_status
             if redis_status["status"] != HealthStatus.HEALTHY:
                 health_status["overall_status"] = HealthStatus.CRITICAL
 
-            # Check workers if registry provided
             if worker_registry:
                 worker_status = self.check_worker_health(worker_registry)
                 health_status["components"]["workers"] = worker_status
                 if (
-                    worker_status["status"]
-                    in [
-                        HealthStatus.CRITICAL,
-                        HealthStatus.UNHEALTHY,
-                    ]
+                    worker_status["status"] in [HealthStatus.CRITICAL, HealthStatus.UNHEALTHY]
                     and health_status["overall_status"] != HealthStatus.CRITICAL
                 ):
                     health_status["overall_status"] = worker_status["status"]
 
-            # Check sessions if manager provided
             if session_manager:
                 session_status = self.check_session_health(session_manager)
                 health_status["components"]["sessions"] = session_status
                 if (
-                    session_status["status"]
-                    in [
-                        HealthStatus.CRITICAL,
-                        HealthStatus.DEGRADED,
-                    ]
+                    session_status["status"] in [HealthStatus.CRITICAL, HealthStatus.DEGRADED]
                     and health_status["overall_status"] == HealthStatus.HEALTHY
                 ):
                     health_status["overall_status"] = session_status["status"]
 
-            # Check queue backlog
             queue_status = self.check_queue_health()
             health_status["components"]["queue"] = queue_status
             if queue_status["status"] == HealthStatus.CRITICAL:
@@ -145,21 +271,15 @@ class HealthMonitor:
                 if health_status["overall_status"] == HealthStatus.HEALTHY:
                     health_status["overall_status"] = HealthStatus.DEGRADED
 
-            # Store health status
             if self.redis_client:
-                self.redis_client.set(
-                    self.health_status_key,
-                    json.dumps(health_status),
-                    ex=300,
-                )
+                self.redis_client.set(self.health_status_key, json.dumps(health_status), ex=300)
                 self.redis_client.set(self.last_check_key, datetime.now(timezone.utc).isoformat())
 
-            logger.info(f"System health check complete: {health_status['overall_status']}")
-
+            logger.info("System health check complete: %s", health_status["overall_status"])
             return health_status
 
         except Exception as e:
-            logger.error(f"Error checking system health: {e!s}")
+            logger.error("Error checking system health: %s", e)
             return {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "overall_status": HealthStatus.UNHEALTHY,
@@ -167,15 +287,7 @@ class HealthMonitor:
             }
 
     def check_worker_health(self, worker_registry) -> dict[str, Any]:
-        """
-        Check health of all workers
-
-        Args:
-            worker_registry: WorkerRegistry instance to check
-
-        Returns:
-            Dict with worker health status
-        """
+        """Check health of all workers."""
         try:
             logger.debug("Checking worker health")
 
@@ -186,9 +298,9 @@ class HealthMonitor:
             healthy = total - len(unhealthy_workers)
 
             status = HealthStatus.HEALTHY
-            if len(unhealthy_workers) > total * 0.5:  # > 50% unhealthy
+            if len(unhealthy_workers) > total * 0.5:
                 status = HealthStatus.CRITICAL
-            elif len(unhealthy_workers) > 0:  # Any unhealthy
+            elif len(unhealthy_workers) > 0:
                 status = HealthStatus.DEGRADED
 
             return {
@@ -201,23 +313,14 @@ class HealthMonitor:
             }
 
         except Exception as e:
-            logger.error(f"Error checking worker health: {e!s}")
+            logger.error("Error checking worker health: %s", e)
             return {"status": HealthStatus.UNHEALTHY, "error": str(e)}
 
     def check_session_health(self, session_manager) -> dict[str, Any]:
-        """
-        Check health of active sessions (detect stuck sessions)
-
-        Args:
-            session_manager: SessionManager instance to check
-
-        Returns:
-            Dict with session health status
-        """
+        """Check health of active sessions (detect stuck sessions)."""
         try:
             logger.debug("Checking session health")
 
-            # Get sessions stuck in PROCESSING
             stuck_sessions = []
             active_sessions = (
                 session_manager.get_active_sessions()
@@ -232,21 +335,17 @@ class HealthMonitor:
                         try:
                             start_dt = datetime.fromisoformat(start_time)
                             elapsed = (datetime.now(timezone.utc) - start_dt).total_seconds()
-
                             if elapsed > self.session_timeout:
                                 stuck_sessions.append(
-                                    {
-                                        "session_id": session.get("session_id"),
-                                        "elapsed_seconds": elapsed,
-                                    }
+                                    {"session_id": session.get("session_id"), "elapsed_seconds": elapsed}
                                 )
                         except Exception:
                             pass
 
             status = HealthStatus.HEALTHY
-            if len(stuck_sessions) > len(active_sessions) * 0.25:  # > 25% stuck
+            if len(stuck_sessions) > len(active_sessions) * 0.25:
                 status = HealthStatus.CRITICAL
-            elif len(stuck_sessions) > 0:  # Any stuck
+            elif len(stuck_sessions) > 0:
                 status = HealthStatus.DEGRADED
 
             return {
@@ -258,26 +357,17 @@ class HealthMonitor:
             }
 
         except Exception as e:
-            logger.error(f"Error checking session health: {e!s}")
+            logger.error("Error checking session health: %s", e)
             return {"status": HealthStatus.UNHEALTHY, "error": str(e)}
 
     def check_queue_health(self) -> dict[str, Any]:
-        """
-        Check Redis queue backlog and health
-
-        Returns:
-            Dict with queue health status
-        """
+        """Check Redis queue backlog and health."""
         try:
             logger.debug("Checking queue health")
 
             if not self.redis_client:
-                return {
-                    "status": HealthStatus.UNHEALTHY,
-                    "error": "Redis not available",
-                }
+                return {"status": HealthStatus.UNHEALTHY, "error": "Redis not available"}
 
-            # Get queue lengths
             queue_length = self.redis_client.llen("celery_queue") if self.redis_client else 0
 
             status = HealthStatus.HEALTHY
@@ -296,27 +386,16 @@ class HealthMonitor:
             }
 
         except Exception as e:
-            logger.error(f"Error checking queue health: {e!s}")
+            logger.error("Error checking queue health: %s", e)
             return {"status": HealthStatus.UNHEALTHY, "error": str(e)}
 
     def _check_redis_health(self) -> dict[str, Any]:
-        """
-        Check Redis connectivity and responsiveness
-
-        Returns:
-            Dict with Redis health status
-        """
+        """Check Redis connectivity and responsiveness."""
         try:
             if not self.redis_client:
-                return {
-                    "status": HealthStatus.UNHEALTHY,
-                    "error": "Redis client not initialized",
-                }
+                return {"status": HealthStatus.UNHEALTHY, "error": "Redis client not initialized"}
 
-            # Test ping
             self.redis_client.ping()
-
-            # Get some basic info
             info = self.redis_client.info()
             connected_clients = info.get("connected_clients", 0)
             used_memory = info.get("used_memory_human", "unknown")
@@ -329,42 +408,24 @@ class HealthMonitor:
             }
 
         except Exception as e:
-            logger.error(f"Error checking Redis health: {e!s}")
+            logger.error("Error checking Redis health: %s", e)
             return {"status": HealthStatus.UNHEALTHY, "error": str(e)}
 
     def detect_worker_failures(self, worker_registry) -> list[str]:
-        """
-        Identify workers that appear to have failed
-
-        Args:
-            worker_registry: WorkerRegistry instance
-
-        Returns:
-            List of worker_ids that appear to have failed
-        """
+        """Identify workers that appear to have failed."""
         try:
             logger.debug("Detecting worker failures")
             failed_workers = worker_registry.detect_unhealthy_workers()
-
             if failed_workers:
-                logger.warning(f"Detected {len(failed_workers)} failed workers: {failed_workers}")
-
+                logger.warning("Detected %d failed workers: %s", len(failed_workers), failed_workers)
             return failed_workers
 
         except Exception as e:
-            logger.error(f"Error detecting worker failures: {e!s}")
+            logger.error("Error detecting worker failures: %s", e)
             return []
 
     def detect_stuck_sessions(self, session_manager) -> list[str]:
-        """
-        Identify sessions stuck in PROCESSING state
-
-        Args:
-            session_manager: SessionManager instance
-
-        Returns:
-            List of session_ids that appear stuck
-        """
+        """Identify sessions stuck in PROCESSING state."""
         try:
             logger.debug("Detecting stuck sessions")
 
@@ -382,12 +443,12 @@ class HealthMonitor:
                         try:
                             start_dt = datetime.fromisoformat(start_time)
                             elapsed = (datetime.now(timezone.utc) - start_dt).total_seconds()
-
                             if elapsed > self.session_timeout:
                                 stuck_sessions.append(session.get("session_id"))
                                 logger.warning(
-                                    f"Detected stuck session {session.get('session_id')}: "
-                                    f"{elapsed}s processing"
+                                    "Detected stuck session %s: %ds processing",
+                                    session.get("session_id"),
+                                    int(elapsed),
                                 )
                         except Exception:
                             pass
@@ -395,5 +456,17 @@ class HealthMonitor:
             return stuck_sessions
 
         except Exception as e:
-            logger.error(f"Error detecting stuck sessions: {e!s}")
+            logger.error("Error detecting stuck sessions: %s", e)
             return []
+
+    def _get_uptime(self) -> int:
+        """Get process uptime in seconds."""
+        try:
+            import os
+
+            stat = os.stat(f"/proc/{os.getpid()}/stat")
+            # field 22 is starttime (clock ticks since boot)
+            start_ticks = int(stat.st_mtime)
+            return int(time.time() - start_ticks)
+        except Exception:
+            return 0

@@ -13,12 +13,16 @@ import {
   RefreshCcw,
   Trash2,
   Zap,
+  Video,
+  UserCircle,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/Dialog";
 
 const NAV_ITEMS = [
   { id: "nav:overview", label: "Overview", icon: LayoutDashboard, action: "/", group: "Navigate" },
+  { id: "nav:interview", label: "Interview", icon: Video, action: "/interview", group: "Navigate" },
   { id: "nav:sessions", label: "Sessions", icon: Activity, action: "/sessions", group: "Navigate" },
+  { id: "nav:candidates", label: "Candidates", icon: UserCircle, action: "/candidates", group: "Navigate" },
   { id: "nav:workers", label: "Workers", icon: Users, action: "/workers", group: "Navigate" },
   { id: "nav:analytics", label: "Analytics", icon: BarChart3, action: "/analytics", group: "Navigate" },
   { id: "nav:settings", label: "Settings", icon: Settings, action: "/settings", group: "Navigate" },
@@ -26,6 +30,7 @@ const NAV_ITEMS = [
 
 const ACTIONS = [
   { id: "act:start", label: "Start new interview", icon: Play, action: "start", group: "Actions" },
+  { id: "act:live-interview", label: "Start live interview", icon: Video, action: "live-interview", group: "Actions" },
   { id: "act:refresh", label: "Refresh all data", icon: RefreshCcw, action: "refresh", group: "Actions" },
   { id: "act:detect", label: "Run failure detection", icon: Zap, action: "detect", group: "Actions" },
   { id: "act:clear-cache", label: "Clear session cache", icon: Trash2, action: "clear-cache", group: "Actions" },

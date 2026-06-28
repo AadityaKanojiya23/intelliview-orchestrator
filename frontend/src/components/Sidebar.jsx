@@ -8,12 +8,16 @@ import {
   Activity,
   BarChart3,
   Settings,
-  Shield
+  Shield,
+  Video,
+  UserCircle
 } from "lucide-react";
 import { jsx, jsxs } from "react/jsx-runtime";
 const items = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/interview", label: "Interview", icon: Video },
   { href: "/sessions", label: "Sessions", icon: Activity },
+  { href: "/candidates", label: "Candidates", icon: UserCircle },
   { href: "/workers", label: "Workers", icon: Users },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings }

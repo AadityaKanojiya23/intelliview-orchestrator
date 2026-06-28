@@ -1,7 +1,7 @@
 "use client";
-import { useState, useMemo, lazy, Suspense } from "react";
+import { useState, useMemo, lazy, Suspense, useCallback } from "react";
 import useSWR from "swr";
-import { Play, RefreshCcw } from "lucide-react";
+import { Play, RefreshCcw, GitCompare, X } from "lucide-react";
 import Card from "@/components/Card";
 import { StatusBadge, Badge } from "@/components/Badge";
 import { Skeleton, ErrorState, EmptyState } from "@/components/States";
@@ -11,15 +11,89 @@ import { endpoints } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { cn, formatDate, riskColor } from "@/lib/utils";
 import { toast } from "@/lib/toast";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 const SessionDetail = lazy(() => import("@/components/SessionDetail"));
 
 const TABS = ["active", "completed", "failed"];
 
+function SessionComparison({ sessions, onClose }) {
+  if (sessions.length < 2) return null;
+  const fields = [
+    { label: "Status", key: "status" },
+    { label: "Risk Score", key: "risk_score", format: (v) => (v != null ? v.toFixed(3) : "—") },
+    { label: "Candidate", key: "candidate_id" },
+    { label: "Worker", key: "assigned_node", fallback: "—" },
+    { label: "Created", key: "created_at", format: (v) => formatDate(v) },
+    { label: "Updated", key: "updated_at", format: (v) => formatDate(v) },
+    { label: "Duration", key: null, compute: (s) => {
+      if (!s.start_time || !s.end_time) return "—";
+      const ms = new Date(s.end_time) - new Date(s.start_time);
+      const sec = Math.round(ms / 1000);
+      if (sec < 60) return `${sec}s`;
+      return `${Math.round(sec / 60)}m ${sec % 60}s`;
+    }},
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-3xl rounded-xl border border-border bg-bg-panel shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h3 className="text-sm font-semibold text-zinc-100">
+            Compare Sessions ({sessions.length})
+          </h3>
+          <button
+            onClick={onClose}
+            className="rounded-md border border-border bg-bg-card p-1.5 text-muted hover:text-zinc-200"
+          >
+            <X size={14} />
+          </button>
+        </div>
+        <div className="overflow-x-auto p-5">
+          <table className="w-full text-sm">
+            <thead>
+              <tr>
+                <th className="py-2 pr-4 text-left text-xs uppercase tracking-wide text-muted">
+                  Field
+                </th>
+                {sessions.map((s) => (
+                  <th
+                    key={s.session_id}
+                    className="py-2 px-4 text-left font-mono text-xs text-zinc-300"
+                  >
+                    {s.session_id.slice(0, 12)}...
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {fields.map((f) => (
+                <tr key={f.label} className="border-t border-border">
+                  <td className="py-2 pr-4 text-xs text-muted">{f.label}</td>
+                  {sessions.map((s) => {
+                    const raw = f.compute ? f.compute(s) : s[f.key];
+                    const value = f.format ? f.format(raw) : (raw ?? f.fallback ?? "—");
+                    return (
+                      <td key={s.session_id} className="py-2 px-4 text-zinc-300">
+                        {f.key === "status" ? <StatusBadge status={raw} /> : value}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SessionsPage() {
   const [tab, setTab] = useState("active");
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState(null);
+  const [compareIds, setCompareIds] = useState([]);
   const token = useAppStore((s) => s.token);
 
   const active = useSWR("/active-sessions", { refreshInterval: 2000 });
@@ -27,6 +101,16 @@ export default function SessionsPage() {
   const failed = useSWR("/failed-sessions?limit=100", { refreshInterval: 10000 });
 
   const data = tab === "active" ? active : tab === "completed" ? completed : failed;
+
+  const { connected } = useWebSocket({
+    path: "/monitoring/ws/metrics",
+    enabled: !!token,
+    onMessage: useCallback(() => {
+      active.mutate();
+      completed.mutate();
+      failed.mutate();
+    }, [active, completed, failed]),
+  });
 
   const filtered = useMemo(() => {
     if (!data.data?.sessions) return [];
@@ -37,6 +121,17 @@ export default function SessionsPage() {
     );
   }, [data.data?.sessions, search]);
 
+  const toggleCompare = useCallback((id) => {
+    setCompareIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id].slice(-4)
+    );
+  }, []);
+
+  const compareSessions = useMemo(
+    () => [...(completed.data?.sessions ?? []), ...(failed.data?.sessions ?? [])].filter((s) => compareIds.includes(s.session_id)),
+    [completed.data, failed.data, compareIds]
+  );
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-end justify-between">
@@ -44,6 +139,14 @@ export default function SessionsPage() {
           <h1 className="text-2xl font-semibold text-zinc-50">Sessions</h1>
           <p className="text-sm text-muted">Start new interviews and review historical results.</p>
         </div>
+        {compareIds.length >= 2 && (
+          <button
+            onClick={() => {}}
+            className="flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-1.5 text-xs text-accent-light hover:bg-accent/10"
+          >
+            <GitCompare size={14} /> Compare ({compareIds.length})
+          </button>
+        )}
       </div>
 
       <StartInterviewForm disabled={!token} />
@@ -66,7 +169,7 @@ export default function SessionsPage() {
             <SearchInput
               value={search}
               onChange={setSearch}
-              placeholder="Filter by id or candidate…"
+              placeholder="Filter by id or candidate..."
               className="w-64"
             />
             <button
@@ -92,6 +195,7 @@ export default function SessionsPage() {
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-muted">
                 <tr>
+                  {tab !== "active" && <th className="py-2 pr-4 w-8"></th>}
                   <th className="py-2 pr-4">Session</th>
                   <th className="py-2 pr-4">Pipeline</th>
                   <th className="py-2 pr-4">Status</th>
@@ -104,10 +208,24 @@ export default function SessionsPage() {
                 {filtered.map((s) => (
                   <tr
                     key={s.session_id}
-                    onClick={() => setOpenId(s.session_id)}
-                    className="cursor-pointer border-t border-border transition-colors hover:bg-bg-card/50"
+                    className="border-t border-border transition-colors hover:bg-bg-card/50"
                   >
-                    <td className="py-2 pr-4 font-mono text-xs text-zinc-300">{s.session_id}</td>
+                    {tab !== "active" && (
+                      <td className="py-2 pr-4">
+                        <input
+                          type="checkbox"
+                          checked={compareIds.includes(s.session_id)}
+                          onChange={() => toggleCompare(s.session_id)}
+                          className="rounded border-border"
+                        />
+                      </td>
+                    )}
+                    <td
+                      onClick={() => setOpenId(s.session_id)}
+                      className="cursor-pointer py-2 pr-4 font-mono text-xs text-zinc-300"
+                    >
+                      {s.session_id}
+                    </td>
                     <td className="py-2 pr-4">
                       <Pipeline current={s.status} />
                     </td>
@@ -134,6 +252,10 @@ export default function SessionsPage() {
       <Suspense fallback={null}>
         <SessionDetail sessionId={openId} onClose={() => setOpenId(null)} />
       </Suspense>
+
+      {compareIds.length >= 2 && (
+        <SessionComparison sessions={compareSessions} onClose={() => setCompareIds([])} />
+      )}
     </div>
   );
 }
@@ -191,7 +313,7 @@ function StartInterviewForm({ disabled }) {
           disabled={disabled || submitting || !candidate.trim()}
           className="flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-dark disabled:opacity-50"
         >
-          <Play size={14} /> {submitting ? "Starting…" : "Start"}
+          <Play size={14} /> {submitting ? "Starting..." : "Start"}
         </button>
       </form>
       {error && <div className="mt-3 text-xs text-rose-400">{error}</div>}

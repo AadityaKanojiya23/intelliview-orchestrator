@@ -16,9 +16,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 
-import redis
-
-from config import REDIS_URL
+from orchestrator.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +42,6 @@ class RetryManager:
 
     def __init__(
         self,
-        redis_url: str = REDIS_URL,
         max_retries: int = 3,
         base_delay: int = 2,
         max_delay: int = 3600,
@@ -54,18 +51,16 @@ class RetryManager:
         Initialize RetryManager
 
         Args:
-            redis_url: Redis connection URL
             max_retries: Maximum number of retry attempts (default: 3)
             base_delay: Base delay in seconds for backoff calculation (default: 2)
             max_delay: Maximum delay between retries in seconds (default: 3600 = 1 hour)
             strategy: Retry strategy to use (default: EXPONENTIAL_BACKOFF)
         """
-        self.redis_url = redis_url
         self.max_retries = max_retries
         self.base_delay = base_delay
         self.max_delay = max_delay
         self.strategy = strategy
-        self.redis_client = self._connect_redis()
+        self.redis_client = get_redis_client()
         self.retry_key_prefix = "retry:"
         self.retry_count_key = "retry_count:"
         self.retry_scheduled_key = "retry_scheduled:"
@@ -74,17 +69,6 @@ class RetryManager:
             f"RetryManager initialized: max_retries={max_retries}, "
             f"strategy={strategy.value}, base_delay={base_delay}s"
         )
-
-    def _connect_redis(self) -> redis.Redis | None:
-        """Connect to Redis server"""
-        try:
-            client = redis.from_url(self.redis_url, decode_responses=True)
-            client.ping()
-            logger.info("Connected to Redis for retry management")
-            return client
-        except Exception as e:
-            logger.error(f"Failed to connect to Redis: {e!s}")
-            return None
 
     def can_retry(self, session_id: str) -> bool:
         """

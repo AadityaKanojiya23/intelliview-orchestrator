@@ -25,6 +25,13 @@ celery_app.conf.update(
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,  # fair distribution across workers
     broker_connection_retry_on_startup=True,
+    # Periodic beat schedule — scan for due retries every 60 seconds
+    beat_schedule={
+        "scan-due-retries": {
+            "task": "workers.tasks.scan_and_dispatch_retries",
+            "schedule": 60.0,
+        },
+    },
 )
 
 # Auto-discover tasks from workers module

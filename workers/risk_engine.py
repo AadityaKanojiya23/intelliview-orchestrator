@@ -7,179 +7,150 @@ Responsibilities:
 - Apply weighted scoring
 - Generate final risk score (0-1 scale)
 - Provide risk classification
+
+All weights and thresholds are configurable via RISK_CONFIG, a single
+source of truth for every numeric constant in the scoring pipeline.
 """
 
 import logging
+import os
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Single-source risk configuration — all weights & thresholds here.
+# Override via environment variables (prefix RISK_), e.g.
+#   RISK_VIDEO_WEIGHT=0.5 RISK_LOW_RISK_THRESHOLD=0.25
+# ---------------------------------------------------------------------------
+
+RISK_CONFIG: dict[str, float] = {
+    # Pipeline weights (must sum to 1.0)
+    "video_weight": float(os.getenv("RISK_VIDEO_WEIGHT", "0.4")),
+    "audio_weight": float(os.getenv("RISK_AUDIO_WEIGHT", "0.3")),
+    "evaluation_weight": float(os.getenv("RISK_EVALUATION_WEIGHT", "0.3")),
+    # Thresholds
+    "low_risk_threshold": float(os.getenv("RISK_LOW_RISK_THRESHOLD", "0.3")),
+    "medium_risk_threshold": float(os.getenv("RISK_MEDIUM_RISK_THRESHOLD", "0.6")),
+    "high_risk_threshold": float(os.getenv("RISK_HIGH_RISK_THRESHOLD", "0.8")),
+    # Video factors
+    "video_multiple_persons": float(os.getenv("RISK_VIDEO_MULTIPLE_PERSONS", "0.35")),
+    "video_phone_detected": float(os.getenv("RISK_VIDEO_PHONE_DETECTED", "0.25")),
+    "video_suspicious_head_movement": float(os.getenv("RISK_VIDEO_SUSPICIOUS_HEAD", "0.20")),
+    "video_no_face_detected": float(os.getenv("RISK_VIDEO_NO_FACE", "0.45")),
+    # Audio factors
+    "audio_background_voices": float(os.getenv("RISK_AUDIO_BACKGROUND_VOICES", "0.35")),
+    "audio_suspicious_pattern": float(os.getenv("RISK_AUDIO_SUSPICIOUS_PATTERN", "0.25")),
+    "audio_no_transcription": float(os.getenv("RISK_AUDIO_NO_TRANSCRIPTION", "0.40")),
+    # Evaluation factors
+    "eval_low_quality": float(os.getenv("RISK_EVAL_LOW_QUALITY", "0.30")),
+    "eval_low_accuracy": float(os.getenv("RISK_EVAL_LOW_ACCURACY", "0.40")),
+    "eval_poor_communication": float(os.getenv("RISK_EVAL_POOR_COMMUNICATION", "0.20")),
+}
+
 
 class RiskScoringEngine:
     """
-    Calculates comprehensive risk scores from interview analysis results
+    Calculates comprehensive risk scores from interview analysis results.
+    All numeric constants read from RISK_CONFIG.
     """
 
-    # Weights for each pipeline component
-    VIDEO_WEIGHT = 0.4
-    AUDIO_WEIGHT = 0.3
-    EVALUATION_WEIGHT = 0.3
+    # Pipeline weights
+    VIDEO_WEIGHT = RISK_CONFIG["video_weight"]
+    AUDIO_WEIGHT = RISK_CONFIG["audio_weight"]
+    EVALUATION_WEIGHT = RISK_CONFIG["evaluation_weight"]
 
-    # Risk thresholds for classification
-    LOW_RISK_THRESHOLD = 0.3
-    MEDIUM_RISK_THRESHOLD = 0.6
-    HIGH_RISK_THRESHOLD = 0.8
+    # Risk thresholds
+    LOW_RISK_THRESHOLD = RISK_CONFIG["low_risk_threshold"]
+    MEDIUM_RISK_THRESHOLD = RISK_CONFIG["medium_risk_threshold"]
+    HIGH_RISK_THRESHOLD = RISK_CONFIG["high_risk_threshold"]
 
-    # Individual risk factor weights
+    # Factor weights
     VIDEO_FACTORS = {
-        "multiple_persons": 0.35,  # High risk: multiple people visible
-        "phone_detected": 0.25,  # High risk: phone usage
-        "suspicious_head_movement": 0.20,  # Medium risk: unusual behavior
-        "no_face_detected": 0.45,  # Critical: candidate not visible
+        "multiple_persons": RISK_CONFIG["video_multiple_persons"],
+        "phone_detected": RISK_CONFIG["video_phone_detected"],
+        "suspicious_head_movement": RISK_CONFIG["video_suspicious_head_movement"],
+        "no_face_detected": RISK_CONFIG["video_no_face_detected"],
     }
 
     AUDIO_FACTORS = {
-        "background_voices": 0.35,  # High risk: external help
-        "suspicious_pattern": 0.25,  # Medium risk: memorized/scripted
-        "no_transcription": 0.40,  # High risk: no speech
+        "background_voices": RISK_CONFIG["audio_background_voices"],
+        "suspicious_pattern": RISK_CONFIG["audio_suspicious_pattern"],
+        "no_transcription": RISK_CONFIG["audio_no_transcription"],
     }
 
     EVALUATION_FACTORS = {
-        "low_quality_answers": 0.30,  # Medium risk: poor quality
-        "low_accuracy": 0.40,  # High risk: wrong answers
-        "poor_communication": 0.20,  # Low-medium risk: communication issues
+        "low_quality_answers": RISK_CONFIG["eval_low_quality"],
+        "low_accuracy": RISK_CONFIG["eval_low_accuracy"],
+        "poor_communication": RISK_CONFIG["eval_poor_communication"],
     }
 
     @staticmethod
     def calculate_video_risk(video_result: dict[str, Any]) -> float:
-        """
-        Calculate risk score from video analysis
-
-        Args:
-            video_result: Video analysis results
-
-        Returns:
-            float: Risk score between 0 and 1
-        """
+        """Calculate risk score from video analysis."""
         risk_score = 0.0
 
-        # Check for multiple persons (highest risk)
         if video_result.get("multiple_persons", {}).get("multiple_persons_detected"):
             risk_score += RiskScoringEngine.VIDEO_FACTORS["multiple_persons"]
 
-        # Check for phone detection (high risk)
         if video_result.get("phone_detected", {}).get("phone_detected"):
             risk_score += RiskScoringEngine.VIDEO_FACTORS["phone_detected"]
 
-        # Check for suspicious head movement (medium risk)
         if video_result.get("head_movement_suspicious", {}).get("suspicious_movement_detected"):
             risk_score += RiskScoringEngine.VIDEO_FACTORS["suspicious_head_movement"]
 
-        # Check for face detection (critical - no candidate visible)
         if not video_result.get("face_detected", {}).get("faces_found"):
             risk_score += RiskScoringEngine.VIDEO_FACTORS["no_face_detected"]
 
-        # Normalize to 0-1 scale
         return min(risk_score, 1.0)
 
     @staticmethod
     def calculate_audio_risk(audio_result: dict[str, Any]) -> float:
-        """
-        Calculate risk score from audio analysis
-
-        Args:
-            audio_result: Audio analysis results
-
-        Returns:
-            float: Risk score between 0 and 1
-        """
+        """Calculate risk score from audio analysis."""
         risk_score = 0.0
 
-        # Check for background voices (highest risk - external help)
         if audio_result.get("background_voices", {}).get("background_voices_detected"):
             risk_score += RiskScoringEngine.AUDIO_FACTORS["background_voices"]
 
-        # Check for suspicious conversation patterns (medium risk)
         if audio_result.get("suspicious_conversation", {}).get("suspicious_pattern_detected"):
             risk_score += RiskScoringEngine.AUDIO_FACTORS["suspicious_pattern"]
 
-        # Check for transcription quality (high risk if no speech)
         if not audio_result.get("transcription", {}).get("text"):
             risk_score += RiskScoringEngine.AUDIO_FACTORS["no_transcription"]
 
-        # Normalize to 0-1 scale
         return min(risk_score, 1.0)
 
     @staticmethod
     def calculate_evaluation_risk(evaluation_result: dict[str, Any]) -> float:
-        """
-        Calculate risk score from answer evaluation
-
-        Args:
-            evaluation_result: Answer evaluation results
-
-        Returns:
-            float: Risk score between 0 and 1
-        """
+        """Calculate risk score from answer evaluation."""
         risk_score = 0.0
 
-        # Extract quality scores (0-100 scale, convert to risk which is inverse)
         quality_score = evaluation_result.get("answer_quality_score", {}).get("overall_quality_score", 50)
         accuracy_score = evaluation_result.get("technical_accuracy", {}).get("accuracy_score", 50)
         clarity_score = evaluation_result.get("communication_clarity", {}).get("clarity_score", 50)
 
-        # Convert performance scores to risk scores (inverse relationship)
-        # Low quality = high risk
         if quality_score < 40:
             risk_score += RiskScoringEngine.EVALUATION_FACTORS["low_quality_answers"]
-
-        # Low accuracy = high risk
         if accuracy_score < 40:
             risk_score += RiskScoringEngine.EVALUATION_FACTORS["low_accuracy"]
-
-        # Poor communication = medium risk
         if clarity_score < 40:
             risk_score += RiskScoringEngine.EVALUATION_FACTORS["poor_communication"]
 
-        # Normalize to 0-1 scale
         return min(risk_score, 1.0)
 
     @staticmethod
     def calculate_final_risk(video_risk: float, audio_risk: float, evaluation_risk: float) -> float:
-        """
-        Calculate final combined risk score using weighted average
-
-        Formula:
-        final_risk = (0.4 * video_risk) + (0.3 * audio_risk) + (0.3 * evaluation_risk)
-
-        Args:
-            video_risk: Video analysis risk score (0-1)
-            audio_risk: Audio analysis risk score (0-1)
-            evaluation_risk: Answer evaluation risk score (0-1)
-
-        Returns:
-            float: Final risk score between 0 and 1
-        """
+        """Calculate final combined risk score using weighted average."""
         final_risk = (
             RiskScoringEngine.VIDEO_WEIGHT * video_risk
             + RiskScoringEngine.AUDIO_WEIGHT * audio_risk
             + RiskScoringEngine.EVALUATION_WEIGHT * evaluation_risk
         )
-
-        # Ensure the score is within 0-1 range
         return round(min(max(final_risk, 0.0), 1.0), 3)
 
     @staticmethod
     def classify_risk(risk_score: float) -> str:
-        """
-        Classify risk level based on score
-
-        Args:
-            risk_score: Risk score between 0 and 1
-
-        Returns:
-            str: Risk classification (LOW, MEDIUM, HIGH, CRITICAL)
-        """
+        """Classify risk level based on score."""
         if risk_score < RiskScoringEngine.LOW_RISK_THRESHOLD:
             return "LOW"
         if risk_score < RiskScoringEngine.MEDIUM_RISK_THRESHOLD:
@@ -195,32 +166,14 @@ class RiskScoringEngine:
         audio_result: dict[str, Any],
         evaluation_result: dict[str, Any],
     ) -> dict[str, Any]:
-        """
-        Generate comprehensive risk report from all analysis results
-
-        Args:
-            session_id: Interview session identifier
-            video_result: Video analysis results
-            audio_result: Audio analysis results
-            evaluation_result: Answer evaluation results
-
-        Returns:
-            dict: Comprehensive risk report
-        """
+        """Generate comprehensive risk report from all analysis results."""
         logger.info(f"Generating risk report for session {session_id}")
 
-        # Calculate individual component risks
         video_risk = RiskScoringEngine.calculate_video_risk(video_result)
         audio_risk = RiskScoringEngine.calculate_audio_risk(audio_result)
         evaluation_risk = RiskScoringEngine.calculate_evaluation_risk(evaluation_result)
-
-        # Calculate final risk score
         final_risk = RiskScoringEngine.calculate_final_risk(video_risk, audio_risk, evaluation_risk)
-
-        # Classify risk level
         risk_classification = RiskScoringEngine.classify_risk(final_risk)
-
-        # Generate risk factors list
         risk_factors = RiskScoringEngine._identify_risk_factors(video_result, audio_result, evaluation_result)
 
         report = {
@@ -245,49 +198,30 @@ class RiskScoringEngine:
         audio_result: dict[str, Any],
         evaluation_result: dict[str, Any],
     ) -> list:
-        """
-        Identify specific risk factors from analysis results
-
-        Args:
-            video_result: Video analysis results
-            audio_result: Audio analysis results
-            evaluation_result: Answer evaluation results
-
-        Returns:
-            list: List of identified risk factors
-        """
+        """Identify specific risk factors from analysis results."""
         risk_factors = []
 
-        # Video risk factors
         if not video_result.get("face_detected", {}).get("faces_found"):
             risk_factors.append("Candidate face not detected")
-
         if video_result.get("multiple_persons", {}).get("multiple_persons_detected"):
             risk_factors.append("Multiple persons detected in frame")
-
         if video_result.get("phone_detected", {}).get("phone_detected"):
             risk_factors.append("Mobile phone detected")
-
         if video_result.get("head_movement_suspicious", {}).get("suspicious_movement_detected"):
             risk_factors.append("Suspicious head movement detected")
 
-        # Audio risk factors
         if audio_result.get("background_voices", {}).get("background_voices_detected"):
             risk_factors.append("Background voices detected - possible external help")
-
         if audio_result.get("suspicious_conversation", {}).get("suspicious_pattern_detected"):
             risk_factors.append("Suspicious conversation pattern detected")
-
         if not audio_result.get("transcription", {}).get("text"):
             risk_factors.append("No speech detected during interview")
 
-        # Evaluation risk factors
         quality_score = evaluation_result.get("answer_quality_score", {}).get("overall_quality_score", 50)
         accuracy_score = evaluation_result.get("technical_accuracy", {}).get("accuracy_score", 50)
 
         if quality_score < 40:
             risk_factors.append("Low answer quality detected")
-
         if accuracy_score < 40:
             risk_factors.append("Low technical accuracy detected")
 
@@ -295,20 +229,11 @@ class RiskScoringEngine:
 
     @staticmethod
     def _generate_recommendation(risk_classification: str) -> str:
-        """
-        Generate recommendation based on risk classification
-
-        Args:
-            risk_classification: Risk level classification
-
-        Returns:
-            str: Recommendation text
-        """
+        """Generate recommendation based on risk classification."""
         recommendations = {
             "LOW": "Candidate appears genuine. Proceed with hiring consideration.",
             "MEDIUM": "Monitor candidate responses. Further verification may be needed.",
             "HIGH": "Multiple concerning factors detected. Recommend interview review.",
             "CRITICAL": "Significant fraud indicators detected. Recommend rejection or investigation.",
         }
-
         return recommendations.get(risk_classification, "Review interview manually.")

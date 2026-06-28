@@ -12,6 +12,7 @@ Responsibilities:
 
 import asyncio
 import logging
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -95,8 +96,8 @@ class SessionManager:
         """
         session_db = SessionLocal()
         try:
-            # Generate unique session ID
-            session_id = f"session_{_utcnow().strftime('%Y%m%d%H%M%S')}_{hash(candidate_id) % 100000:05d}"
+            # Generate collision-safe unique session ID
+            session_id = f"session_{uuid.uuid4().hex[:16]}"
 
             logger.info(f"Creating new interview session: {session_id} for candidate {candidate_id}")
 

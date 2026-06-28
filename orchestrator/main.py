@@ -25,17 +25,26 @@ from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 
-from config import API_TOKEN, CORS_ALLOW_ORIGINS
+from config import (
+    API_TOKEN,
+    CORS_ALLOW_ORIGINS,
+    ENABLE_PROMETHEUS,
+    MAX_REQUEST_BODY_BYTES,
+)
 from database.db import engine
 from database.models import Base
 from monitoring.dashboard_api import create_dashboard_routes
 from monitoring.metrics_collector import MetricsCollector
 from monitoring.websocket_manager import ws_manager
 from orchestrator import http_cache
+
 from orchestrator.fault_manager import FaultManager
 from orchestrator.health_monitor import HealthMonitor
 from orchestrator.load_balancer import BalancingStrategy, LoadBalancer
 from orchestrator.logging_config import configure_logging, log_event
+from orchestrator.rate_limiter import RateLimiterMiddleware
+from orchestrator.redis_client import circuit_breaker
+from orchestrator.request_validation import RequestValidationMiddleware
 from orchestrator.retry_manager import RetryManager, RetryStrategy
 from orchestrator.scheduler import Scheduler, TaskPriority
 from orchestrator.session_manager import SessionManager
@@ -55,9 +64,8 @@ async def lifespan(app: FastAPI):
     Startup: ensure schema exists, run an initial health probe, and warn
     loudly if the default API token is still in use.
 
-    Shutdown: best-effort graceful drain — no background tasks are owned
-    by this process beyond the in-memory registries, so this is mostly
-    about flushing the request-id log line and notifying Redis clients.
+    Shutdown: best-effort graceful drain — flush the request-id log line,
+    close the shared Redis client, and notify clients.
     """
     Base.metadata.create_all(bind=engine)
     if API_TOKEN == "dev-token-change-me":
@@ -77,6 +85,15 @@ async def lifespan(app: FastAPI):
                     close()
                 except Exception as exc:
                     logger.debug("shutdown close failed: %s", exc)
+        # Close the shared Redis client
+        from orchestrator.redis_client import get_redis_client
+
+        rc = get_redis_client()
+        if rc is not None:
+            try:
+                rc.raw.close()
+            except Exception:
+                pass
 
 
 # Initialize FastAPI application
@@ -151,6 +168,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+app.add_middleware(RateLimiterMiddleware, limit=60, window_seconds=60)
+app.add_middleware(
+    RequestValidationMiddleware,
+    max_body_size_bytes=MAX_REQUEST_BODY_BYTES,
 )
 
 
@@ -276,6 +298,76 @@ class TaskStatusResponse(BaseModel):
     result: dict | None = None
 
 
+# ========== Interview Feature Request/Response Models ==========
+
+
+class AskQuestionRequest(BaseModel):
+    """Request model for getting next question in a session"""
+
+    session_id: str
+    category: str | None = None
+
+
+class AskQuestionResponse(BaseModel):
+    """Response model for a question"""
+
+    session_id: str
+    question_id: str
+    text: str
+    category: str
+    difficulty: str
+
+
+class SubmitAnswerRequest(BaseModel):
+    """Request model for submitting an answer"""
+
+    session_id: str
+    question_id: str
+    answer_text: str
+    score: float | None = Field(default=None, ge=0, le=10)
+
+
+class SubmitAnswerResponse(BaseModel):
+    """Response model after submitting an answer"""
+
+    session_id: str
+    question_id: str
+    feedback: str
+    score: float | None = None
+    questions_asked: int
+    overall_score: float | None = None
+
+
+class AddQuestionRequest(BaseModel):
+    """Request model for adding a question to the bank"""
+
+    text: str = Field(min_length=1, max_length=1000)
+    category: str
+    difficulty: str = "medium"
+    tags: list[str] | None = None
+
+
+class CreateCandidateRequest(BaseModel):
+    """Request model for creating a candidate profile"""
+
+    name: str = Field(min_length=1, max_length=200)
+    email: str = Field(min_length=1, max_length=255)
+    resume_text: str | None = None
+    skills: list[str] | None = None
+
+
+class CreateTemplateRequest(BaseModel):
+    """Request model for creating an interview template"""
+
+    name: str = Field(min_length=1, max_length=200)
+    interview_type: str
+    description: str | None = None
+    duration_minutes: int = 60
+    question_count: int = 10
+    category_distribution: dict[str, float] | None = None
+    difficulty_distribution: dict[str, float] | None = None
+
+
 @app.get("/health")
 async def health_check():
     """
@@ -283,6 +375,61 @@ async def health_check():
     Returns system status
     """
     return {"status": "system running", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+# ========== Deep Health & Probe Endpoints ==========
+
+
+@app.get("/livez")
+async def liveness_probe():
+    """Kubernetes-style liveness probe. Returns 200 if the process is alive."""
+    return health_monitor.liveness_check()
+
+
+@app.get("/readyz")
+async def readiness_probe():
+    """Kubernetes-style readiness probe. Returns 200 only when all dependencies are up."""
+    result = health_monitor.readiness_check()
+    if not result["ready"]:
+        from fastapi.responses import JSONResponse as _JSONResponse
+
+        return _JSONResponse(status_code=503, content=result)
+    return result
+
+
+@app.get("/dependencies")
+async def get_dependency_statuses():
+    """Deep health check of all dependencies (Redis, Postgres, Celery broker)."""
+    return health_monitor._check_all_dependencies()
+
+
+# ========== Prometheus Metrics Endpoint ==========
+
+
+if ENABLE_PROMETHEUS:
+    from fastapi.responses import Response as _Response
+
+    from monitoring.prometheus_metrics import get_metrics_text
+
+    @app.get("/metrics")
+    async def prometheus_metrics():
+        """Prometheus metrics endpoint."""
+        return _Response(
+            content=get_metrics_text(),
+            media_type="text/plain; version=0.0.4; charset=utf-8",
+        )
+
+
+@app.get("/circuit-breaker")
+async def get_circuit_breaker_status():
+    """Return the current state of the Redis circuit breaker."""
+    return {
+        "state": circuit_breaker.state.value,
+        "failure_count": circuit_breaker._failure_count,
+        "failure_threshold": circuit_breaker.failure_threshold,
+        "cooldown_seconds": circuit_breaker.cooldown_seconds,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 # ========== Interview Session Endpoints ==========
@@ -684,6 +831,241 @@ async def list_interviews(limit: int = 100, status: str | None = None):
         raise HTTPException(status_code=500, detail="Error listing interviews")
     finally:
         session_db.close()
+
+
+# ========== Question Endpoints ==========
+
+
+@app.get("/questions")
+async def list_questions(category: str | None = None, difficulty: str | None = None, limit: int = 100):
+    """List questions with optional category/difficulty filter"""
+    try:
+        questions = question_bank.get_questions(category=category, difficulty=difficulty, limit=limit)
+        return {"count": len(questions), "questions": questions}
+    except Exception as e:
+        logger.error(f"Error listing questions: {e!s}")
+        raise HTTPException(status_code=500, detail="Error listing questions")
+
+
+@app.post("/questions")
+async def add_question(request: AddQuestionRequest):
+    """Add a new question to the bank"""
+    try:
+        question = question_bank.add_question(
+            text=request.text,
+            category=request.category,
+            difficulty=request.difficulty,
+            tags=request.tags,
+        )
+        return question
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error adding question: {e!s}")
+        raise HTTPException(status_code=500, detail="Error adding question")
+
+
+# ========== Candidate Endpoints ==========
+
+
+@app.get("/candidates")
+async def list_candidates(limit: int = 100):
+    """List all candidates"""
+    try:
+        candidates = candidate_manager.list_candidates(limit=limit)
+        return {"count": len(candidates), "candidates": candidates}
+    except Exception as e:
+        logger.error(f"Error listing candidates: {e!s}")
+        raise HTTPException(status_code=500, detail="Error listing candidates")
+
+
+@app.post("/candidates")
+async def create_candidate(request: CreateCandidateRequest):
+    """Create a new candidate profile"""
+    try:
+        candidate = candidate_manager.create_candidate(
+            name=request.name,
+            email=request.email,
+            resume_text=request.resume_text,
+            skills=request.skills,
+        )
+        return candidate
+    except Exception as e:
+        logger.error(f"Error creating candidate: {e!s}")
+        raise HTTPException(status_code=500, detail="Error creating candidate")
+
+
+@app.get("/candidates/{candidate_id}")
+async def get_candidate(candidate_id: str):
+    """Get candidate details by ID"""
+    try:
+        candidate = candidate_manager.get_candidate(candidate_id)
+        if not candidate:
+            raise HTTPException(status_code=404, detail="Candidate not found")
+        return candidate
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching candidate: {e!s}")
+        raise HTTPException(status_code=500, detail="Error fetching candidate")
+
+
+@app.get("/candidates/{candidate_id}/history")
+async def get_candidate_history(candidate_id: str):
+    """Get candidate interview history"""
+    try:
+        candidate = candidate_manager.get_candidate(candidate_id)
+        if not candidate:
+            raise HTTPException(status_code=404, detail="Candidate not found")
+        history = candidate_manager.get_interview_history(candidate_id)
+        return {"candidate_id": candidate_id, "history": history}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching candidate history: {e!s}")
+        raise HTTPException(status_code=500, detail="Error fetching candidate history")
+
+
+# ========== Template Endpoints ==========
+
+
+@app.get("/templates")
+async def list_templates(interview_type: str | None = None, limit: int = 100):
+    """List interview templates with optional type filter"""
+    try:
+        templates = interview_template_manager.list_templates(interview_type=interview_type, limit=limit)
+        return {"count": len(templates), "templates": templates}
+    except Exception as e:
+        logger.error(f"Error listing templates: {e!s}")
+        raise HTTPException(status_code=500, detail="Error listing templates")
+
+
+@app.post("/templates")
+async def create_template(request: CreateTemplateRequest):
+    """Create a new interview template"""
+    try:
+        template = interview_template_manager.create_template(
+            name=request.name,
+            interview_type=request.interview_type,
+            description=request.description,
+            duration_minutes=request.duration_minutes,
+            question_count=request.question_count,
+            category_distribution=request.category_distribution,
+            difficulty_distribution=request.difficulty_distribution,
+        )
+        return template
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creating template: {e!s}")
+        raise HTTPException(status_code=500, detail="Error creating template")
+
+
+# ========== Interview Q&A Endpoints ==========
+
+
+@app.post("/interviews/ask-question")
+async def ask_question(request: AskQuestionRequest):
+    """Get next question for a session"""
+    try:
+        session_data = session_manager.get_session(request.session_id)
+        if not session_data:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        asked_ids = session_data.get("questions_asked", [])
+        question = question_bank.get_next_question(
+            category=request.category,
+            exclude_ids=[q.get("question_id") for q in asked_ids] if asked_ids else [],
+        )
+        if not question:
+            raise HTTPException(status_code=404, detail="No more questions available")
+
+        return AskQuestionResponse(
+            session_id=request.session_id,
+            question_id=question["question_id"],
+            text=question["text"],
+            category=question["category"],
+            difficulty=question["difficulty"],
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting question: {e!s}")
+        raise HTTPException(status_code=500, detail="Error getting question")
+
+
+@app.post("/interviews/submit-answer")
+async def submit_answer(request: SubmitAnswerRequest):
+    """Submit an answer and get feedback"""
+    try:
+        session_data = session_manager.get_session(request.session_id)
+        if not session_data:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        question = question_bank.get_question(request.question_id)
+        if not question:
+            raise HTTPException(status_code=404, detail="Question not found")
+
+        question_bank.record_usage(request.question_id, score=request.score)
+
+        feedback = f"Answer recorded for: {question['text'][:80]}..."
+        if request.score is not None:
+            if request.score >= 7:
+                feedback = f"Strong answer ({request.score}/10). Good demonstration of knowledge."
+            elif request.score >= 5:
+                feedback = f"Acceptable answer ({request.score}/10). Some areas for improvement."
+            else:
+                feedback = f"Needs improvement ({request.score}/10). Consider reviewing core concepts."
+
+        questions_asked = session_data.get("questions_asked", [])
+        questions_asked.append(
+            {
+                "question_id": request.question_id,
+                "text": question["text"],
+                "category": question["category"],
+            }
+        )
+
+        answers = session_data.get("answers_provided", [])
+        answers.append(
+            {
+                "question_id": request.question_id,
+                "answer_text": request.answer_text,
+                "score": request.score,
+            }
+        )
+
+        feedbacks = session_data.get("feedback_generated", [])
+        feedbacks.append(
+            {
+                "question_id": request.question_id,
+                "feedback": feedback,
+                "score": request.score,
+            }
+        )
+
+        scores = [a.get("score") for a in answers if a.get("score") is not None]
+        overall_score = sum(scores) / len(scores) if scores else None
+
+        session_data["questions_asked"] = questions_asked
+        session_data["answers_provided"] = answers
+        session_data["feedback_generated"] = feedbacks
+        session_data["overall_score"] = overall_score
+        session_manager.state_sync.set_session_state(request.session_id, session_data)
+
+        return SubmitAnswerResponse(
+            session_id=request.session_id,
+            question_id=request.question_id,
+            feedback=feedback,
+            score=request.score,
+            questions_asked=len(questions_asked),
+            overall_score=overall_score,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error submitting answer: {e!s}")
+        raise HTTPException(status_code=500, detail="Error submitting answer")
 
 
 # ========== Worker Management Endpoints ==========

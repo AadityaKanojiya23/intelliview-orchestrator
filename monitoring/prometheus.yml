@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "intelliview-orchestrator"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["fastapi:8000"]
+        labels:
+          service: "orchestrator"
+
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis:6379"]
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

@@ -70,6 +70,10 @@ export function ClientProviders({ children }) {
         router.push("/sessions?action=start");
         return;
       }
+      if (action === "live-interview") {
+        router.push("/interview");
+        return;
+      }
       if (action === "refresh") {
         toast.info("Refreshing all data…");
         window.location.reload();

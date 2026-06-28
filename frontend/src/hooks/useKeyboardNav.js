@@ -25,7 +25,9 @@ function useKeyboardNav(onShowHelp) {
           w: "/workers",
           a: "/analytics",
           o: "/",
-          ",": "/settings"
+          ",": "/settings",
+          i: "/interview",
+          c: "/candidates"
         };
         if (route[e.key.toLowerCase()]) {
           e.preventDefault();

@@ -6,7 +6,7 @@ import { StatusBadge, Badge } from "@/components/Badge";
 import { Shimmer } from "@/components/Shimmer";
 import { useAppStore } from "@/lib/store";
 import { formatDate, riskColor, formatRelative } from "@/lib/utils";
-import { Activity, Calendar, Cpu, Hash, RefreshCw, User } from "lucide-react";
+import { Activity, Calendar, Cpu, Hash, RefreshCw, User, Film, Mic, MessageSquare } from "lucide-react";
 import useSWR from "swr";
 
 function SessionDetailImpl({ sessionId, onClose }) {
@@ -76,6 +76,98 @@ function SessionDetailImpl({ sessionId, onClose }) {
                   icon={Hash}
                 />
               </div>
+
+              {data.video_analysis && (
+                <div>
+                  <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Video Analysis</h3>
+                  <div className="mt-2 grid grid-cols-2 gap-3">
+                    {data.video_analysis.confidence_score != null && (
+                      <div className="rounded-md border border-border bg-bg-card px-3 py-2.5">
+                        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted">
+                          <Film size={10} />
+                          <span>Confidence</span>
+                        </div>
+                        <div className="mt-1 text-sm text-zinc-200">
+                          {(data.video_analysis.confidence_score * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                    )}
+                    {data.video_analysis.facial_expressions && (
+                      <div className="rounded-md border border-border bg-bg-card px-3 py-2.5">
+                        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted">
+                          <Film size={10} />
+                          <span>Expression</span>
+                        </div>
+                        <div className="mt-1 text-sm text-zinc-200">
+                          {Object.entries(data.video_analysis.facial_expressions)
+                            .sort(([, a], [, b]) => b - a)
+                            .slice(0, 3)
+                            .map(([k]) => k)
+                            .join(", ") || "—"}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {data.audio_analysis && (
+                <div>
+                  <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Audio Analysis</h3>
+                  <div className="mt-2 grid grid-cols-2 gap-3">
+                    {data.audio_analysis.sentiment && (
+                      <div className="rounded-md border border-border bg-bg-card px-3 py-2.5">
+                        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted">
+                          <Mic size={10} />
+                          <span>Sentiment</span>
+                        </div>
+                        <div className="mt-1 text-sm text-zinc-200 capitalize">{data.audio_analysis.sentiment}</div>
+                      </div>
+                    )}
+                    {data.audio_analysis.clarity_score != null && (
+                      <div className="rounded-md border border-border bg-bg-card px-3 py-2.5">
+                        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted">
+                          <Mic size={10} />
+                          <span>Clarity</span>
+                        </div>
+                        <div className="mt-1 text-sm text-zinc-200">
+                          {(data.audio_analysis.clarity_score * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                    )}
+                    {data.audio_analysis.speech_pace != null && (
+                      <div className="rounded-md border border-border bg-bg-card px-3 py-2.5">
+                        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted">
+                          <Mic size={10} />
+                          <span>Speech pace</span>
+                        </div>
+                        <div className="mt-1 text-sm text-zinc-200">{data.audio_analysis.speech_pace} wpm</div>
+                      </div>
+                    )}
+                    {data.audio_analysis.filler_words != null && (
+                      <div className="rounded-md border border-border bg-bg-card px-3 py-2.5">
+                        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted">
+                          <Mic size={10} />
+                          <span>Filler words</span>
+                        </div>
+                        <div className="mt-1 text-sm text-zinc-200">{data.audio_analysis.filler_words}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {data.ai_feedback && (
+                <div>
+                  <h3 className="text-xs font-medium uppercase tracking-wide text-muted">AI Feedback</h3>
+                  <div className="mt-2 rounded-md border border-border bg-bg-card px-3 py-2.5">
+                    <div className="flex items-start gap-2">
+                      <MessageSquare size={12} className="mt-0.5 shrink-0 text-accent" />
+                      <p className="text-sm text-zinc-300">{data.ai_feedback}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -16,9 +16,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-import redis
-
-from config import REDIS_URL
+from orchestrator.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -59,29 +57,14 @@ class MetricsCollector:
     - Failure and retry patterns
     """
 
-    def __init__(self, redis_url: str = REDIS_URL):
+    def __init__(self):
         """
         Initialize MetricsCollector
-
-        Args:
-            redis_url: Redis connection URL
         """
-        self.redis_url = redis_url
-        self.redis_client = self._connect_redis()
+        self.redis_client = get_redis_client()
         self.metrics_prefix = "metrics:"
         self._system_cache = _TTLCache()
         logger.info("MetricsCollector initialized")
-
-    def _connect_redis(self) -> redis.Redis | None:
-        """Connect to Redis server"""
-        try:
-            client = redis.from_url(self.redis_url, decode_responses=True)
-            client.ping()
-            logger.info("Connected to Redis for metrics collection")
-            return client
-        except Exception as e:
-            logger.error(f"Failed to connect to Redis: {e!s}")
-            return None
 
     def get_system_metrics(self) -> dict[str, Any]:
         """

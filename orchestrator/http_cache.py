@@ -13,22 +13,16 @@ from datetime import datetime, timezone
 from functools import wraps
 from typing import Any
 
-import redis
 from fastapi import Response
 
-from config import REDIS_URL
+from orchestrator.redis_client import get_redis_client
 
 _TTL_PREFIX = "httpcache:"
 _DEFAULT_TTL = 2  # seconds — short, dashboard polls every 5s
 
 
-def _client() -> redis.Redis | None:
-    try:
-        c = redis.from_url(REDIS_URL, decode_responses=True)
-        c.ping()
-        return c
-    except Exception:
-        return None
+def _client():
+    return get_redis_client()
 
 
 def _key(name: str) -> str:

@@ -16,9 +16,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 
-import redis
-
-from config import REDIS_URL
+from orchestrator.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -45,33 +43,20 @@ class FaultManager:
     - Failure logging and analysis
     """
 
-    def __init__(self, redis_url: str = REDIS_URL, debounce_time: int = 60):
+    def __init__(self, debounce_time: int = 60):
         """
         Initialize FaultManager
 
         Args:
-            redis_url: Redis connection URL
             debounce_time: Seconds to wait before treating alert as new (prevent spam)
         """
-        self.redis_url = redis_url
         self.debounce_time = debounce_time
-        self.redis_client = self._connect_redis()
+        self.redis_client = get_redis_client()
         self.failure_log_prefix = "failure_log:"
         self.recovery_queue_prefix = "recovery_queue:"
         self.dead_letter_queue = "dead_letter_queue"
 
         logger.info(f"FaultManager initialized with debounce_time={debounce_time}s")
-
-    def _connect_redis(self) -> redis.Redis | None:
-        """Connect to Redis server"""
-        try:
-            client = redis.from_url(self.redis_url, decode_responses=True)
-            client.ping()
-            logger.info("Connected to Redis for fault management")
-            return client
-        except Exception as e:
-            logger.error(f"Failed to connect to Redis: {e!s}")
-            return None
 
     def detect_failed_sessions(self, timeout_seconds: int = 1800) -> list[str]:
         """

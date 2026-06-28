@@ -14,9 +14,7 @@ from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Any
 
-import redis
-
-from config import REDIS_URL
+from orchestrator.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +33,7 @@ class WorkerRegistry:
     def __init__(self):
         """Initialize worker registry"""
         try:
-            self.redis_url = REDIS_URL or "redis://localhost:6379/0"
-            self.redis_client = self._connect_redis()
+            self.redis_client = get_redis_client()
             self.local_workers: dict[str, dict[str, Any]] = {}
             self.lock = Lock()
             self._hydrated = False
@@ -71,16 +68,6 @@ class WorkerRegistry:
             self._hydrated = True
         except Exception as exc:
             logger.warning("Could not hydrate worker registry from Redis: %s", exc)
-
-    def _connect_redis(self) -> redis.Redis | None:
-        """Establish Redis connection"""
-        try:
-            client = redis.from_url(self.redis_url, decode_responses=True)
-            client.ping()
-            return client
-        except Exception as e:
-            logger.warning(f"Could not connect to Redis: {e!s}")
-            return None
 
     def register_worker(self, worker_id: str, capacity: int = 4) -> bool:
         """

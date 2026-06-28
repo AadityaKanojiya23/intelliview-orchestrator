@@ -14,3 +14,10 @@ __all__ = [
     "create_dashboard_routes",
     "ws_manager",
 ]
+
+try:
+    from monitoring.prometheus_metrics import get_metrics_text
+
+    __all__.append("get_metrics_text")
+except ImportError:
+    pass
