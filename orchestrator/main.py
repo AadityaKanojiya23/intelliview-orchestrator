@@ -1666,6 +1666,75 @@ async def detect_and_handle_failures():
         raise HTTPException(status_code=500, detail=f"Error during failure detection: {e!s}")
 
 
+# ========== Moment Tracking Endpoints ==========
+
+
+@app.post("/moments/track")
+async def track_moment(session_id: str, moment_type: str, metadata: dict | None = None):
+    """Track a real-time moment during an interview session."""
+    from orchestrator.moment_tracker import moment_tracker
+
+    try:
+        moment = moment_tracker.track_moment(session_id, moment_type, metadata)
+        http_cache.invalidate(f"moments:{session_id}")
+        return {"status": "success", "moment": moment}
+    except Exception as e:
+        logger.error(f"Error tracking moment: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error tracking moment: {e!s}")
+
+
+@app.get("/moments/{session_id}")
+async def get_session_moments(session_id: str, moment_type: str | None = None, limit: int = 100):
+    """Get all tracked moments for a session."""
+    from orchestrator.moment_tracker import moment_tracker
+
+    try:
+        moments = moment_tracker.get_session_moments(session_id, moment_type, limit)
+        return {"session_id": session_id, "count": len(moments), "moments": moments}
+    except Exception as e:
+        logger.error(f"Error fetching moments: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching moments: {e!s}")
+
+
+@app.get("/moments/{session_id}/timeline")
+async def get_session_timeline(session_id: str):
+    """Get the moment timeline for a session."""
+    from orchestrator.moment_tracker import moment_tracker
+
+    try:
+        timeline = moment_tracker.get_timeline(session_id)
+        return {"session_id": session_id, "count": len(timeline), "timeline": timeline}
+    except Exception as e:
+        logger.error(f"Error fetching timeline: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching timeline: {e!s}")
+
+
+@app.get("/moments/{session_id}/summary")
+async def get_session_moment_summary(session_id: str):
+    """Get a summary of moments for a session."""
+    from orchestrator.moment_tracker import moment_tracker
+
+    try:
+        summary = moment_tracker.get_session_summary(session_id)
+        return summary
+    except Exception as e:
+        logger.error(f"Error fetching moment summary: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching moment summary: {e!s}")
+
+
+@app.get("/moments/analytics")
+async def get_moment_analytics(time_range_hours: int = 24):
+    """Get moment analytics across all sessions."""
+    from orchestrator.moment_tracker import moment_tracker
+
+    try:
+        analytics = moment_tracker.get_analytics(time_range_hours)
+        return analytics
+    except Exception as e:
+        logger.error(f"Error fetching moment analytics: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching moment analytics: {e!s}")
+
+
 # ========== Dashboard HTML Endpoint ==========
 
 
