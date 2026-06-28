@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, lazy, useEffect, useState, useCallback } from "react";
+import { Suspense, lazy, useEffect, useState, useCallback, useMemo } from "react";
 import { SWRConfig } from "swr";
 import { swrFetcher } from "@/lib/fetcher";
 import { useHydrateToken } from "@/hooks/useHydrateToken";
@@ -10,6 +10,7 @@ import { useUIStore } from "@/lib/ui-store";
 import { endpoints, api } from "@/lib/api";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
+import { useScreenLock } from "@/components/ScreenLock";
 
 const CommandPalette = lazy(() =>
   import("@/components/CommandPalette").then((m) => ({ default: m.CommandPalette })),
@@ -26,16 +27,17 @@ const MobileSidebar = lazy(() =>
 const SidebarMobile = lazy(() =>
   import("@/components/Sidebar").then((m) => ({ default: m.Sidebar })),
 );
+const ScreenLock = lazy(() =>
+  import("@/components/ScreenLock").then((m) => ({ default: m.ScreenLock, useScreenLock: m.useScreenLock })),
+);
 
 function NullFallback() {
   return null;
 }
 
 export function ClientProviders({ children }) {
-  // Hydrate persisted stores once on mount. Don't gate the tree on this —
-  // the SSR pass already renders the full layout, and the only side-effect
-  // is reading localStorage.
   useHydrateToken();
+  const { isLocked, lock, unlock } = useScreenLock(300000);
   useEffect(() => {
     hydrateTheme();
   }, []);
@@ -120,6 +122,9 @@ export function ClientProviders({ children }) {
       }}
     >
       <ErrorBoundary>{children}</ErrorBoundary>
+      <Suspense fallback={null}>
+        <ScreenLock isLocked={isLocked} onUnlock={unlock} />
+      </Suspense>
       <Suspense fallback={null}>
         <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} onAction={handleAction} />
         <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} />

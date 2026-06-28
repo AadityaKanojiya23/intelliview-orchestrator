@@ -2,7 +2,7 @@
 import { useAppStore } from "@/lib/store";
 import { useThemeStore } from "@/lib/theme";
 import { useEffect, useState } from "react";
-import { LogIn, LogOut, Menu, Moon, Sun, Monitor, Search, Keyboard, Radio } from "lucide-react";
+import { LogIn, LogOut, Menu, Moon, Sun, Monitor, Search, Keyboard, Radio, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/lib/ui-store";
 import { Tooltip } from "@/components/Tooltip";
@@ -78,6 +78,18 @@ function Topbar() {
           className: "rounded-md border border-border bg-bg-card p-1.5 text-muted hover:text-zinc-200",
           "aria-label": "Show shortcuts",
           children: /* @__PURE__ */ jsx(Keyboard, { size: 14 })
+        }
+      ) }),
+      /* @__PURE__ */ jsx(Tooltip, { content: "Lock screen", children: /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: () => {
+            localStorage.setItem("intelliview_screen_lock", "locked");
+            window.location.reload();
+          },
+          className: "rounded-md border border-border bg-bg-card p-1.5 text-muted hover:text-zinc-200",
+          "aria-label": "Lock screen",
+          children: /* @__PURE__ */ jsx(Lock, { size: 14 })
         }
       ) }),
       showForm ? /* @__PURE__ */ jsxs(
