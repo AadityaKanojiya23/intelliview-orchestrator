@@ -22,6 +22,7 @@ import { endpoints } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { useMomentTracking, MomentTimeline } from "@/hooks/useMomentTracking";
 import { cn, riskColor } from "@/lib/utils";
 
 export default function InterviewPage() {
@@ -42,6 +43,14 @@ export default function InterviewPage() {
   const [audioLevels, setAudioLevels] = useState(new Array(32).fill(0));
   const [candidate, setCandidate] = useState("");
   const [starting, setStarting] = useState(false);
+
+  const {
+    moments,
+    isTracking,
+    startTracking,
+    stopTracking,
+    trackEvent,
+  } = useMomentTracking(activeSession);
 
   const { connected } = useWebSocket({
     path: "/monitoring/ws/metrics",
@@ -124,6 +133,8 @@ export default function InterviewPage() {
       setActiveSession(r.session_id);
       setIsLive(true);
       await startCamera();
+      startTracking();
+      trackEvent("session_start", { candidate_id: candidate.trim() });
       toast.success("Interview started", `Session ${r.session_id}`);
     } catch (err) {
       toast.error("Failed to start", err instanceof Error ? err.message : String(err));
@@ -133,6 +144,8 @@ export default function InterviewPage() {
   };
 
   const handleStop = () => {
+    trackEvent("session_end", { duration: moments.length * 1000 });
+    stopTracking();
     stopCamera();
     setIsLive(false);
     setActiveSession(null);
@@ -356,8 +369,22 @@ export default function InterviewPage() {
                   <Badge variant="muted">Disconnected</Badge>
                 )}
               </div>
+              <div className="flex justify-between">
+                <span className="text-muted">Tracking</span>
+                {isTracking ? (
+                  <Badge variant="success">{moments.length} moments</Badge>
+                ) : (
+                  <Badge variant="muted">Inactive</Badge>
+                )}
+              </div>
             </div>
           </Card>
+
+          {moments.length > 0 && (
+            <Card title="Moment Timeline">
+              <MomentTimeline moments={moments} />
+            </Card>
+          )}
         </div>
       </div>
     </div>
