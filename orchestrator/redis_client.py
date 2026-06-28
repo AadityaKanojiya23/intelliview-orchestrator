@@ -187,6 +187,11 @@ class _RedisClientWrapper:
         return self._call("info", *a, **kw)
 
 
+def get_redis() -> _RedisClientWrapper:
+    """Alias for get_redis_client() for backward compatibility."""
+    return get_redis_client()
+
+
 # Singleton instances
 _client_instance: _RedisClientWrapper | None = None
 _redis_url: str | None = None
@@ -204,15 +209,21 @@ def get_redis_client(url: str | None = None) -> _RedisClientWrapper:
     if _client_instance is not None and _redis_url == target:
         return _client_instance
     try:
-        raw = redis.from_url(target, decode_responses=True)
+        pool = redis.ConnectionPool.from_url(
+            target,
+            decode_responses=True,
+            max_connections=20,
+            retry_on_timeout=True,
+            socket_connect_timeout=5,
+            socket_timeout=5,
+        )
+        raw = redis.Redis(connection_pool=pool)
         raw.ping()
         _client_instance = _RedisClientWrapper(raw)
         _redis_url = target
-        logger.info("Shared Redis client connected to %s", target)
+        logger.info("Shared Redis client connected to %s (pool max=%d)", target, 20)
     except Exception as exc:
         logger.error("Failed to connect to Redis at %s: %s", target, exc)
-        # Return a wrapper around a dummy client - callers that check the
-        # wrapper won't crash, but will get ConnectionError on actual ops.
         _client_instance = _RedisClientWrapper(redis.Redis())
         _redis_url = target
     return _client_instance
