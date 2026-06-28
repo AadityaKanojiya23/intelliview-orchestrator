@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
 import useSWR from "swr";
-import { Activity, AlertTriangle, CheckCircle2, Cpu, Users } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Users, Zap, Shield, TrendingUp, Clock } from "lucide-react";
 import Card from "@/components/Card";
 import Stat from "@/components/Stat";
 import { StatusBadge } from "@/components/Badge";
@@ -47,48 +47,62 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-50">Overview</h1>
-        <p className="text-sm text-muted">Real-time system health and throughput.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-50">Overview</h1>
+          <p className="text-sm text-muted">Real-time system health and throughput.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-xs text-muted">Live</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat
-          label="System"
-          value={health.data ? <StatusBadge status={health.data.overall_status} /> : <Skeleton className="h-7 w-20" />}
-          hint={health.data ? `Updated ${formatRelative(health.data.timestamp)}` : ""}
-          icon={<Activity size={16} />}
-        />
-        <Stat
-          label="Workers"
-          value={
-            workers.data ? (
-              `${workers.data.healthy_workers}/${workers.data.total_workers}`
-            ) : (
-              <Skeleton className="h-7 w-12" />
-            )
-          }
-          hint={workers.data ? `${formatPercent(utilization)} utilization` : ""}
-          icon={<Users size={16} />}
-        />
-        <Stat
-          label="Completed"
-          value={stats.data ? stats.data.completed_sessions : <Skeleton className="h-7 w-12" />}
-          hint={stats.data ? `${stats.data.active_sessions} active · ${stats.data.failed_sessions} failed` : ""}
-          icon={<CheckCircle2 size={16} />}
-        />
-        <Stat
-          label="Avg risk"
-          value={
-            stats.data ? (
-              stats.data.risk_score_stats.average_risk_score.toFixed(3)
-            ) : (
-              <Skeleton className="h-7 w-16" />
-            )
-          }
-          hint={stats.data ? `${stats.data.risk_score_stats.high_risk_sessions} high risk` : ""}
-          icon={<AlertTriangle size={16} />}
-        />
+        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "0ms" }}>
+          <Stat
+            label="System"
+            value={health.data ? <StatusBadge status={health.data.overall_status} /> : <Skeleton className="h-7 w-20" />}
+            hint={health.data ? `Updated ${formatRelative(health.data.timestamp)}` : ""}
+            icon={<Activity size={16} />}
+          />
+        </div>
+        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "50ms" }}>
+          <Stat
+            label="Workers"
+            value={
+              workers.data ? (
+                `${workers.data.healthy_workers}/${workers.data.total_workers}`
+              ) : (
+                <Skeleton className="h-7 w-12" />
+              )
+            }
+            hint={workers.data ? `${formatPercent(utilization)} utilization` : ""}
+            icon={<Users size={16} />}
+          />
+        </div>
+        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "100ms" }}>
+          <Stat
+            label="Completed"
+            value={stats.data ? stats.data.completed_sessions : <Skeleton className="h-7 w-12" />}
+            hint={stats.data ? `${stats.data.active_sessions} active · ${stats.data.failed_sessions} failed` : ""}
+            icon={<CheckCircle2 size={16} />}
+          />
+        </div>
+        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "150ms" }}>
+          <Stat
+            label="Avg risk"
+            value={
+              stats.data ? (
+                stats.data.risk_score_stats.average_risk_score.toFixed(3)
+              ) : (
+                <Skeleton className="h-7 w-16" />
+              )
+            }
+            hint={stats.data ? `${stats.data.risk_score_stats.high_risk_sessions} high risk` : ""}
+            icon={<AlertTriangle size={16} />}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -125,7 +139,7 @@ export default function OverviewPage() {
               {Object.entries(health.data.components).map(([k, v]) => (
                 <li
                   key={k}
-                  className="flex items-center justify-between rounded-md border border-border bg-bg-card px-3 py-2"
+                  className="flex items-center justify-between rounded-md border border-border bg-bg-card px-3 py-2 hover:border-accent/30 transition-colors"
                 >
                   <span className="capitalize text-zinc-300">{k}</span>
                   <StatusBadge status={v?.status || "unknown"} />
@@ -147,7 +161,7 @@ export default function OverviewPage() {
               {active.data.sessions.slice(0, 6).map((s) => (
                 <li
                   key={s.session_id}
-                  className="flex items-center justify-between rounded-md border border-border bg-bg-card px-3 py-2"
+                  className="flex items-center justify-between rounded-md border border-border bg-bg-card px-3 py-2 hover:border-accent/30 transition-colors"
                 >
                   <div>
                     <div className="font-mono text-xs text-zinc-300">{s.session_id}</div>
@@ -181,7 +195,7 @@ export default function OverviewPage() {
               </thead>
               <tbody>
                 {workers.data.workers.map((w) => (
-                  <tr key={w.worker_id} className="border-t border-border">
+                  <tr key={w.worker_id} className="border-t border-border hover:bg-white/5 transition-colors">
                     <td className="py-2 pr-4 font-mono text-xs text-zinc-200">{w.worker_id}</td>
                     <td className="py-2 pr-4">
                       <StatusBadge status={w.health_status} />
