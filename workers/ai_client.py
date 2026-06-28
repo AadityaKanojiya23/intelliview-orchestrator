@@ -33,6 +33,44 @@ except ImportError:
     logger.info("openai package not installed — OpenAI client unavailable")
 
 try:
+    import google.generativeai as genai
+
+    _gemini_api_key = os.getenv("GEMINI_API_KEY", "")
+    if _gemini_api_key:
+        genai.configure(api_key=_gemini_api_key)
+        gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+        HAS_GEMINI = True
+        logger.info("Gemini client initialised (API key detected)")
+    else:
+        gemini_model = None
+        HAS_GEMINI = False
+        logger.info("No GEMINI_API_KEY — Gemini client unavailable")
+except ImportError:
+    gemini_model = None
+    HAS_GEMINI = False
+    logger.info("google-generativeai not installed — Gemini client unavailable")
+
+try:
+    from openai import OpenAI as GrokClient
+
+    _grok_api_key = os.getenv("GROK_API_KEY", "")
+    if _grok_api_key:
+        grok_client = GrokClient(
+            api_key=_grok_api_key,
+            base_url="https://api.x.ai/v1",
+        )
+        HAS_GROK = True
+        logger.info("Grok client initialised (API key detected)")
+    else:
+        grok_client = None
+        HAS_GROK = False
+        logger.info("No GROK_API_KEY — Grok client unavailable")
+except ImportError:
+    grok_client = None
+    HAS_GROK = False
+    logger.info("openai package not installed — Grok client unavailable")
+
+try:
     import whisper  # type: ignore
 
     whisper_model_name = os.getenv("WHISPER_MODEL", "base")
@@ -80,6 +118,84 @@ def chat_completion(
         return resp.choices[0].message.content
     except Exception as exc:
         logger.warning("OpenAI chat completion failed: %s", exc)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Gemini helpers
+# ---------------------------------------------------------------------------
+
+
+def gemini_generate(
+    prompt: str,
+    *,
+    temperature: float = 0.7,
+    max_output_tokens: int = 1024,
+) -> str | None:
+    """Generate text using Gemini; returns the text or None."""
+    if not HAS_GEMINI:
+        return None
+    try:
+        response = gemini_model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=temperature,
+                max_output_tokens=max_output_tokens,
+            ),
+        )
+        return response.text
+    except Exception as exc:
+        logger.warning("Gemini generation failed: %s", exc)
+        return None
+
+
+def gemini_chat(
+    messages: list[dict[str, str]],
+    *,
+    temperature: float = 0.7,
+    max_output_tokens: int = 1024,
+) -> str | None:
+    """Multi-turn chat with Gemini; returns the response text or None."""
+    if not HAS_GEMINI:
+        return None
+    try:
+        chat = gemini_model.start_chat(history=[])
+        for msg in messages:
+            if msg["role"] == "user":
+                chat.send_message(msg["content"])
+            elif msg["role"] == "assistant":
+                pass
+        return chat.last.text if chat.last else None
+    except Exception as exc:
+        logger.warning("Gemini chat failed: %s", exc)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Grok helpers
+# ---------------------------------------------------------------------------
+
+
+def grok_completion(
+    messages: list[dict[str, str]],
+    *,
+    model: str = "grok-2-1212",
+    temperature: float = 0.7,
+    max_tokens: int = 1024,
+) -> str | None:
+    """Send a chat completion request to Grok; returns the assistant text or None."""
+    if not HAS_GROK:
+        return None
+    try:
+        resp = grok_client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        return resp.choices[0].message.content
+    except Exception as exc:
+        logger.warning("Grok completion failed: %s", exc)
         return None
 
 
