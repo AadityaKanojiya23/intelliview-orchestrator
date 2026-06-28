@@ -56,6 +56,26 @@ class Settings(BaseSettings):
     # --- Prometheus ---
     enable_prometheus: bool = True
 
+    # --- AI Provider Keys ---
+    gemini_api_key: str = ""
+    grok_api_key: str = ""
+
+    # --- Screen Lock ---
+    screen_lock_timeout: int = 300
+    screen_lock_pin: str = "1234"
+
+    # --- Real-time Tracking ---
+    realtime_enabled: bool = True
+    realtime_tick_interval: int = 1
+    moment_tracking_enabled: bool = True
+
+    # --- Celery ---
+    celery_broker_url: str = ""
+    celery_result_backend: str = ""
+
+    # --- Database SSL ---
+    database_sslmode: str = "disable"
+
     # --- Feature flags ---
     enable_celery_broker: bool = True
     json_logging: bool = True
@@ -64,10 +84,13 @@ class Settings(BaseSettings):
     # --- Derived ---
     @property
     def database_url(self) -> str:
-        return (
+        base = (
             f"postgresql://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
+        if self.database_sslmode and self.database_sslmode != "disable":
+            return f"{base}?sslmode={self.database_sslmode}"
+        return base
 
     @property
     def is_default_token(self) -> bool:
@@ -106,3 +129,11 @@ JSON_LOGGING = "1" if settings.json_logging else "0"
 MAX_REQUEST_BODY_BYTES = settings.max_request_body_bytes
 AUDIT_LOG_FILE = settings.audit_log_file
 ENABLE_PROMETHEUS = settings.enable_prometheus
+GEMINI_API_KEY = settings.gemini_api_key
+GROK_API_KEY = settings.grok_api_key
+SCREEN_LOCK_TIMEOUT = settings.screen_lock_timeout
+SCREEN_LOCK_PIN = settings.screen_lock_pin
+REALTIME_ENABLED = settings.realtime_enabled
+REALTIME_TICK_INTERVAL = settings.realtime_tick_interval
+MOMENT_TRACKING_ENABLED = settings.moment_tracking_enabled
+DATABASE_SSLMODE = settings.database_sslmode
