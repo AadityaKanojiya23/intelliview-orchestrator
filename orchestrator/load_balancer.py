@@ -144,12 +144,20 @@ class LoadBalancer:
         """
         available = self.worker_registry.get_available_workers()
 
-        if not available:
-            return None
+if not available:
+    return None
+
+available.sort(
+    key=lambda w: (
+        w["active_tasks"] /
+        self.worker_registry.get_worker_weight(w)
+    )
+)
+
 
         # For high priority, select least loaded
         if priority == "high":
-            return min(available, key=lambda w: w["active_tasks"])
+        return available[0]
 
         # For medium priority, select from least loaded
         if priority == "medium":

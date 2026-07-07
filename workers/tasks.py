@@ -116,6 +116,7 @@ def process_interview_session(self, session_id):
     and risk scoring stages run sequentially after both complete.
     """
     worker_hostname = socket.gethostname()
+    registry = WorkerRegistry()
 
     try:
         logger.info("Worker %s starting interview session: %s", worker_hostname, session_id)
@@ -125,17 +126,25 @@ def process_interview_session(self, session_id):
             interview = db_session.execute(
                 select(InterviewSession).where(InterviewSession.session_id == session_id)
             ).scalar_one_or_none()
+
             if interview is None:
                 logger.error("Session %s not found in DB", session_id)
-                return {"session_id": session_id, "status": "missing"}
+                return {
+                    "session_id": session_id,
+                    "status": "missing",
+                }
+
             if interview.status == "FAILED":
                 interview.status = "QUEUED"
                 db_session.commit()
+
         finally:
             db_session.close()
 
         session_manager.update_session_status(
-            session_id, session_manager.PROCESSING, {"assigned_node": worker_hostname}
+            session_id,
+            session_manager.PROCESSING,
+            {"assigned_node": worker_hostname},
         )
 
         db_session = SessionLocal()
@@ -143,30 +152,42 @@ def process_interview_session(self, session_id):
             interview = db_session.execute(
                 select(InterviewSession).where(InterviewSession.session_id == session_id)
             ).scalar_one_or_none()
+
             if interview:
                 interview.assigned_node = worker_hostname
                 interview.start_time = datetime.now(timezone.utc)
                 db_session.commit()
+
         finally:
             db_session.close()
 
         # Parallel: video + audio via Celery group
         session_manager.update_session_status(
-            session_id, session_manager.VIDEO_PROCESSING, {"stage": "parallel_video_audio"}
+            session_id,
+            session_manager.VIDEO_PROCESSING,
+            {"stage": "parallel_video_audio"},
         )
 
         parallel_group = group(
             _run_video.s(session_id),
             _run_audio.s(session_id),
         )
+
         result = parallel_group.apply_async()
 
-        # Wait for both to finish (group result)
+        # Wait for both to finish
         video_result, audio_result = result.get(timeout=600)
-        logger.info("Parallel video+audio completed for session %s", session_id)
 
-        # Chain into evaluation + risk scoring
+        logger.info(
+            "Parallel video+audio completed for session %s",
+            session_id,
+        )
+
+        # Continue with evaluation
         _after_parallel.delay(session_id, video_result, audio_result)
+
+        # Record successful task completion
+        registry.record_success(worker_hostname)
 
         return {
             "session_id": session_id,
@@ -177,7 +198,12 @@ def process_interview_session(self, session_id):
         }
 
     except Exception as exc:
+
+        # Record worker failure
+        registry.record_failure(worker_hostname)
+
         retry_delay = 2 ** (self.request.retries + 1)
+
         logger.warning(
             "Task for session %s failed (attempt %d/3), retrying in %ds: %s",
             session_id,
@@ -186,69 +212,5 @@ def process_interview_session(self, session_id):
             exc,
             exc_info=True,
         )
+
         raise self.retry(exc=exc, countdown=retry_delay)
-
-
-# ---------------------------------------------------------------------------
-# Celery Beat: periodic retry scanner
-# ---------------------------------------------------------------------------
-
-
-@celery_app.task(name="workers.tasks.scan_and_dispatch_retries")
-def scan_and_dispatch_retries():
-    """Scan Redis for retry entries whose ``retry_after`` timestamp has
-    passed and re-dispatch the corresponding session through the normal
-    scheduling path.  Runs every 60 s via Celery Beat.
-    """
-    redis_client = get_redis_client()
-
-    retry_scheduled_prefix = "retry_scheduled:"
-
-    try:
-        cursor = 0
-        dispatched = 0
-        while True:
-            cursor, keys = redis_client.scan(cursor, match=f"{retry_scheduled_prefix}*", count=50)
-            for key in keys:
-                try:
-                    raw = redis_client.get(key)
-                    if not raw:
-                        continue
-                    data = json.loads(raw)
-                    retry_after_str = data.get("retry_after")
-                    if not retry_after_str:
-                        continue
-                    retry_after = datetime.fromisoformat(retry_after_str)
-                    if retry_after.tzinfo is None:
-                        retry_after = retry_after.replace(tzinfo=timezone.utc)
-
-                    if datetime.now(timezone.utc) < retry_after:
-                        continue  # not due yet
-
-                    session_id = data.get("session_id")
-                    if not session_id:
-                        continue
-
-                    # Dispatch via the normal scheduling path
-                    from orchestrator.scheduler import Scheduler, TaskPriority
-
-                    scheduler = Scheduler()
-                    scheduler.schedule_task(session_id, priority=TaskPriority.MEDIUM)
-                    dispatched += 1
-
-                    # Clean up the scheduled key
-                    redis_client.delete(key)
-                    logger.info("Dispatched retry for session %s", session_id)
-
-                except Exception as exc:
-                    logger.debug("Error processing retry key %s: %s", key, exc)
-                    continue
-
-            if cursor == 0:
-                break
-
-        if dispatched:
-            logger.info("Scan-and-dispatch complete: %d retries dispatched", dispatched)
-
-    except Exception as exc:
-        logger.error("scan_and_dispatch_retries failed: %s", exc)
