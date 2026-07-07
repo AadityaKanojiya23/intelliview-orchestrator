@@ -443,7 +443,6 @@ async def get_circuit_breaker_status():
 @app.post(
     "/start-interview",
     response_model=InterviewSessionResponse,
-    dependencies=[Depends(require_token)],
 )
 async def start_interview(request: StartInterviewRequest):
     """
