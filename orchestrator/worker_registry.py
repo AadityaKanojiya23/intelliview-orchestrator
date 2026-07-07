@@ -90,6 +90,11 @@ class WorkerRegistry:
                 "last_heartbeat": datetime.now(timezone.utc).isoformat(),
                 "total_tasks_processed": 0,
                 "failed_tasks": 0,
+
+               # New fields
+              "failure_count": 0,
+              "penalty_weight": 1.0,
+              "penalty_until": None,
             }
 
             with self.lock:
@@ -105,10 +110,13 @@ class WorkerRegistry:
                         if isinstance(v, (int, float))
                         and k
                         in {
-                            "capacity",
-                            "active_tasks",
-                            "total_tasks_processed",
-                            "failed_tasks",
+                            in {
+                             "capacity",
+                             "active_tasks",
+                             "total_tasks_processed",
+                             "failed_tasks",
+                             "failure_count",
+}
                         }
                         else str(v)
                     )
@@ -341,6 +349,46 @@ class WorkerRegistry:
                     worker["status"] = "unhealthy"
 
         return unhealthy
+    
+    def record_worker_failure(self, worker_id: str) -> bool:
+    """
+    Record a failed task for a worker and apply a temporary penalty
+    after repeated failures.
+    """
+    try:
+        with self.lock:
+            if worker_id not in self.local_workers:
+                return False
+
+            worker = self.local_workers[worker_id]
+
+            worker["failed_tasks"] += 1
+            worker["failure_count"] += 1
+
+            # Apply penalty after 3 consecutive failures
+            if worker["failure_count"] >= 3:
+                worker["penalty_weight"] = 0.5
+                worker["penalty_until"] = (
+                    datetime.now(timezone.utc) + timedelta(minutes=5)
+                ).isoformat()
+
+        if self.redis_client:
+            key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
+            self.redis_client.hset(key, "failed_tasks", worker["failed_tasks"])
+            self.redis_client.hset(key, "failure_count", worker["failure_count"])
+            self.redis_client.hset(key, "penalty_weight", worker["penalty_weight"])
+            self.redis_client.hset(
+                key,
+                "penalty_until",
+                worker["penalty_until"] or "",
+            )
+
+        logger.info(f"Recorded failure for worker {worker_id}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error recording worker failure: {e!s}")
+        return False
 
     def deregister_worker(self, worker_id: str) -> bool:
         """Remove a worker from the registry"""
