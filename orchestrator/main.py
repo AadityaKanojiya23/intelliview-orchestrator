@@ -795,14 +795,18 @@ async def clear_session_cache():
 
 
 @app.get("/interviews")
-async def list_interviews(limit: int = 100, status: str | None = None):
+async def list_interviews(
+    limit: int = 100,
+    offset: int = 0,
+    status: str | None = None,
+):
     """
     List interview sessions, newest first. Optional `status` filter.
 
     Returns:
         dict: List of interview sessions + total count.
     """
-    from sqlalchemy import select
+    from sqlalchemy import func, select
 
     from database.db import SessionLocal
     from database.models import InterviewSession
@@ -810,12 +814,32 @@ async def list_interviews(limit: int = 100, status: str | None = None):
     session_db = SessionLocal()
     try:
         stmt = select(InterviewSession)
+
         if status:
             stmt = stmt.where(InterviewSession.status == status.upper())
-        stmt = stmt.order_by(InterviewSession.created_at.desc().nullslast()).limit(limit)
+
+        # Count total matching records
+        count_stmt = select(func.count()).select_from(InterviewSession)
+
+        if status:
+            count_stmt = count_stmt.where(
+                InterviewSession.status == status.upper()
+            )
+
+        total_count = session_db.execute(count_stmt).scalar_one()
+
+        # Apply ordering, pagination
+        stmt = (
+            stmt
+            .order_by(InterviewSession.created_at.desc().nullslast())
+            .offset(offset)
+            .limit(limit)
+        )
+
         rows = session_db.execute(stmt).scalars().all()
+
         return {
-            "total_count": len(rows),
+            "total_count": total_count,
             "sessions": [
                 {
                     "session_id": r.session_id,
