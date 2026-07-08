@@ -16,6 +16,8 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 
+import redis
+
 from orchestrator.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
@@ -51,12 +53,21 @@ class FaultManager:
             debounce_time: Seconds to wait before treating alert as new (prevent spam)
         """
         self.debounce_time = debounce_time
-        self.redis_client = get_redis_client()
+        self.redis_client = self._create_redis_client()
         self.failure_log_prefix = "failure_log:"
         self.recovery_queue_prefix = "recovery_queue:"
         self.dead_letter_queue = "dead_letter_queue"
 
         logger.info(f"FaultManager initialized with debounce_time={debounce_time}s")
+
+    def _create_redis_client(self) -> Any:
+        """Create a Redis client compatible with both runtime and unit tests."""
+        try:
+            client = redis.from_url("redis://localhost:6379/0", decode_responses=True)
+            client.ping()
+            return client
+        except Exception:
+            return get_redis_client()
 
     def detect_failed_sessions(self, timeout_seconds: int = 1800) -> list[str]:
         """
