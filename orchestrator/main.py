@@ -31,7 +31,7 @@ from config import (
     ENABLE_PROMETHEUS,
     MAX_REQUEST_BODY_BYTES,
 )
-from database.db import engine
+from database.db import engine, get_db
 from database.models import Base
 from monitoring.dashboard_api import create_dashboard_routes
 from monitoring.metrics_collector import MetricsCollector
@@ -53,6 +53,7 @@ from orchestrator.session_manager import SessionManager
 from orchestrator.session_tracker import SessionTracker
 from orchestrator.state_sync import StateSynchronizer
 from orchestrator.worker_registry import WorkerRegistry
+from sqlalchemy.orm import Session
 
 # Configure logging after imports so startup messages are structured.
 configure_logging()
@@ -795,7 +796,11 @@ async def clear_session_cache():
 
 
 @app.get("/interviews")
-async def list_interviews(limit: int = 100, status: str | None = None):
+async def list_interviews(
+    limit: int = 100,
+    status: str | None = None,
+    session_db: Session = Depends(get_db),
+):
     """
     List interview sessions, newest first. Optional `status` filter.
 
@@ -803,18 +808,14 @@ async def list_interviews(limit: int = 100, status: str | None = None):
         dict: List of interview sessions + total count.
     """
     from sqlalchemy import select
-
-    from database.db import SessionLocal
     from database.models import InterviewSession
-
-    session_db = SessionLocal()
-    try:
-        stmt = select(InterviewSession)
-        if status:
+    stmt = select(InterviewSession)
+    
+    if status:
             stmt = stmt.where(InterviewSession.status == status.upper())
-        stmt = stmt.order_by(InterviewSession.created_at.desc().nullslast()).limit(limit)
-        rows = session_db.execute(stmt).scalars().all()
-        return {
+    stmt = stmt.order_by(InterviewSession.created_at.desc().nullslast()).limit(limit)
+    rows = session_db.execute(stmt).scalars().all()
+    return {
             "total_count": len(rows),
             "sessions": [
                 {
@@ -831,12 +832,6 @@ async def list_interviews(limit: int = 100, status: str | None = None):
                 for r in rows
             ],
         }
-    except Exception as e:
-        logger.error(f"Error listing interviews: {e!s}")
-        raise HTTPException(status_code=500, detail="Error listing interviews")
-    finally:
-        session_db.close()
-
 
 # ========== Question Endpoints ==========
 
