@@ -30,9 +30,8 @@ from workers._stubs import _seeded_unit  # noqa: E402
 def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
     """Use GPT-4o/Gemini/Grok to evaluate answer quality and relevance."""
     prompt = (
-        "You are an expert technical interviewer. Evaluate this candidate answer. "
-        "Return a JSON object with keys: overall_quality_score (0-100), "
-        "relevance (0-1), completeness (0-1), clarity (0-1), feedback (string)."
+        "Evaluate the candidate's answer. "
+        "Return JSON: overall_quality_score (0-100), relevance (0-1), completeness (0-1), clarity (0-1), feedback."
     )
     user_msg = f"Question: {question}\n\nAnswer: {answer}"
 
@@ -105,10 +104,8 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
 def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
     """Use GPT-4o/Gemini/Grok to evaluate technical accuracy."""
     prompt = (
-        "You are a technical interviewer evaluating a candidate's answer. "
-        "Return a JSON object with keys: accuracy_score (0-100), "
-        "correct_concepts_count (int), incorrect_concepts_count (int), "
-        "knowledge_gaps (list of strings)."
+        "Evaluate the answer. "
+        "Return JSON with keys: accuracy_score, correct_concepts_count, incorrect_concepts_count, knowledge_gaps."
     )
     user_msg = f"Question: {question}\n\nAnswer: {answer}"
 
@@ -185,10 +182,8 @@ def _llm_evaluate_communication(session_id: str, question: str, answer: str) -> 
                 {
                     "role": "system",
                     "content": (
-                        "Evaluate the candidate's communication quality. "
-                        "Return a JSON object with keys: clarity_score (0-100), "
-                        "professionalism (0-100), confidence_level (0-1), "
-                        "pace_appropriateness (0-1)."
+                        "Evaluate communication. "
+                        "Return JSON with keys: clarity_score, professionalism, confidence_level, pace_appropriateness."
                     ),
                 },
                 {"role": "user", "content": f"Question: {question}\n\nAnswer: {answer}"},
@@ -221,11 +216,8 @@ def _llm_generate_feedback(session_id: str, question: str, answer: str) -> dict[
                 {
                     "role": "system",
                     "content": (
-                        "You are an experienced technical interviewer. Based on the "
-                        "question and answer, generate structured feedback. "
-                        "Return a JSON object with keys: strengths (list of strings), "
-                        "improvements (list of strings), detailed_feedback (string), "
-                        "recommendation (one of: strong_hire, hire, maybe, no_hire)."
+                        "Generate structured interview feedback. "
+                        "Return JSON: strengths, improvements, detailed_feedback, recommendation.(strong_hire|hire|maybe|no_hire)."
                     ),
                 },
                 {"role": "user", "content": f"Question: {question}\n\nAnswer: {answer}"},
@@ -261,8 +253,8 @@ def _llm_generate_question(session_id: str, topic: str = "systems_design") -> st
                 {
                     "role": "system",
                     "content": (
-                        "Generate a single challenging technical interview question "
-                        f"about {topic}. Return only the question text, nothing else."
+                        f"Generate one challenging {topic} interview question. "
+                        "Return only the question."
                     ),
                 },
                 {"role": "user", "content": "Generate one question."},
