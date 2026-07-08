@@ -193,6 +193,7 @@ class AuditLogger:
         old_value: str,
         new_value: str,
         actor: str = "admin",
+        request_id: str = "",
     ) -> None:
         """Log a configuration change."""
         event = AuditEvent(
@@ -205,6 +206,7 @@ class AuditLogger:
                 "old_value": old_value,
                 "new_value": new_value,
             },
+            request_id=request_id,
             severity="WARNING",
         )
         self.log_event(event)
