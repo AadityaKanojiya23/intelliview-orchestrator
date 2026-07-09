@@ -47,7 +47,11 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                 max_tokens=512,
             )
             if response:
-                parsed = json.loads(response)
+                try:
+                    parsed = json.loads(response)
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON from LLM (openai, quality): %s", response)
+                    return None
                 return {
                     "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
                     "relevance": round(parsed.get("relevance", 0.5), 2),
@@ -65,7 +69,11 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
         if HAS_GEMINI:
             response = gemini_generate(f"{prompt}\n\n{user_msg}", temperature=0.3, max_output_tokens=512)
             if response:
-                parsed = json.loads(response)
+                try:
+                    parsed = json.loads(response)
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON from LLM (gemini, quality): %s", response)
+                    return None
                 return {
                     "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
                     "relevance": round(parsed.get("relevance", 0.5), 2),
@@ -87,7 +95,11 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                 max_tokens=512,
             )
             if response:
-                parsed = json.loads(response)
+                try:
+                    parsed = json.loads(response)
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON from LLM (grok, quality): %s", response)
+                    return None
                 return {
                     "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
                     "relevance": round(parsed.get("relevance", 0.5), 2),
@@ -123,7 +135,11 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
                 max_tokens=512,
             )
             if response:
-                parsed = json.loads(response)
+                try:
+                    parsed = json.loads(response)
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON from LLM (openai, accuracy): %s", response)
+                    return None
                 return {
                     "accuracy_score": round(parsed.get("accuracy_score", 50), 2),
                     "correct_concepts_count": parsed.get("correct_concepts_count", 0),
@@ -140,7 +156,11 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
         if HAS_GEMINI:
             response = gemini_generate(f"{prompt}\n\n{user_msg}", temperature=0.3, max_output_tokens=512)
             if response:
-                parsed = json.loads(response)
+                try:
+                    parsed = json.loads(response)
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON from LLM (gemini, accuracy): %s", response)
+                    return None
                 return {
                     "accuracy_score": round(parsed.get("accuracy_score", 50), 2),
                     "correct_concepts_count": parsed.get("correct_concepts_count", 0),
@@ -161,7 +181,11 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
                 max_tokens=512,
             )
             if response:
-                parsed = json.loads(response)
+                try:
+                    parsed = json.loads(response)
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON from LLM (grok, accuracy): %s", response)
+                    return None
                 return {
                     "accuracy_score": round(parsed.get("accuracy_score", 50), 2),
                     "correct_concepts_count": parsed.get("correct_concepts_count", 0),
@@ -199,7 +223,11 @@ def _llm_evaluate_communication(session_id: str, question: str, answer: str) -> 
         )
         if response is None:
             return None
-        parsed = json.loads(response)
+        try:
+            parsed = json.loads(response)
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON from LLM (communication): %s", response)
+            return None
         return {
             "clarity_score": round(parsed.get("clarity_score", 50), 2),
             "professionalism": round(parsed.get("professionalism", 50), 2),
@@ -236,7 +264,11 @@ def _llm_generate_feedback(session_id: str, question: str, answer: str) -> dict[
         )
         if response is None:
             return None
-        parsed = json.loads(response)
+        try:
+            parsed = json.loads(response)
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON from LLM (feedback): %s", response)
+            return None
         recommendation = parsed.get("recommendation", "progress")
         if recommendation == "hire":
             recommendation = "progress"
