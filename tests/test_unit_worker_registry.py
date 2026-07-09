@@ -86,3 +86,29 @@ def test_deregister_worker_removes_entry():
     reg.register_worker("w4", capacity=2)
     assert reg.deregister_worker("w4") is True
     assert reg.get_worker("w4") is None
+
+
+# ===========================================================================
+# NEW: Weight field tests
+# ===========================================================================
+
+
+def test_register_worker_with_weight():
+    """Explicit weight should be stored correctly, separate from capacity."""
+    reg = _new_registry()
+    assert reg.register_worker("heavy", capacity=4, weight=10) is True
+    w = reg.get_worker("heavy")
+    assert w is not None
+    assert w["capacity"] == 4
+    assert w["weight"] == 10
+
+
+def test_register_worker_default_weight_equals_capacity():
+    """When no weight is specified, it should default to the capacity value."""
+    reg = _new_registry()
+    assert reg.register_worker("default", capacity=8) is True
+    w = reg.get_worker("default")
+    assert w is not None
+    assert w["weight"] == 8  # defaults to capacity
+    assert w["capacity"] == 8
+

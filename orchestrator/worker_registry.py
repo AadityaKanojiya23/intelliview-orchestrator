@@ -55,11 +55,13 @@ class WorkerRegistry:
                 raw = self.redis_client.hgetall(f"{self.WORKER_KEY_PREFIX}{wid}")
                 if not raw:
                     continue
+                capacity = int(raw.get("capacity", 4))
                 self.local_workers[wid] = {
                     "worker_id": wid,
                     "status": raw.get("status", "healthy"),
                     "active_tasks": int(raw.get("active_tasks", 0)),
-                    "capacity": int(raw.get("capacity", 4)),
+                    "capacity": capacity,
+                    "weight": int(raw.get("weight", capacity)),
                     "registered_at": raw.get("registered_at", ""),
                     "last_heartbeat": raw.get("last_heartbeat", ""),
                     "total_tasks_processed": int(raw.get("total_tasks_processed", 0)),
@@ -69,23 +71,26 @@ class WorkerRegistry:
         except Exception as exc:
             logger.warning("Could not hydrate worker registry from Redis: %s", exc)
 
-    def register_worker(self, worker_id: str, capacity: int = 4) -> bool:
+    def register_worker(self, worker_id: str, capacity: int = 4, weight: int | None = None) -> bool:
         """
         Register a new worker node
 
         Args:
             worker_id: Unique worker identifier
             capacity: Maximum concurrent tasks this worker can handle
+            weight: Scheduling weight for weighted round robin (defaults to capacity)
 
         Returns:
             bool: True if successful
         """
         try:
+            effective_weight = weight if weight is not None else capacity
             worker_data = {
                 "worker_id": worker_id,
                 "status": "healthy",
                 "active_tasks": 0,
                 "capacity": capacity,
+                "weight": effective_weight,
                 "registered_at": datetime.now(timezone.utc).isoformat(),
                 "last_heartbeat": datetime.now(timezone.utc).isoformat(),
                 "total_tasks_processed": 0,
@@ -106,6 +111,7 @@ class WorkerRegistry:
                         and k
                         in {
                             "capacity",
+                            "weight",
                             "active_tasks",
                             "total_tasks_processed",
                             "failed_tasks",
@@ -118,7 +124,7 @@ class WorkerRegistry:
                 self.redis_client.sadd(self.WORKER_SET_KEY, worker_id)
                 self.redis_client.expire(key, int(timedelta(hours=24).total_seconds()))
 
-            logger.info(f"Registered worker: {worker_id} with capacity {capacity}")
+            logger.info(f"Registered worker: {worker_id} with capacity {capacity}, weight {effective_weight}")
             return True
 
         except Exception as e:
@@ -289,6 +295,7 @@ class WorkerRegistry:
                 {
                     "worker_id": wid,
                     "capacity": w["capacity"],
+                    "weight": w.get("weight", w["capacity"]),
                     "active_tasks": w["active_tasks"],
                     "status": w["status"],
                     "last_heartbeat": w.get("last_heartbeat"),

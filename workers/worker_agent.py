@@ -27,11 +27,13 @@ class WorkerAgent:
         api_url: str,
         worker_id: str,
         capacity: int = WORKER_CONCURRENCY,
+        weight: int | None = None,
         heartbeat_interval: int = 15,
     ):
         self.api_url = api_url.rstrip("/")
         self.worker_id = worker_id
         self.capacity = capacity
+        self.weight = weight
         self.heartbeat_interval = heartbeat_interval
         self.active_tasks = 0
         self._stop = False
@@ -55,7 +57,10 @@ class WorkerAgent:
         return False
 
     def register(self) -> bool:
-        ok = self._post("/register-worker", {"worker_id": self.worker_id, "capacity": self.capacity})
+        payload = {"worker_id": self.worker_id, "capacity": self.capacity}
+        if self.weight is not None:
+            payload["weight"] = self.weight
+        ok = self._post("/register-worker", payload)
         if ok:
             logger.info("Worker %s registered with %s", self.worker_id, self.api_url)
         else:
@@ -100,7 +105,9 @@ if __name__ == "__main__":
 
     api_url = os.getenv("API_URL", "http://fastapi:8000")
     worker_id = os.getenv("WORKER_ID", f"worker-{os.getpid()}")
-    agent = WorkerAgent(api_url=api_url, worker_id=worker_id)
+    raw_weight = os.getenv("WORKER_WEIGHT")
+    weight = int(raw_weight) if raw_weight else None
+    agent = WorkerAgent(api_url=api_url, worker_id=worker_id, weight=weight)
     agent.start()
 
     # Block main thread
