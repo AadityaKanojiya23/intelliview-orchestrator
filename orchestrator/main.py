@@ -31,8 +31,9 @@ from config import (
     ENABLE_PROMETHEUS,
     MAX_REQUEST_BODY_BYTES,
 )
-from database.db import engine
-from database.models import Base
+from database.db import engine, SessionLocal
+from database.models import Base, InterviewSession, Candidate
+from sqlalchemy import select
 from monitoring.dashboard_api import create_dashboard_routes
 from monitoring.metrics_collector import MetricsCollector
 from monitoring.websocket_manager import ws_manager
@@ -292,6 +293,63 @@ class SessionStatusResponse(BaseModel):
     start_time: str | None = None
     end_time: str | None = None
     updated_at: str | None = None
+
+
+class ReportCandidate(BaseModel):
+    candidate_id: str
+    name: str
+    email: str
+
+
+class ReportInterviewSummary(BaseModel):
+    start_time: str | None = None
+    end_time: str | None = None
+    duration_minutes: float | None = None
+
+
+class ReportQuestion(BaseModel):
+    question_id: str
+    text: str
+    answer: str | None = None
+    score: float | None = None
+    feedback: str | None = None
+
+
+class ReportEvaluation(BaseModel):
+    quality: float | None = None
+    accuracy: float | None = None
+    clarity: float | None = None
+
+
+class ReportLLMFeedback(BaseModel):
+    strengths: list[str] = Field(default_factory=list)
+    improvements: list[str] = Field(default_factory=list)
+    recommendation: str | None = None
+    detailed_feedback: str | None = None
+
+
+class ReportRiskAssessment(BaseModel):
+    score: float | None = None
+    classification: str | None = None
+    factors: list[str] = Field(default_factory=list)
+
+
+class ReportMetadata(BaseModel):
+    token_usage: int | None = None
+    estimated_cost_usd: float | None = None
+
+
+class InterviewReportResponse(BaseModel):
+    """Comprehensive final interview report"""
+
+    session_id: str
+    candidate: ReportCandidate
+    interview_summary: ReportInterviewSummary
+    questions: list[ReportQuestion] = Field(default_factory=list)
+    overall_evaluation: ReportEvaluation
+    llm_feedback: ReportLLMFeedback
+    risk_assessment: ReportRiskAssessment
+    metadata: ReportMetadata
 
 
 class TaskStatusResponse(BaseModel):
@@ -564,6 +622,124 @@ async def get_session_status(session_id: str):
     except Exception as e:
         logger.error(f"Error fetching session status: {e!s}")
         raise HTTPException(status_code=500, detail=f"Error fetching session: {e!s}")
+
+
+@app.get("/interviews/{session_id}/report", response_model=InterviewReportResponse)
+async def get_interview_report(session_id: str):
+    """
+    Get comprehensive final interview report.
+    """
+    db = SessionLocal()
+    try:
+        session_obj = db.execute(
+            select(InterviewSession).where(InterviewSession.session_id == session_id)
+        ).scalar_one_or_none()
+
+        if not session_obj:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        candidate_obj = db.execute(
+            select(Candidate).where(Candidate.candidate_id == session_obj.candidate_id)
+        ).scalar_one_or_none()
+
+        if not candidate_obj:
+            raise HTTPException(status_code=404, detail="Candidate not found")
+
+        # Calculate duration
+        duration_minutes = None
+        if session_obj.start_time and session_obj.end_time:
+            duration_delta = session_obj.end_time - session_obj.start_time
+            duration_minutes = round(duration_delta.total_seconds() / 60.0, 2)
+
+        # Map questions, answers, feedback
+        q_asked = session_obj.questions_asked or []
+        a_provided = session_obj.answers_provided or []
+        f_generated = session_obj.feedback_generated or []
+        
+        # Build question lookup
+        q_dict = {q.get("question_id"): q for q in q_asked}
+        for a in a_provided:
+            q_id = a.get("question_id")
+            if q_id in q_dict:
+                q_dict[q_id]["answer"] = a.get("answer_text")
+        for f in f_generated:
+            q_id = f.get("question_id")
+            if q_id in q_dict:
+                q_dict[q_id]["feedback"] = f.get("feedback")
+                q_dict[q_id]["score"] = f.get("score")
+                
+        questions_list = []
+        for q_id, q_data in q_dict.items():
+            questions_list.append(
+                ReportQuestion(
+                    question_id=q_id,
+                    text=q_data.get("text", ""),
+                    answer=q_data.get("answer"),
+                    score=q_data.get("score"),
+                    feedback=q_data.get("feedback")
+                )
+            )
+            
+        eval_analysis = session_obj.evaluation_analysis or {}
+        llm_feedback = eval_analysis.get("llm_feedback", {})
+        
+        # Since evaluation_analysis structure might differ based on other PRs, 
+        # we will handle nested or flat structures for strengths/improvements.
+        strengths = eval_analysis.get("strengths", llm_feedback.get("strengths", []))
+        improvements = eval_analysis.get("improvements", llm_feedback.get("improvements", []))
+        recommendation = eval_analysis.get("recommendation", llm_feedback.get("recommendation"))
+        detailed_feedback = eval_analysis.get("detailed_feedback", llm_feedback.get("detailed_feedback"))
+        
+        # Determine risk classification
+        risk_score = session_obj.risk_score
+        classification = "LOW"
+        if risk_score is not None:
+            if risk_score > 0.7:
+                classification = "HIGH"
+            elif risk_score > 0.3:
+                classification = "MEDIUM"
+
+        return InterviewReportResponse(
+            session_id=session_id,
+            candidate=ReportCandidate(
+                candidate_id=candidate_obj.candidate_id,
+                name=candidate_obj.name,
+                email=candidate_obj.email
+            ),
+            interview_summary=ReportInterviewSummary(
+                start_time=session_obj.start_time.isoformat() if session_obj.start_time else None,
+                end_time=session_obj.end_time.isoformat() if session_obj.end_time else None,
+                duration_minutes=duration_minutes
+            ),
+            questions=questions_list,
+            overall_evaluation=ReportEvaluation(
+                quality=eval_analysis.get("quality"),
+                accuracy=eval_analysis.get("accuracy"),
+                clarity=eval_analysis.get("clarity")
+            ),
+            llm_feedback=ReportLLMFeedback(
+                strengths=strengths,
+                improvements=improvements,
+                recommendation=recommendation,
+                detailed_feedback=detailed_feedback
+            ),
+            risk_assessment=ReportRiskAssessment(
+                score=risk_score,
+                classification=classification,
+                factors=eval_analysis.get("risk_factors", [])
+            ),
+            metadata=ReportMetadata(
+                token_usage=None,  # Feature #3 not yet merged
+                estimated_cost_usd=None
+            )
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching interview report: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching report: {e!s}")
+    finally:
+        db.close()
 
 
 @app.get("/task-status/{task_id}", response_model=TaskStatusResponse)
