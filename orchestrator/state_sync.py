@@ -18,7 +18,9 @@ from typing import Any
 
 from sqlalchemy import select
 
-from orchestrator.redis_client import get_redis_client
+from database.db import SessionLocal
+from database.models import InterviewSession
+from orchestrator.redis_client import get_redis_client, is_circuit_open
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +78,10 @@ class StateSynchronizer:
 
     def get_session_state(self, session_id: str) -> dict[str, Any] | None:
         """
-        Retrieve session state from Redis cache
+        Retrieve session state from Redis cache.
+
+        Falls back to PostgreSQL when the Redis circuit breaker is OPEN
+        or when a Redis read raises an exception.
 
         Args:
             session_id: Session identifier
@@ -84,8 +89,9 @@ class StateSynchronizer:
         Returns:
             dict: Session data or None if not found
         """
-        if not self.redis_client:
-            return None
+        if is_circuit_open() or not self.redis_client:
+            logger.info(f"Redis unavailable, reading session {session_id} from PG")
+            return self._read_session_from_db(session_id)
 
         try:
             key = f"{self.SESSION_KEY_PREFIX}{session_id}"
@@ -100,8 +106,8 @@ class StateSynchronizer:
             return session_data
 
         except Exception as e:
-            logger.error(f"Error getting session state from Redis: {e!s}")
-            return None
+            logger.warning(f"Redis read failed, falling back to PG: {e!s}")
+            return self._read_session_from_db(session_id)
 
     def delete_session_state(self, session_id: str) -> bool:
         """
@@ -129,13 +135,17 @@ class StateSynchronizer:
 
     def get_active_sessions(self) -> list:
         """
-        Get all active session IDs from cache
+        Get all active session IDs from cache.
+
+        Falls back to PostgreSQL when the Redis circuit breaker is OPEN
+        or when a Redis read raises an exception.
 
         Returns:
             list: List of active session IDs
         """
-        if not self.redis_client:
-            return []
+        if is_circuit_open() or not self.redis_client:
+            logger.info("Redis unavailable, reading active sessions from PG")
+            return self._read_active_sessions_from_db()
 
         try:
             active_sessions = self.redis_client.smembers(self.ACTIVE_SESSIONS_KEY)
@@ -143,8 +153,67 @@ class StateSynchronizer:
             return list(active_sessions)
 
         except Exception as e:
-            logger.error(f"Error getting active sessions: {e!s}")
+            logger.warning(f"Redis read failed, falling back to PG: {e!s}")
+            return self._read_active_sessions_from_db()
+
+    def _read_session_from_db(self, session_id: str) -> dict[str, Any] | None:
+        """Direct PG read — used when Redis is unavailable."""
+        session_db = SessionLocal()
+        try:
+            interview = session_db.execute(
+                select(InterviewSession).where(InterviewSession.session_id == session_id)
+            ).scalar_one_or_none()
+
+            if not interview:
+                return None
+
+            return {
+                "session_id": interview.session_id,
+                "candidate_id": interview.candidate_id,
+                "status": interview.status,
+                "risk_score": interview.risk_score,
+                "assigned_node": interview.assigned_node,
+                "start_time": interview.start_time.isoformat() if interview.start_time else None,
+                "end_time": interview.end_time.isoformat() if interview.end_time else None,
+                "created_at": interview.created_at.isoformat() if interview.created_at else None,
+                "updated_at": interview.updated_at.isoformat() if interview.updated_at else None,
+                "video_analysis": interview.video_analysis,
+                "audio_analysis": interview.audio_analysis,
+                "evaluation_analysis": interview.evaluation_analysis,
+            }
+        except Exception as e:
+            logger.error(f"PG fallback read failed for session {session_id}: {e!s}")
+            return None
+        finally:
+            session_db.close()
+
+    def _read_active_sessions_from_db(self) -> list:
+        """Direct PG read for active session IDs — used when Redis is unavailable."""
+        session_db = SessionLocal()
+        try:
+            active_statuses = [
+                "CREATED",
+                "QUEUED",
+                "PROCESSING",
+                "VIDEO_PROCESSING",
+                "AUDIO_PROCESSING",
+                "EVALUATING",
+            ]
+            rows = (
+                session_db.execute(
+                    select(InterviewSession.session_id).where(
+                        InterviewSession.status.in_(active_statuses)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            return list(rows)
+        except Exception as e:
+            logger.error(f"PG fallback read failed for active sessions: {e!s}")
             return []
+        finally:
+            session_db.close()
 
     def sync_state_to_db(self, session_id: str, session_data: dict[str, Any]) -> bool:
         """

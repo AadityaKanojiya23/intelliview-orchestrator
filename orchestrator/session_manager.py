@@ -21,6 +21,7 @@ from sqlalchemy import select
 from database.db import SessionLocal
 from database.models import InterviewSession
 from monitoring.websocket_manager import ws_manager
+from orchestrator.redis_client import is_circuit_open
 from orchestrator.state_sync import StateSynchronizer
 
 logger = logging.getLogger(__name__)
@@ -180,14 +181,15 @@ class SessionManager:
             interview.updated_at = _utcnow()
             session_db.commit()
 
-            # Update Redis cache
-            session_data = self.state_sync.get_session_state(session_id)
-            if session_data:
-                session_data["status"] = new_status
-                session_data["updated_at"] = _utcnow().isoformat()
-                if metadata:
-                    session_data.update(metadata)
-                self.state_sync.set_session_state(session_id, session_data)
+            # Update Redis cache (skip if circuit breaker is open)
+            if not is_circuit_open():
+                session_data = self.state_sync.get_session_state(session_id)
+                if session_data:
+                    session_data["status"] = new_status
+                    session_data["updated_at"] = _utcnow().isoformat()
+                    if metadata:
+                        session_data.update(metadata)
+                    self.state_sync.set_session_state(session_id, session_data)
 
             logger.info(f"Session {session_id} status updated to {new_status}")
 
@@ -303,14 +305,15 @@ class SessionManager:
             interview.updated_at = _utcnow()
             session_db.commit()
 
-            # Update Redis
-            session_data = self.state_sync.get_session_state(session_id)
-            if session_data:
-                session_data["status"] = self.COMPLETED
-                session_data["risk_score"] = risk_score
-                session_data["end_time"] = _utcnow().isoformat()
-                session_data["updated_at"] = _utcnow().isoformat()
-                self.state_sync.set_session_state(session_id, session_data)
+            # Update Redis (skip if circuit breaker is open)
+            if not is_circuit_open():
+                session_data = self.state_sync.get_session_state(session_id)
+                if session_data:
+                    session_data["status"] = self.COMPLETED
+                    session_data["risk_score"] = risk_score
+                    session_data["end_time"] = _utcnow().isoformat()
+                    session_data["updated_at"] = _utcnow().isoformat()
+                    self.state_sync.set_session_state(session_id, session_data)
 
             logger.info(f"Session {session_id} marked as completed")
             return True
