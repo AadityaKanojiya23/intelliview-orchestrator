@@ -25,3 +25,9 @@ prometheus-client==0.21.1
 # --- Dev / test ---
 pytest==8.3.4
 pytest-asyncio==0.25.0
+
+# === Semantic Similarity ===
+sentence-transformers==3.0.1
+scikit-learn==1.5.1
+torch>=2.3.0
+numpy>=1.26.4
