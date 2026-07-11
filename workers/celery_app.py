@@ -7,10 +7,63 @@ every transient exception).
 """
 
 from celery import Celery, signals
+from kombu import Queue
 
 from config import REDIS_URL
 
 celery_app = Celery("interview_tasks", broker=REDIS_URL, backend=REDIS_URL)
+
+# --- Priority queues -------------------------------------------------------
+# Two physical queues. Workers dedicated to "high-priority" (see the
+# `celery worker -Q high-priority` command in the deployment docs/README)
+# guarantee that high-priority work is never stuck behind default work,
+# rather than relying on ordering within a single queue.
+HIGH_PRIORITY_QUEUE = "high-priority"
+DEFAULT_QUEUE = "default"
+
+
+def route_by_priority(name, args, kwargs, options, task=None, **_extra):
+    """Celery task router — called for every task right before it's
+    published, and decides which queue it should land in.
+
+    Priority is set by the API layer (`main.py`'s `/start-interview`
+    endpoint) when a session is queued: it's stored in the session's
+    cached data via `SessionManager.update_session_status(..., metadata=
+    {"priority": priority.name})`. Stored values are uppercase enum names
+    — "HIGH", "MEDIUM", "LOW" (see `orchestrator.scheduler.TaskPriority`).
+
+    We fetch it via the existing `SessionManager().get_session(session_id)`
+    — no new orchestrator method needed. Any failure to resolve a priority
+    (missing session, orchestrator unreachable, unrecognized value) falls
+    back to the default queue rather than raising, so a broken lookup
+    never blocks task dispatch.
+    """
+    if options.get("queue"):
+        return {}  # caller already picked a queue explicitly, leave it alone
+
+    session_id = args[0] if args else kwargs.get("session_id")
+    if session_id is None:
+        return {"queue": DEFAULT_QUEUE}
+
+    try:
+        # Imported lazily so importing this module doesn't pull in the
+        # DB/orchestrator stack before the worker process is ready.
+        from orchestrator.session_manager import SessionManager
+
+        session_data = SessionManager().get_session(session_id)
+        priority = (session_data or {}).get("priority", "")
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Priority lookup failed for session %s, falling back to default queue: %s",
+            session_id,
+            exc,
+        )
+        return {"queue": DEFAULT_QUEUE}
+
+    return {"queue": HIGH_PRIORITY_QUEUE if str(priority).upper() == "HIGH" else DEFAULT_QUEUE}
+
 
 celery_app.conf.update(
     task_serializer="json",
@@ -25,6 +78,12 @@ celery_app.conf.update(
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,  # fair distribution across workers
     broker_connection_retry_on_startup=True,
+    task_queues=(   # Priority queues + routing
+        Queue(HIGH_PRIORITY_QUEUE),
+        Queue(DEFAULT_QUEUE),
+    ),
+    task_default_queue=DEFAULT_QUEUE,
+    task_routes=(route_by_priority,),
     # Periodic beat schedule — scan for due retries every 60 seconds
     beat_schedule={
         "scan-due-retries": {
