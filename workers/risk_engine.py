@@ -46,6 +46,7 @@ RISK_CONFIG: dict[str, float] = {
     "eval_low_quality": float(os.getenv("RISK_EVAL_LOW_QUALITY", "0.30")),
     "eval_low_accuracy": float(os.getenv("RISK_EVAL_LOW_ACCURACY", "0.40")),
     "eval_poor_communication": float(os.getenv("RISK_EVAL_POOR_COMMUNICATION", "0.20")),
+    "eval_hallucination": float(os.getenv("RISK_EVAL_HALLUCINATION", "0.30")),
 }
 
 
@@ -83,6 +84,7 @@ class RiskScoringEngine:
         "low_quality_answers": RISK_CONFIG["eval_low_quality"],
         "low_accuracy": RISK_CONFIG["eval_low_accuracy"],
         "poor_communication": RISK_CONFIG["eval_poor_communication"],
+        "hallucination": RISK_CONFIG["eval_hallucination"],
     }
 
     @staticmethod
@@ -128,6 +130,7 @@ class RiskScoringEngine:
         quality_score = evaluation_result.get("answer_quality_score", {}).get("overall_quality_score", 50)
         accuracy_score = evaluation_result.get("technical_accuracy", {}).get("accuracy_score", 50)
         clarity_score = evaluation_result.get("communication_clarity", {}).get("clarity_score", 50)
+        hallucination_flagged = evaluation_result.get("hallucination_check", {}).get("is_hallucination", False)
 
         if quality_score < 40:
             risk_score += RiskScoringEngine.EVALUATION_FACTORS["low_quality_answers"]
@@ -135,6 +138,8 @@ class RiskScoringEngine:
             risk_score += RiskScoringEngine.EVALUATION_FACTORS["low_accuracy"]
         if clarity_score < 40:
             risk_score += RiskScoringEngine.EVALUATION_FACTORS["poor_communication"]
+        if hallucination_flagged:
+            risk_score += RiskScoringEngine.EVALUATION_FACTORS["hallucination"]
 
         return min(risk_score, 1.0)
 
@@ -224,6 +229,8 @@ class RiskScoringEngine:
             risk_factors.append("Low answer quality detected")
         if accuracy_score < 40:
             risk_factors.append("Low technical accuracy detected")
+        if evaluation_result.get("hallucination_check", {}).get("is_hallucination"):
+            risk_factors.append("Fabricated or unsupported claims detected in response")
 
         return risk_factors
 
