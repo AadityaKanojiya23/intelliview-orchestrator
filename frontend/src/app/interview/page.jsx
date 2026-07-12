@@ -18,6 +18,7 @@ import {
 import Card from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { Skeleton, ErrorState, EmptyState } from "@/components/States";
+import VideoPlayer from "@/components/VideoPlayer";
 import { endpoints } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
@@ -270,6 +271,10 @@ export default function InterviewPage() {
                 </button>
               </div>
             )}
+          </Card>
+
+          <Card title="Interview Recording Playback" description="Review a local interview video with WebVTT captions.">
+            <VideoPlayer />
           </Card>
 
           <Card title="Audio Visualization">
