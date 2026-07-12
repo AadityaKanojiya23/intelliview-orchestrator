@@ -1,10 +1,14 @@
-import { jsx, jsxs } from "react/jsx-runtime";
-function Loading() {
-  return /* @__PURE__ */ jsxs("div", { className: "flex h-64 items-center justify-center", role: "status", "aria-live": "polite", children: [
-    /* @__PURE__ */ jsx("div", { className: "h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-accent" }),
-    /* @__PURE__ */ jsx("span", { className: "sr-only", children: "Loading\u2026" })
-  ] });
+import { Shimmer } from "@/components/Shimmer";
+
+export default function Loading() {
+  return (
+    <div className="space-y-4 p-6">
+      <Shimmer className="h-10 w-1/3" />
+
+      <Shimmer className="h-24 w-full" />
+      <Shimmer className="h-24 w-full" />
+
+      <Shimmer className="h-24 w-full" />
+    </div>
+  );
 }
-export {
-  Loading as default
-};
