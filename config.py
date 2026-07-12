@@ -81,6 +81,26 @@ class Settings(BaseSettings):
     json_logging: bool = True
     auto_seed_demo_data: bool = False
 
+    def validate_configuration(self) -> None:
+        errors = []
+
+        if not self.api_token.strip():
+            errors.append("API_TOKEN is required.")
+
+        if self.worker_concurrency <= 0:
+            errors.append("WORKER_CONCURRENCY must be greater than 0.")
+
+        if self.max_retries < 0:
+            errors.append("MAX_RETRIES cannot be negative.")
+
+        if self.max_request_body_bytes <= 0:
+            errors.append("MAX_REQUEST_BODY_BYTES must be greater than 0.")
+
+        if errors:
+            raise ValueError(
+                "Configuration validation failed:\n- " + "\n- ".join(errors)
+            )
+
     # --- Derived ---
     @property
     def database_url(self) -> str:

@@ -30,6 +30,7 @@ from config import (
     CORS_ALLOW_ORIGINS,
     ENABLE_PROMETHEUS,
     MAX_REQUEST_BODY_BYTES,
+    get_settings,
 )
 from database.db import engine
 from database.models import Base
@@ -69,6 +70,9 @@ async def lifespan(app: FastAPI):
     Shutdown: best-effort graceful drain — flush the request-id log line,
     close the shared Redis client, and notify clients.
     """
+
+    settings = get_settings()
+    settings.validate_configuration()
     Base.metadata.create_all(bind=engine)
     if API_TOKEN == "dev-token-change-me":
         logger.warning(
