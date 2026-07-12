@@ -219,6 +219,7 @@ dashboard_routes = create_dashboard_routes(
     retry_manager=retry_manager,
     health_monitor=health_monitor,
     ws_manager=ws_manager,
+    
 )
 app.include_router(dashboard_routes, prefix="/monitoring", tags=["monitoring"])
 
