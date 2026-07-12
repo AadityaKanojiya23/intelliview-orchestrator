@@ -187,6 +187,7 @@ def detect_background_voices(session_id: str) -> dict[str, Any]:
         "background_voices_detected": multi,
         "voice_count": 2 if multi else 1,
         "confidence": round(_seeded_unit(session_id, "bg_conf"), 3),
+        "speaker_segments": [],
         "timestamps": [],
     }
 
