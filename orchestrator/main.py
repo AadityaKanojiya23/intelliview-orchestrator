@@ -22,6 +22,7 @@ from uuid import uuid4
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import select
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 
@@ -31,8 +32,8 @@ from config import (
     ENABLE_PROMETHEUS,
     MAX_REQUEST_BODY_BYTES,
 )
-from database.db import engine
-from database.models import Base
+from database.db import engine, get_db
+from database.models import Base, InterviewSession
 from monitoring.dashboard_api import create_dashboard_routes
 from monitoring.metrics_collector import MetricsCollector
 from monitoring.websocket_manager import ws_manager
@@ -661,7 +662,6 @@ async def get_stuck_sessions(timeout_minutes: int = 30):
 
 # ========== Statistics Endpoints ==========
 
-
 @app.get("/session-statistics")
 @http_cache.cached("session-statistics", ttl=2)
 async def get_session_statistics():
@@ -683,7 +683,6 @@ async def get_session_statistics():
         logger.error(f"Error generating statistics: {e!s}")
         raise HTTPException(status_code=500, detail="Error generating statistics")
 
-
 @app.get("/worker-distribution")
 async def get_worker_distribution():
     """
@@ -698,7 +697,6 @@ async def get_worker_distribution():
     except Exception as e:
         logger.error(f"Error fetching worker distribution: {e!s}")
         raise HTTPException(status_code=500, detail="Error fetching worker distribution")
-
 
 @app.get("/high-risk-sessions")
 async def get_high_risk_sessions(threshold: float = 0.8, limit: int = 50):
@@ -721,7 +719,6 @@ async def get_high_risk_sessions(threshold: float = 0.8, limit: int = 50):
 
 
 # ========== Cache Management Endpoints ==========
-
 
 @app.get("/cache-stats")
 async def get_cache_stats():
@@ -795,19 +792,18 @@ async def clear_session_cache():
 
 
 @app.get("/interviews")
-async def list_interviews(limit: int = 100, status: str | None = None):
+async def list_interviews(
+    limit: int = 100,
+    status: str | None = None,
+    session_db=Depends(get_db),
+):
     """
     List interview sessions, newest first. Optional `status` filter.
 
     Returns:
         dict: List of interview sessions + total count.
     """
-    from sqlalchemy import select
 
-    from database.db import SessionLocal
-    from database.models import InterviewSession
-
-    session_db = SessionLocal()
     try:
         stmt = select(InterviewSession)
         if status:
@@ -834,8 +830,6 @@ async def list_interviews(limit: int = 100, status: str | None = None):
     except Exception as e:
         logger.error(f"Error listing interviews: {e!s}")
         raise HTTPException(status_code=500, detail="Error listing interviews")
-    finally:
-        session_db.close()
 
 
 # ========== Question Endpoints ==========
@@ -1775,3 +1769,4 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
