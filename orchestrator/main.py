@@ -15,6 +15,7 @@ Integrates:
 import logging
 import re
 import time as _time
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -24,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
+from monitoring.prometheus_metrics import (REQUEST_COUNT,REQUEST_DURATION,)
 
 from config import (
     API_TOKEN,
@@ -105,6 +107,26 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+@app.middleware("http")
+async def prometheus_middleware(request, call_next):
+    start = time.perf_counter()
+
+    response = await call_next(request)
+
+    duration = time.perf_counter() - start
+
+    REQUEST_COUNT.labels(
+        method=request.method,
+        path=request.url.path,
+        status=response.status_code,
+    ).inc()
+
+    REQUEST_DURATION.labels(
+        method=request.method,
+        path=request.url.path,
+    ).observe(duration)
+
+    return response
 
 
 # ========== Request ID + duration middleware ==========
@@ -374,13 +396,6 @@ class CreateTemplateRequest(BaseModel):
 
 
 @app.get("/health")
-async def health_check():
-    """
-    Health check endpoint
-    Returns system status
-    """
-    return {"status": "system running", "timestamp": datetime.now(timezone.utc).isoformat()}
-
 
 # ========== Deep Health & Probe Endpoints ==========
 
@@ -418,6 +433,11 @@ if ENABLE_PROMETHEUS:
 
     @app.get("/metrics")
     async def prometheus_metrics():
+        REDIS_HEALTH.set(...)
+        POSTGRES_HEALTH.set(...)
+        WORKERS_REGISTERED.set(...)
+        WORKERS_HEALTHY.set(...)
+        WORKERS_UNHEALTHY.set(...)
         """Prometheus metrics endpoint."""
         return _Response(
             content=get_metrics_text(),
@@ -1095,6 +1115,8 @@ async def register_worker(request: WorkerRegistrationRequest):
 
         # Log successful registration
         logger.info(f"Worker registered successfully: {request.worker_id}")
+        WORKERS_REGISTERED.inc()
+        WORKERS_HEALTHY.inc()
 
         return {
             "status": "success",
@@ -1127,6 +1149,14 @@ async def worker_heartbeat(request: WorkerHeartbeatRequest):
 
         # Update worker heartbeat in registry
         worker_registry.heartbeat(worker_id=request.worker_id, active_tasks=request.active_tasks)
+        WORKER_HEARTBEAT_AGE_SECONDS.labels(worker_id=request.worker_id).set(0)
+
+        WORKER_ACTIVE_TASKS.labels(worker_id=request.worker_id).set(request.active_tasks)
+
+        worker_status = worker_registry.get_worker(request.worker_id)
+        if worker_status:
+          WORKER_CAPACITY.labels(worker_id=request.worker_id).set(worker_status.get("capacity", 0))
+
 
         # Invalidate the workers + load caches so the next dashboard poll is fresh.
         http_cache.invalidate("workers", "worker-statistics", "load-status")
