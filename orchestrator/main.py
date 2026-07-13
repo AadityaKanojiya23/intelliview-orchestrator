@@ -55,6 +55,7 @@ from monitoring.prometheus_metrics import (
 )
 from monitoring.websocket_manager import ws_manager
 from orchestrator import http_cache
+from orchestrator.auth import create_access_token
 from orchestrator.candidate_manager import CandidateManager
 from orchestrator.fault_manager import FaultManager
 from orchestrator.health_monitor import HealthMonitor
@@ -67,6 +68,7 @@ from orchestrator.redis_client import circuit_breaker
 from orchestrator.request_validation import RequestValidationMiddleware
 from orchestrator.retry_manager import RetryManager, RetryStrategy
 from orchestrator.scheduler import Scheduler, TaskPriority
+from orchestrator.security import get_current_user, require_role
 from orchestrator.session_manager import SessionManager
 from orchestrator.session_tracker import SessionTracker
 from orchestrator.state_sync import StateSynchronizer
@@ -237,6 +239,24 @@ def require_token(x_api_token: str | None = Header(default=None)) -> None:
         raise HTTPException(status_code=401, detail="invalid or missing API token")
 
 
+class LoginRequest(BaseModel):
+    api_token: str
+
+
+@app.post("/login")
+async def login(request: LoginRequest):
+    """
+    Exchange a valid API token for a JWT access token.
+    """
+
+    if request.api_token != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid API token")
+
+    access_token = create_access_token({"sub": "system", "role": "admin"})
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
 # Initialize managers and orchestrators
 session_manager = SessionManager()
 session_tracker = SessionTracker()
@@ -311,6 +331,10 @@ class WorkerHeartbeatRequest(BaseModel):
 
     worker_id: str
     active_tasks: int
+
+
+class LoginRequest(BaseModel):
+    api_token: str
 
 
 class InterviewSessionResponse(BaseModel):
@@ -575,7 +599,7 @@ async def get_circuit_breaker_status():
 @app.post(
     "/start-interview",
     response_model=InterviewSessionResponse,
-    dependencies=[Depends(require_token)],
+    dependencies=[Depends(get_current_user)],
 )
 async def start_interview(
     request: StartInterviewRequest,
@@ -1126,7 +1150,7 @@ async def sync_cache_to_database(session_id: str | None = None):
         raise HTTPException(status_code=500, detail="Error syncing to database")
 
 
-@app.delete("/clear-cache", dependencies=[Depends(require_token)])
+@app.delete("/clear-cache", dependencies=[Depends(require_role("admin"))])
 async def clear_session_cache():
     """
     Clear all session cache from Redis
@@ -1682,7 +1706,7 @@ async def get_scheduling_status():
         raise HTTPException(status_code=500, detail=f"Error fetching scheduling status: {e!s}")
 
 
-@app.post("/switch-strategy", dependencies=[Depends(require_token)])
+@app.post("/switch-strategy", dependencies=[Depends(require_role("admin"))])
 async def switch_load_balancing_strategy(strategy: str):
     """
     Change the active load balancing strategy
@@ -1797,7 +1821,7 @@ async def get_failed_sessions(limit: int = 100):
         raise HTTPException(status_code=500, detail=f"Error fetching failed sessions: {e!s}")
 
 
-@app.post("/retry-session/{session_id}", dependencies=[Depends(require_token)])
+@app.post("/retry-session/{session_id}", dependencies=[Depends(require_role("admin"))])
 async def retry_failed_session(session_id: str):
     """
     Retry a failed interview session
@@ -2002,7 +2026,7 @@ async def get_fault_statistics():
         raise HTTPException(status_code=500, detail=f"Error generating fault statistics: {e!s}")
 
 
-@app.post("/detect-failures", dependencies=[Depends(require_token)])
+@app.post("/detect-failures", dependencies=[Depends(require_role("admin"))])
 async def detect_and_handle_failures():
     """
     Manually trigger failure detection and recovery
