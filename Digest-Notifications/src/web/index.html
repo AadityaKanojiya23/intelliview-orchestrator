@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orchestrator - Communication Control Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --panel-bg: rgba(17, 24, 39, 0.75);
+      --border-glow: rgba(59, 130, 246, 0.2);
+      --border-glow-focus: rgba(99, 102, 241, 0.6);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-amber: #f59e0b;
+      --card-shadow: 0 8px 32px 0 rgba(0,0,0,0.37);
+      --font-outfit: 'Outfit', sans-serif;
+      --font-inter: 'Inter', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image:
+        radial-gradient(at 10% 20%, rgba(59,130,246,0.10) 0px, transparent 50%),
+        radial-gradient(at 90% 80%, rgba(99,102,241,0.10) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      font-family: var(--font-inter);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-glow);
+      border-radius: 16px;
+      margin-bottom: 24px;
+      box-shadow: var(--card-shadow);
+      animation: fadeInDown 0.6s ease-out;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-logo {
+      width: 40px; height: 40px;
+      background: var(--primary-gradient);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-outfit); font-weight: 800; font-size: 20px;
+      box-shadow: 0 0 15px rgba(59,130,246,0.5);
+    }
+    .brand-title h1 { font-family: var(--font-outfit); font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .brand-title p  { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2px; }
+
+    .status-badge {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 500;
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.3);
+      color: var(--accent-green);
+      padding: 6px 14px; border-radius: 99px;
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      background: var(--accent-green); border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    /* ── Layout ── */
+    main {
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      gap: 24px;
+      flex-grow: 1;
+      align-items: start;
+    }
+    @media (max-width: 1024px) { main { grid-template-columns: 1fr; } }
+
+    .sidebar, .content-area { display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Panel ── */
+    .panel {
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-glow);
+      border-radius: 16px;
+      padding: 22px;
+      box-shadow: var(--card-shadow);
+      transition: border-color 0.3s;
+    }
+    .panel:hover { border-color: rgba(59,130,246,0.35); }
+
+    .panel-title {
+      font-family: var(--font-outfit);
+      font-size: 16px; font-weight: 600;
+      margin-bottom: 16px;
+      display: flex; align-items: center; gap: 10px;
+      color: var(--text-main);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding-bottom: 12px;
+    }
+    .panel-title .icon { font-size: 18px; }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+      display: block; font-size: 11px; font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .form-control {
+      width: 100%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border-glow);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text-main);
+      font-family: var(--font-inter);
+      font-size: 14px;
+      transition: all 0.2s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .form-control:focus {
+      outline: none;
+      border-color: var(--border-glow-focus);
+      background: rgba(255,255,255,0.07);
+      box-shadow: 0 0 10px rgba(99,102,241,0.15);
+    }
+
+    /* ── SELECT FIX: force dark background on all option elements ── */
+    select.form-control { background-color: #1e293b; cursor: pointer; }
+    select.form-control option {
+      background-color: #1e293b;
+      color: #f8fafc;
+      font-size: 14px;
+      padding: 8px;
+    }
+    select.form-control option:hover,
+    select.form-control option:checked {
+      background-color: #3b82f6;
+      color: #ffffff;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%;
+      background: var(--primary-gradient);
+      border: none; border-radius: 8px; padding: 12px;
+      color: white;
+      font-family: var(--font-outfit); font-weight: 600; font-size: 14px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: all 0.3s;
+      box-shadow: 0 4px 12px rgba(59,130,246,0.3);
+    }
+    .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(59,130,246,0.5); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border-glow);
+      color: var(--text-main);
+      box-shadow: none;
+    }
+    .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.1); border-color: var(--text-muted); box-shadow: none; }
+
+    .btn-danger {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: var(--accent-red);
+      box-shadow: none; padding: 6px 10px; border-radius: 6px;
+      font-size: 12px; width: auto; cursor: pointer; font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn-danger:hover { background: var(--accent-red); color: white; }
+
+    .btn-ics {
+      display: none;                 /* shown by JS after generate */
+      align-items: center; gap: 6px;
+      width: 100%;
+      background: rgba(16,185,129,0.12);
+      border: 1px solid rgba(16,185,129,0.35);
+      color: var(--accent-green);
+      box-shadow: none; padding: 10px 16px; border-radius: 8px;
+      font-family: var(--font-outfit); font-weight: 600; font-size: 14px;
+      cursor: pointer; transition: all 0.2s;
+      justify-content: center;
+    }
+    .btn-ics:hover { background: var(--accent-green); color: #0f172a; }
+
+    .btn-green {
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+      border: none;
+      color: white;
+      box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+    }
+    .btn-green:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(16,185,129,0.5);
+    }
+
+    /* Scheduler badge */
+    .sched-badge {
+      margin-left: auto;
+      font-size: 11px; font-weight: 700;
+      padding: 3px 10px; border-radius: 99px;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .sched-idle    { background: rgba(148,163,184,0.12); color: #94a3b8; }
+    .sched-running { background: rgba(16,185,129,0.15);  color: var(--accent-green);
+                     animation: pulse 1.5s infinite; }
+    .sched-done    { background: rgba(59,130,246,0.15);  color: #60a5fa; }
+    .sched-error   { background: rgba(239,68,68,0.15);   color: var(--accent-red); }
+
+    /* Scheduler status card */
+    .sched-status-card {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border-glow);
+      border-radius: 10px; padding: 12px 14px;
+    }
+    .sched-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 12px;
+    }
+    .sched-row:last-child { border-bottom: none; }
+    .sched-label { color: var(--text-muted); font-weight: 500; }
+    .sched-value { color: var(--text-main); font-weight: 600; text-align: right; max-width: 65%; word-break: break-word; }
+
+    /* ── Two-column grid for date/time ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    /* ── Timeline list ── */
+    .timeline { display: flex; flex-direction: column; gap: 10px; max-height: 360px; overflow-y: auto; padding-right: 4px; }
+    .timeline::-webkit-scrollbar { width: 5px; }
+    .timeline::-webkit-scrollbar-track { background: transparent; }
+    .timeline::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+    .timeline-item {
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px; padding: 12px;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      transition: all 0.2s;
+      animation: fadeIn 0.35s ease-out;
+    }
+    .timeline-item:hover { background: rgba(255,255,255,0.05); border-color: rgba(59,130,246,0.25); }
+    .timeline-content h4 { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+    .timeline-content p  { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+    .timeline-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; color: var(--text-muted); }
+
+    /* ── Generator grid ── */
+    .generator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+
+    /* ── Preview ── */
+    .preview-container {
+      background: #f8fafc; border-radius: 10px;
+      border: 1px solid var(--border-glow);
+      height: 460px; overflow: hidden;
+      display: flex; flex-direction: column; position: relative;
+    }
+    .preview-header {
+      background: #0f172a; border-bottom: 1px solid #1e293b;
+      padding: 10px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-shrink: 0;
+    }
+    .preview-badge {
+      font-size: 11px; font-family: var(--font-outfit); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      background: rgba(59,130,246,0.2); color: #60a5fa;
+      padding: 3px 10px; border-radius: 4px;
+    }
+    .preview-info { font-size: 12px; color: #94a3b8; }
+    .preview-iframe { width: 100%; flex-grow: 1; border: none; background: #f8fafc; }
+
+    .preview-empty {
+      position: absolute; inset: 0;
+      background: rgba(15,23,42,0.96);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 14px; color: var(--text-muted);
+      text-align: center; padding: 24px; z-index: 10;
+    }
+    .preview-empty .big-icon { font-size: 44px; animation: float 3s ease-in-out infinite; }
+    .preview-empty h3 { color: var(--text-main); font-family: var(--font-outfit); font-size: 18px; margin-bottom: 4px; }
+    .preview-empty p  { font-size: 13px; max-width: 280px; }
+
+    /* ── Plain-text preview ── */
+    .text-preview {
+      display: none;               /* shown by JS */
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--border-glow);
+      border-radius: 8px; padding: 14px 16px;
+      font-family: 'Courier New', monospace; font-size: 11.5px;
+      color: #94a3b8; white-space: pre-wrap;
+      max-height: 180px; overflow-y: auto;
+    }
+
+    /* ── Scheduler info box ── */
+    .scheduler-box {
+      background: rgba(245,158,11,0.06);
+      border: 1px solid rgba(245,158,11,0.2);
+      border-radius: 10px; padding: 14px 16px;
+      font-size: 12px;
+    }
+    .scheduler-box h4 { color: var(--accent-amber); font-size: 13px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+    .scheduler-box code {
+      display: block; background: rgba(0,0,0,0.35); border-radius: 6px;
+      padding: 6px 10px; font-size: 11px; color: #e2e8f0;
+      margin-bottom: 5px; font-family: 'Courier New', monospace;
+    }
+    .scheduler-box p { color: var(--text-muted); margin-top: 8px; line-height: 1.5; }
+
+    /* ── Logs ── */
+    .logs-list { display: flex; flex-direction: column; gap: 8px; max-height: 180px; overflow-y: auto; }
+    .log-item {
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 8px; padding: 10px 14px;
+      font-size: 12px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .log-left { display: flex; flex-direction: column; gap: 2px; }
+    .log-title { font-weight: 600; color: var(--text-main); }
+    .log-sub   { color: var(--text-muted); font-size: 11px; }
+    .log-badge {
+      background: rgba(16,185,129,0.15); color: var(--accent-green);
+      padding: 2px 8px; border-radius: 4px;
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+    }
+    .log-badge.badge-simulated {
+      background: rgba(245,158,11,0.15); color: var(--accent-amber);
+    }
+
+    /* ── Config badge ── */
+    .config-badge {
+      margin-left: auto; font-size: 11px;
+      background: rgba(59,130,246,0.1); color: #60a5fa;
+      padding: 2px 10px; border-radius: 99px; font-weight: 500;
+    }
+
+    /* ── Animations ── */
+    @keyframes pulse {
+      0%   { transform: scale(0.95); opacity: 0.5; }
+      50%  { transform: scale(1.1);  opacity: 1;   }
+      100% { transform: scale(0.95); opacity: 0.5; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0);   }
+    }
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+    @keyframes float {
+      0%   { transform: translateY(0);    }
+      50%  { transform: translateY(-9px); }
+      100% { transform: translateY(0);    }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ── -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">N</div>
+      <div class="brand-title">
+        <h1>Orchestrator</h1>
+        <p>Communications Service &bull; Digest Notifications</p>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 20px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <label for="apiTokenInput" style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0;">API Token:</label>
+        <input type="password" id="apiTokenInput" class="form-control" style="width: 150px; padding: 6px 10px; font-size: 12px;" placeholder="Enter Token">
+      </div>
+      <div class="status-badge">
+        <div class="status-dot"></div>
+        <span>Active Dispatch Engine</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ══════════════════ LEFT SIDEBAR ══════════════════ -->
+    <div class="sidebar">
+
+      <!-- Schedule Interview -->
+      <div class="panel">
+        <h2 class="panel-title"><span class="icon">📅</span>Schedule Interview</h2>
+        <form id="interviewForm">
+          <div class="form-group">
+            <label for="candidateName">Candidate Name</label>
+            <input type="text" id="candidateName" class="form-control" placeholder="e.g. Alex Rivera" required>
+          </div>
+          <div class="form-group">
+            <label for="role">Role / Position</label>
+            <input type="text" id="role" class="form-control" placeholder="e.g. Frontend Engineer" required>
+          </div>
+          <div class="form-group">
+            <label for="interviewerName">Interviewer Name</label>
+            <input type="text" id="interviewerName" class="form-control" placeholder="e.g. Sarah Connor" required>
+          </div>
+          <div class="two-col" style="margin-bottom: 14px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="date">Date</label>
+              <input type="date" id="date" class="form-control" required>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="time">Time</label>
+              <input type="time" id="time" class="form-control" required>
+            </div>
+          </div>
+          <button type="submit" class="btn">
+            <span>➕</span> Add Upcoming Interview
+          </button>
+        </form>
+      </div>
+
+      <!-- Upcoming List -->
+      <div class="panel">
+        <h2 class="panel-title">
+          <span class="icon">📋</span>Upcoming List
+          <span id="totalCount" class="config-badge">0</span>
+        </h2>
+        <div id="timelineList" class="timeline">
+          <!-- Populated by JS -->
+        </div>
+        <div class="pagination-controls" id="interviewsPagination" style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+          <button id="interviewsPrevBtn" class="btn-ics" style="padding: 4px 10px; font-size: 12px; margin: 0;" disabled>‹ Prev</button>
+          <span id="interviewsPageInfo" style="font-size:12px; color:var(--text-muted);">Page 1 of 1</span>
+          <button id="interviewsNextBtn" class="btn-ics" style="padding: 4px 10px; font-size: 12px; margin: 0;" disabled>Next ›</button>
+        </div>
+      </div>
+
+
+    </div>
+
+    <!-- ══════════════════ RIGHT CONTENT ══════════════════ -->
+    <div class="content-area">
+
+      <!-- Digest Generator -->
+      <div class="panel">
+        <h2 class="panel-title">
+          <span class="icon">⚙️</span>Digest Generator
+          <span id="batchSizeBadge" class="config-badge">Batch limit: 5</span>
+        </h2>
+        <div class="generator-grid">
+          <div class="form-group" style="margin-bottom:0;">
+            <label for="digestType">Digest Schedule</label>
+            <select id="digestType" class="form-control">
+              <option value="daily">Daily Digest</option>
+              <option value="weekly">Weekly Digest</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label for="refDate">Reference Date</label>
+            <input type="date" id="refDate" class="form-control">
+          </div>
+        </div>
+        <button id="generateBtn" class="btn">
+          <span>⚡</span> Generate Preview
+        </button>
+      </div>
+
+      <!-- Live Preview -->
+      <div class="panel" style="display:flex; flex-direction:column; gap:14px;">
+        <h2 class="panel-title" style="margin-bottom:0; padding-bottom:0; border-bottom:none;">
+          <span class="icon">👁️</span>Digest Live Preview
+        </h2>
+
+        <div class="preview-container">
+          <div class="preview-empty" id="previewEmpty">
+            <div class="big-icon">✉️</div>
+            <h3>No Digest Generated Yet</h3>
+            <p>Select your configuration above and click "Generate Preview" to review the email batch.</p>
+          </div>
+          <div class="preview-header">
+            <span class="preview-badge" id="previewTypeBadge">DAILY</span>
+            <span class="preview-info" id="previewDateRange">—</span>
+          </div>
+          <div id="previewTruncationWarning" style="display: none; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; padding: 10px 14px; margin: 10px 22px; font-size: 13px; color: #f59e0b; text-align: center; font-weight: 500;">
+            ⚠️ <strong>Notice:</strong> Capped at batch limit. Showing <span id="warningShown">5</span> of <span id="warningTotal">12</span> upcoming interviews.
+          </div>
+          <iframe id="previewIframe" class="preview-iframe"></iframe>
+        </div>
+
+        <!-- Action Buttons -->
+        <button id="sendBtn" class="btn btn-secondary" disabled>
+          <span>📨</span> Dispatch Email Notification
+        </button>
+      </div>
+
+      <!-- Plain-Text Fallback Preview -->
+      <div class="panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h2 class="panel-title" style="margin:0; padding:0; border:none;"><span class="icon">📄</span>Plain-Text Fallback</h2>
+          <button id="txtDownloadBtn" class="btn-ics" style="margin:0; display:none; padding:4px 10px; font-size:11px;">
+            <span>⬇️</span> Download Text File
+          </button>
+        </div>
+        <pre id="textPreviewBox" class="text-preview"></pre>
+        <p style="font-size:12px; color:var(--text-muted); margin-top:10px; line-height:1.6;">
+          Every digest also generates a <strong style="color:#e2e8f0;">text/plain</strong> version
+          saved to <code style="background:rgba(255,255,255,0.05); padding:1px 6px; border-radius:4px;">output/digest_email.txt</code>.
+          This improves email deliverability scores and supports text-only mail clients.
+          Click Generate above to preview it here.
+        </p>
+      </div>
+
+      <!-- Dispatch Logs -->
+      <div class="panel">
+        <h2 class="panel-title"><span class="icon">📜</span>Dispatch Logs</h2>
+        <div id="logsList" class="logs-list">
+          <!-- Populated by JS -->
+        </div>
+        <div class="pagination-controls" id="logsPagination" style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+          <button id="logsPrevBtn" class="btn-ics" style="padding: 4px 10px; font-size: 12px; margin: 0;" disabled>‹ Prev</button>
+          <span id="logsPageInfo" style="font-size:12px; color:var(--text-muted);">Page 1 of 1</span>
+          <button id="logsNextBtn" class="btn-ics" style="padding: 4px 10px; font-size: 12px; margin: 0;" disabled>Next ›</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="/main.js"></script>
+</body>
+</html>

@@ -209,6 +209,29 @@ services:
           memory: 256M
           cpus: "0.5"
 
+  digest-notifications:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-interview-digest-notifications
+    ports:
+      - "8080:8080"
+    environment:
+      API_TOKEN: "${API_TOKEN:-dev-token-change-me}"
+      DIGEST_BATCH_SIZE: "5"
+    volumes:
+      - .:/app
+    networks:
+      - ai-interview-network
+    working_dir: /app/Digest-Notifications
+    command: python src/digest.py --serve --port 8080 --host 0.0.0.0
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+
 volumes:
   redis_data:
   postgres_data:
