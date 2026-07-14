@@ -60,7 +60,5 @@ def test_start_interview_valid():
         },
     )
 
-    print("Status:", response.status_code)
-    print("Body:", response.json())
 
     assert response.status_code == 200
