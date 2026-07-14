@@ -121,3 +121,29 @@ CORS_ALLOW_ORIGINS = ",".join(settings.cors_allow_origins)
 MAX_REQUEST_BODY_BYTES = settings.max_request_body_bytes
 ENABLE_PROMETHEUS = settings.enable_prometheus
 DATABASE_SSLMODE = settings.database_sslmode
+
+# ---------------------------------------------------------------------------
+# EEOC / legal compliance — banned interview topics (Issue #121)
+# ---------------------------------------------------------------------------
+# Keywords whose presence in a generated question signals a legally or
+# ethically prohibited interview topic under EEOC and similar regulations.
+# The list is intentionally kept here so it can be extended in one place
+# without touching the validation logic in workers/evaluation_pipeline.py.
+BANNED_TOPICS: list[str] = [
+    "age",
+    "how old",
+    "old are you",
+    "pregnant",
+    "children",
+    "family planning",
+    "religion",
+    "religious",
+    "citizenship",
+    "nationality",
+    "marital status",
+    "married",
+    "disability",
+    "disabled",
+    "medical condition",
+    "health condition",
+]
