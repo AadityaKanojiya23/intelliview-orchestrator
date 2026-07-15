@@ -49,11 +49,12 @@ def _on_task_failure(task_id, exception, args, kwargs, traceback, einfo, **_extr
     """
     try:
         from orchestrator.session_manager import SessionManager
-
+        from workers.tasks import send_mock_email_alert 
         session_id = args[0] if args else None
         if not session_id:
             return
         SessionManager().mark_session_failed(session_id, f"Celery task exhausted retries: {exception!s}")
+        send_mock_email_alert.delay(session_id)
     except Exception as exc:
         # Don't let a signal handler crash the worker.
         import logging

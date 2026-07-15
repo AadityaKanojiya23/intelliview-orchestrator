@@ -252,3 +252,16 @@ def scan_and_dispatch_retries():
 
     except Exception as exc:
         logger.error("scan_and_dispatch_retries failed: %s", exc)
+@celery_app.task(name="workers.tasks.send_mock_email_alert")
+def send_mock_email_alert(session_id: str):
+    logger.info("=" * 60)
+    logger.info("MOCK EMAIL ALERT")
+    logger.info("Session %s entered DLQ.", session_id)
+    logger.info("Admin has been notified successfully.")
+    logger.info("=" * 60)
+
+    return {
+        "status": "success",
+        "message": "Mock email alert sent",
+        "session_id": session_id,
+    }
