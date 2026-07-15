@@ -93,3 +93,96 @@ def test_generate_risk_report_shape():
     assert "component_risks" in report
     assert "risk_factors" in report
     assert "recommendation" in report
+
+def test_multiple_persons_override_to_critical():
+    report = RiskScoringEngine.generate_risk_report(
+        "s1",
+        {
+            "face_detected": {"faces_found": True},
+            "multiple_persons": {"multiple_persons_detected": True},
+        },
+        {"transcription": {"text": "hello"}},
+        {
+            "answer_quality_score": {"overall_quality_score": 90},
+            "technical_accuracy": {"accuracy_score": 90},
+            "communication_clarity": {"clarity_score": 90},
+        },
+    )
+
+    assert report["risk_classification"] == "CRITICAL"
+
+def test_face_absent_override_to_high():
+    report = RiskScoringEngine.generate_risk_report(
+        "s1",
+        {
+            "face_detected": {"faces_found": False},
+            "multiple_persons": {"multiple_persons_detected": False},
+        },
+        {"transcription": {"text": "hello"}},
+        {
+            "answer_quality_score": {"overall_quality_score": 90},
+            "technical_accuracy": {"accuracy_score": 90},
+            "communication_clarity": {"clarity_score": 90},
+        },
+    )
+
+    assert report["risk_classification"] == "HIGH"
+
+def test_no_override_keeps_weighted_classification():
+    report = RiskScoringEngine.generate_risk_report(
+        "s1",
+        {
+            "face_detected": {"faces_found": True},
+            "multiple_persons": {"multiple_persons_detected": False},
+            "phone_detected": {"phone_detected": False},
+            "head_movement_suspicious": {
+                "suspicious_movement_detected": False
+            },
+        },
+        {"transcription": {"text": "hello"}},
+        {
+            "answer_quality_score": {"overall_quality_score": 90},
+            "technical_accuracy": {"accuracy_score": 90},
+            "communication_clarity": {"clarity_score": 90},
+        },
+)
+
+    assert report["risk_classification"] == "LOW"
+
+def test_no_override_keeps_weighted_classification():
+    report = RiskScoringEngine.generate_risk_report(
+        "s1",
+        {
+            "face_detected": {"faces_found": True},
+            "multiple_persons": {"multiple_persons_detected": False},
+            "phone_detected": {"phone_detected": False},
+            "head_movement_suspicious": {
+                "suspicious_movement_detected": False
+            },
+        },
+        {"transcription": {"text": "hello"}},
+        {
+            "answer_quality_score": {"overall_quality_score": 90},
+            "technical_accuracy": {"accuracy_score": 90},
+            "communication_clarity": {"clarity_score": 90},
+        },
+    )
+
+    assert report["risk_classification"] == "LOW"
+
+def test_multiple_persons_has_priority_over_face_absent():
+    report = RiskScoringEngine.generate_risk_report(
+        "s1",
+        {
+            "face_detected": {"faces_found": False},
+            "multiple_persons": {"multiple_persons_detected": True},
+        },
+        {"transcription": {"text": "hello"}},
+        {
+            "answer_quality_score": {"overall_quality_score": 90},
+            "technical_accuracy": {"accuracy_score": 90},
+            "communication_clarity": {"clarity_score": 90},
+        },
+    )
+
+    assert report["risk_classification"] == "CRITICAL"
