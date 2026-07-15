@@ -15,6 +15,7 @@ Integrates:
 import logging
 import re
 import time as _time
+from database.subscriber_store import create_table, list_subscribers
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -70,6 +71,15 @@ async def lifespan(app: FastAPI):
     close the shared Redis client, and notify clients.
     """
     Base.metadata.create_all(bind=engine)
+
+        # Initialize webhook subscriber store
+    create_table()
+
+    subscribers = list_subscribers()
+    logger.info(
+        "Loaded %d webhook subscribers",
+        len(subscribers)
+    )
     if API_TOKEN == "dev-token-change-me":
         logger.warning(
             "API_TOKEN is the built-in dev default — set a strong token "
