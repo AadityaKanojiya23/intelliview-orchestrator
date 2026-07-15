@@ -380,11 +380,23 @@ export default function InterviewPage() {
             </div>
           </Card>
 
-          {moments.length > 0 && (
-            <Card title="Moment Timeline">
-              <MomentTimeline moments={moments} />
-            </Card>
-          )}
+          <Card
+  title="Risk Timeline"
+  description={
+    isLive
+      ? "Real-time interview events and risk history."
+      : "Timeline will appear after the interview starts."
+  }
+>
+  {isLive ? (
+    <MomentTimeline moments={moments} />
+  ) : (
+    <div className="flex h-32 items-center justify-center text-center text-sm text-muted">
+      Interview not started
+    </div>
+  )}
+</Card>
+          
         </div>
       </div>
     </div>
