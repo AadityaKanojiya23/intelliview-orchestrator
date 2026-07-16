@@ -26,7 +26,7 @@ def create_table():
     conn.close()
 
 
-def add_subscriber(webhook_id, url, secret_ref):
+def add_subscriber(webhook_id, url, secret_ref, active=True):
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -39,7 +39,7 @@ def add_subscriber(webhook_id, url, secret_ref):
         webhook_id,
         url,
         secret_ref,
-        1,
+        1 if active else 0,
         datetime.now().isoformat()
     ))
 

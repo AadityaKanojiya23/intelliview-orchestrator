@@ -18,3 +18,5 @@ frontend/out/
 frontend/.env.local
 frontend/*.tsbuildinfo
 
+.env.local
+subscribers.db
