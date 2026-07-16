@@ -17,7 +17,13 @@ import { StatusBadge, Badge } from "@/components/Badge";
 import { Skeleton, ErrorState, EmptyState } from "@/components/States";
 import { SearchInput } from "@/components/SearchInput";
 import Pipeline from "@/components/Pipeline";
-import { formatDate, formatRelative, riskColor, formatPercent } from "@/lib/utils";
+import {
+  formatDate,
+  formatRelative,
+  riskColor,
+  formatPercent,
+  cn,
+} from "@/lib/utils";
 import {
   Bar,
   BarChart,
