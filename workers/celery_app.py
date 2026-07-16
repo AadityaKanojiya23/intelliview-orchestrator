@@ -38,19 +38,61 @@ celery_app.conf.update(
 celery_app.autodiscover_tasks(["workers"])
 
 
-@signals.task_failure.connect
-def _on_task_failure(task_id, exception, args, kwargs, traceback, einfo, **_extra):
-    """When a task fails permanently (retries exhausted), mark the
-    session as FAILED so the dashboard reflects reality.
+_SESSION_TASK_NAMES: frozenset[str] = frozenset(
+    {
+        "workers.tasks.process_interview_session",
+        "workers.tasks._run_video",
+        "workers.tasks._run_audio",
+        "workers.tasks._after_parallel",
+    }
+)
+"""Tasks that carry a ``session_id`` and whose permanent failure should be
+propagated to the session record.  Tasks outside this set (e.g.
+``scan_and_dispatch_retries``) do not own a session and are skipped."""
 
-    `args[0]` is the session_id passed to `process_interview_session`.
+
+def _extract_session_id(args: tuple, kwargs: dict) -> str | None:
+    """Return ``session_id`` from either positional or keyword arguments.
+
+    Callers may invoke a task in any of the following equivalent ways::
+
+        task.delay("abc-123")               # positional  → args[0]
+        task.delay(session_id="abc-123")    # keyword     → kwargs["session_id"]
+        task.apply_async(args=["abc-123"])  # positional  → args[0]
+        task.apply_async(kwargs={"session_id": "abc-123"})  # keyword
+
+    Checking only ``args[0]`` silently misses the keyword form and returns
+    ``None``, causing the failure handler to skip updating the session status.
+    """
+    if args:
+        return args[0]
+    return kwargs.get("session_id")
+
+
+@signals.task_failure.connect
+def _on_task_failure(sender, task_id, exception, args, kwargs, traceback, einfo, **_extra):
+    """When a session-aware task fails permanently (retries exhausted), mark
+    the session as FAILED so the dashboard reflects reality.
+
+    The handler is scoped to :data:`_SESSION_TASK_NAMES` so that unrelated
+    periodic tasks (e.g. ``scan_and_dispatch_retries``) do not trigger a
+    spurious DB write.
+
+    ``session_id`` is resolved from *either* positional or keyword arguments
+    via :func:`_extract_session_id` so the handler is safe regardless of how
+    the task was dispatched.
+
     Imported lazily so importing this module doesn't pull in the DB stack
     before the worker process is ready.
     """
+    task_name: str = getattr(sender, "name", "") or ""
+    if task_name not in _SESSION_TASK_NAMES:
+        return
+
     try:
         from orchestrator.session_manager import SessionManager
 
-        session_id = args[0] if args else None
+        session_id = _extract_session_id(args, kwargs)
         if not session_id:
             return
         SessionManager().mark_session_failed(session_id, f"Celery task exhausted retries: {exception!s}")
