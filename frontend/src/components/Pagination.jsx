@@ -83,4 +83,4 @@ function Pagination(){
 );
 }
 
-export default Pagination;
+export { Pagination };

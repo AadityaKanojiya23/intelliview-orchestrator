@@ -1,4 +1,6 @@
 "use client";
+import { Pagination } from "@/components/Pagination";
+
 import { useState, useMemo } from "react";
 import useSWR from "swr";
 import {
@@ -113,6 +115,7 @@ export default function CandidatesPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <Pagination />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-50">Candidates</h1>
@@ -354,7 +357,7 @@ export default function CandidatesPage() {
                         ))}
                     </tbody>
                   </table>
-                </div>
+                </div> <Pagination />
               </Card>
             </div>
           )}
