@@ -31,19 +31,42 @@ def _real_transcribe(session_id: str) -> dict[str, Any] | None:
     """Transcribe audio using local Whisper model."""
     try:
         from workers.ai_client import transcribe_audio_file
-
+        import numpy as np
         audio_path = f"/tmp/interview_{session_id}.wav"
         result = transcribe_audio_file(audio_path)
-        if result is None:
-            return None
+        segments = result.get("segments", [])
+        if segments:
+            avg_logprob = np.mean(
+                [s.get("avg_logprob", -1.0) for s in segments]
+            )
+
+            confidence = round(
+                max(0.0, min(1.0, 1.0 + avg_logprob)),
+                3,
+            )
+        else:
+            confidence = 0.0
+
+        logger.info(
+            "avg_logprob=%s, confidence=%s",
+            avg_logprob,
+            confidence,
+        )
+
         return {
-            "text": result["text"],
-            "confidence": 0.9,
+            "text": result.get("text", ""),
+            "confidence": confidence,
             "language": result.get("language", "en"),
-            "duration_seconds": sum(s.get("end", 0) - s.get("start", 0) for s in result.get("segments", []))
-            or 120.0,
+            "duration_seconds": (
+                sum(
+                    s.get("end", 0) - s.get("start", 0)
+                    for s in segments
+                )
+                or 120.0
+            ),
             "timestamp": time.time(),
         }
+        
     except Exception as exc:
         logger.debug("Real transcription unavailable: %s", exc)
         return None
