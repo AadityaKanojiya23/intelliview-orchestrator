@@ -11,6 +11,8 @@
 
 ## Quick Start
 
+Running `docker compose up -d --build` automatically builds and starts the entire stack, including both the FastAPI backend and the Next.js frontend.
+
 ```bash
 git clone https://github.com/rajat-wyrm/intelliview-orchestrator
 cd intelliview-orchestrator
@@ -110,9 +112,6 @@ Full OpenAPI docs at `/docs` when running. Key endpoints:
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn orchestrator.main:app --reload
-
-# Frontend
-cd frontend && npm install && npm run dev
 
 # Tests
 pytest tests/ --ignore=tests/test_e2e_smoke.py -v
