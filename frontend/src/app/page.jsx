@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/Badge";
 import { Skeleton, ErrorState, EmptyState } from "@/components/States";
 import Sparkline from "@/components/Sparkline";
 import { formatPercent, formatRelative } from "@/lib/utils";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui";
 
 const MAX_SAMPLES = 20;
 
@@ -183,32 +184,26 @@ export default function OverviewPage() {
         ) : workers.data.workers.length === 0 ? (
           <EmptyState title="No workers registered" description="Workers self-register via the worker_agent on startup." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-muted">
-                <tr>
-                  <th className="py-2 pr-4">Worker</th>
-                  <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">Load</th>
-                  <th className="py-2 pr-4">Last heartbeat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {workers.data.workers.map((w) => (
-                  <tr key={w.worker_id} className="border-t border-border hover:bg-white/5 transition-colors">
-                    <td className="py-2 pr-4 font-mono text-xs text-zinc-200">{w.worker_id}</td>
-                    <td className="py-2 pr-4">
-                      <StatusBadge status={w.health_status} />
-                    </td>
-                    <td className="py-2 pr-4">
-                      {w.active_tasks}/{w.capacity}
-                    </td>
-                    <td className="py-2 pr-4 text-muted">{formatRelative(w.last_heartbeat)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <Thead>
+              <Tr>
+                <Th>Worker</Th>
+                <Th>Status</Th>
+                <Th>Load</Th>
+                <Th>Last heartbeat</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {workers.data.workers.map((w) => (
+                <Tr key={w.worker_id}>
+                  <Td className="font-mono text-xs text-zinc-200">{w.worker_id}</Td>
+                  <Td><StatusBadge status={w.health_status} /></Td>
+                  <Td>{w.active_tasks}/{w.capacity}</Td>
+                  <Td className="text-muted">{formatRelative(w.last_heartbeat)}</Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
         )}
       </Card>
     </div>

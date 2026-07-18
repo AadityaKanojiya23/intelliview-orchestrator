@@ -15,7 +15,7 @@ import Card from "@/components/Card";
 import Stat from "@/components/Stat";
 import { StatusBadge, Badge } from "@/components/Badge";
 import { Skeleton, ErrorState, EmptyState } from "@/components/States";
-import { SearchInput } from "@/components/SearchInput";
+import { SearchInput, Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui";
 import Pipeline from "@/components/Pipeline";
 import { formatDate, formatRelative, riskColor, formatPercent } from "@/lib/utils";
 import {
@@ -306,55 +306,43 @@ export default function CandidatesPage() {
               )}
 
               <Card title="Interview History" description="All sessions for this candidate">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="text-left text-xs uppercase tracking-wide text-muted">
-                      <tr>
-                        <th className="py-2 pr-4">Session</th>
-                        <th className="py-2 pr-4">Pipeline</th>
-                        <th className="py-2 pr-4">Status</th>
-                        <th className="py-2 pr-4">Risk</th>
-                        <th className="py-2 pr-4">Worker</th>
-                        <th className="py-2 pr-4">Updated</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selected.sessions
-                        .sort(
-                          (a, b) =>
-                            new Date(b.updated_at || 0) - new Date(a.updated_at || 0)
-                        )
-                        .map((s) => (
-                          <tr key={s.session_id} className="border-t border-border">
-                            <td className="py-2 pr-4 font-mono text-xs text-zinc-300">
-                              {s.session_id}
-                            </td>
-                            <td className="py-2 pr-4">
-                              <Pipeline current={s.status} />
-                            </td>
-                            <td className="py-2 pr-4">
-                              <StatusBadge status={s.status} />
-                            </td>
-                            <td className="py-2 pr-4">
-                              {s.risk_score != null ? (
-                                <Badge variant={riskColor(s.risk_score)}>
-                                  {s.risk_score.toFixed(2)}
-                                </Badge>
-                              ) : (
-                                <span className="text-muted">—</span>
-                              )}
-                            </td>
-                            <td className="py-2 pr-4 font-mono text-xs text-muted">
-                              {s.assigned_node ?? "—"}
-                            </td>
-                            <td className="py-2 pr-4 text-muted">
-                              {formatDate(s.updated_at ?? s.end_time)}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
+                <Table>
+                  <Thead>
+                    <Tr>
+                      <Th>Session</Th>
+                      <Th>Pipeline</Th>
+                      <Th>Status</Th>
+                      <Th>Risk</Th>
+                      <Th>Worker</Th>
+                      <Th>Updated</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {selected.sessions
+                      .sort(
+                        (a, b) =>
+                          new Date(b.updated_at || 0) - new Date(a.updated_at || 0)
+                      )
+                      .map((s) => (
+                        <Tr key={s.session_id}>
+                          <Td className="font-mono text-xs text-zinc-300">{s.session_id}</Td>
+                          <Td><Pipeline current={s.status} /></Td>
+                          <Td><StatusBadge status={s.status} /></Td>
+                          <Td>
+                            {s.risk_score != null ? (
+                              <Badge variant={riskColor(s.risk_score)}>
+                                {s.risk_score.toFixed(2)}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted">—</span>
+                            )}
+                          </Td>
+                          <Td className="font-mono text-xs text-muted">{s.assigned_node ?? "—"}</Td>
+                          <Td className="text-muted">{formatDate(s.updated_at ?? s.end_time)}</Td>
+                        </Tr>
+                      ))}
+                  </Tbody>
+                </Table>
               </Card>
             </div>
           )}
