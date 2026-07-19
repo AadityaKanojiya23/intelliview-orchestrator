@@ -40,4 +40,3 @@ class CacheManager:
     def __getattr__(self, name: str) -> Any:
         """Delegate unknown operations to the wrapped Redis client."""
         return getattr(self._client, name)
-    
