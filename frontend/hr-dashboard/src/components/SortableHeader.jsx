@@ -1,40 +1,19 @@
-import React from "react";
+import React, { useState } from "react";
 
-export default function SortableHeader({
-  label,
-  column,
-  sortBy,
-  sortOrder,
-  onSort,
-}) {
-  const isActive = sortBy === column;
+const SortableHeader = ({ label, onSort }) => {
+  const [order, setOrder] = useState("asc");
 
-  const handleClick = () => {
-    if (!isActive) {
-      onSort(column, "asc");
-    } else if (sortOrder === "asc") {
-      onSort(column, "desc");
-    } else {
-      onSort(null, null);
-    }
+  const handleSort = () => {
+    const newOrder = order === "asc" ? "desc" : "asc";
+    setOrder(newOrder);
+    onSort(newOrder);
   };
 
   return (
-    <th
-      onClick={handleClick}
-      style={{
-        cursor: "pointer",
-        userSelect: "none",
-        padding: "10px",
-      }}
-    >
-      {label}
-
-      {isActive && (
-        <span style={{ marginLeft: "6px" }}>
-          {sortOrder === "asc" ? "↑" : "↓"}
-        </span>
-      )}
+    <th onClick={handleSort} style={{ cursor: "pointer" }}>
+      {label} {order === "asc" ? "🔼" : "🔽"}
     </th>
   );
-}
+};
+
+export default SortableHeader;
