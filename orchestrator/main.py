@@ -181,6 +181,7 @@ app.add_middleware(
 # ========== Auth ==========
 
 
+
 def require_token(x_api_token: str | None = Header(default=None)) -> None:
     """Dependency that requires a valid API token.
 
@@ -372,14 +373,19 @@ class CreateTemplateRequest(BaseModel):
     category_distribution: dict[str, float] | None = None
     difficulty_distribution: dict[str, float] | None = None
 
+class HealthResponse(BaseModel):
+    """Response model for GET /health"""
+    status: str
+    timestamp: str
 
-@app.get("/health")
+
+
+@app.get("/health", response_model=HealthResponse)
 async def health_check():
-    """
-    Health check endpoint
-    Returns system status
-    """
-    return {"status": "system running", "timestamp": datetime.now(timezone.utc).isoformat()}
+    return HealthResponse(
+        status="system running",
+        timestamp=datetime.now(timezone.utc).isoformat()
+    )
 
 
 # ========== Deep Health & Probe Endpoints ==========
