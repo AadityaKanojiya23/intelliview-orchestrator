@@ -27,12 +27,25 @@ from orchestrator.state_sync import StateSynchronizer
 from workers.celery_app import celery_app
 from workers.evaluation_pipeline import evaluate_answers
 from workers.risk_engine import RiskScoringEngine
+from celery.exceptions import TimeoutError
+from celery.result import AsyncResult
 
 logger = logging.getLogger(__name__)
 
 session_manager = SessionManager()
 state_sync = StateSynchronizer()
 
+def _get_session_state(session_id: str) -> dict:
+    """Get cached session state from Redis."""
+    state = session_manager.state_sync.get_session_state(session_id)
+    return state or {}
+
+
+def _update_session_state(session_id: str, **kwargs) -> None:
+    """Merge additional fields into the cached session state."""
+    state = _get_session_state(session_id)
+    state.update(kwargs)
+    session_manager.state_sync.set_session_state(session_id, state)
 
 # ---------------------------------------------------------------------------
 # Individual stage tasks
@@ -44,7 +57,15 @@ def _run_video(self, session_id: str) -> dict:
     """Video analysis stage."""
     from workers.video_pipeline import run_video_analysis
 
-    return run_video_analysis(session_id)
+    result = run_video_analysis(session_id)
+
+    _update_session_state(
+        session_id,
+        video_completed=True,
+        video_result=result,
+    )
+
+    return result
 
 
 @celery_app.task(bind=True, max_retries=3, name="workers.tasks._run_audio")
@@ -52,7 +73,15 @@ def _run_audio(self, session_id: str) -> dict:
     """Audio analysis stage."""
     from workers.audio_pipeline import run_audio_analysis
 
-    return run_audio_analysis(session_id)
+    result = run_audio_analysis(session_id)
+
+    _update_session_state(
+        session_id,
+        audio_completed=True,
+        audio_result=result,
+    )
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -116,7 +145,7 @@ def process_interview_session(self, session_id):
     and risk scoring stages run sequentially after both complete.
     """
     worker_hostname = socket.gethostname()
-
+    
     try:
         logger.info("Worker %s starting interview session: %s", worker_hostname, session_id)
 
@@ -149,24 +178,84 @@ def process_interview_session(self, session_id):
                 db_session.commit()
         finally:
             db_session.close()
+        # Load previously saved orchestration state
+        session_state = _get_session_state(session_id)
 
+        video_completed = session_state.get("video_completed", False)
+        audio_completed = session_state.get("audio_completed", False)
+
+        video_result = session_state.get("video_result")
+        audio_result = session_state.get("audio_result")
+
+       
         # Parallel: video + audio via Celery group
         session_manager.update_session_status(
             session_id, session_manager.VIDEO_PROCESSING, {"stage": "parallel_video_audio"}
         )
+         
 
-        parallel_group = group(
-            _run_video.s(session_id),
-            _run_audio.s(session_id),
-        )
-        result = parallel_group.apply_async()
+        # Build only the tasks that still need to run
+        parallel_tasks = []
+        task_order = []
 
-        # Wait for both to finish (group result)
-        video_result, audio_result = result.get(timeout=600)
-        logger.info("Parallel video+audio completed for session %s", session_id)
+        if not video_completed:
+            parallel_tasks.append(_run_video.s(session_id))
+            task_order.append("video")
 
-        # Chain into evaluation + risk scoring
-        _after_parallel.delay(session_id, video_result, audio_result)
+        if not audio_completed:
+            parallel_tasks.append(_run_audio.s(session_id))
+            task_order.append("audio")
+
+        # Run only unfinished tasks
+        if parallel_tasks:
+            result = group(*parallel_tasks).apply_async()
+                       
+
+            try:
+                outputs = result.get(timeout=600)
+
+            except TimeoutError:
+                # Temporary problem while waiting
+                raise
+
+            except Exception:
+                # Refresh state in case one task finished before the other failed
+                session_state = _get_session_state(session_id)
+
+                video_completed = session_state.get("video_completed", False)
+                audio_completed = session_state.get("audio_completed", False)
+
+                video_result = session_state.get("video_result")
+                audio_result = session_state.get("audio_result")
+
+                # Retry process_interview_session.
+                # Completed subtasks will be skipped on the next run.
+                raise
+
+            if len(task_order) == 1:
+                outputs = [outputs]
+
+            for stage, output in zip(task_order, outputs):
+                if stage == "video":
+                    video_result = output
+                    video_completed = True
+                else:
+                    audio_result = output
+                    audio_completed = True
+
+            logger.info(
+                "Completed pending parallel tasks for session %s",
+                session_id,
+            )
+        else:
+            logger.info(
+                "Video and audio already completed for session %s",
+                session_id,
+            )
+
+        # Continue only when both results are available
+        if video_completed and audio_completed:
+            _after_parallel.delay(session_id, video_result, audio_result)
 
         return {
             "session_id": session_id,
@@ -175,18 +264,26 @@ def process_interview_session(self, session_id):
             "audio_result": audio_result,
             "processed_by": worker_hostname,
         }
-
-    except Exception as exc:
+    except TimeoutError as exc:
         retry_delay = 2 ** (self.request.retries + 1)
+
         logger.warning(
-            "Task for session %s failed (attempt %d/3), retrying in %ds: %s",
+            "Timed out waiting for subtasks for session %s (attempt %d/3). Retrying in %ds.",
             session_id,
             self.request.retries + 1,
             retry_delay,
+        )
+
+        raise self.retry(exc=exc, countdown=retry_delay)
+
+    except Exception as exc:
+        logger.error(
+            "Processing failed for session %s: %s",
+            session_id,
             exc,
             exc_info=True,
         )
-        raise self.retry(exc=exc, countdown=retry_delay)
+        raise
 
 
 # ---------------------------------------------------------------------------
