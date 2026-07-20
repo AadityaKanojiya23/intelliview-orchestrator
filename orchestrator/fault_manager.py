@@ -16,9 +16,12 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 
+issue-128-fairness-audit
 import redis
 
 from orchestrator.redis_client import get_redis_client
+from orchestrator.cache_manager import CacheManager
+ main
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +56,11 @@ class FaultManager:
             debounce_time: Seconds to wait before treating alert as new (prevent spam)
         """
         self.debounce_time = debounce_time
+ issue-128-fairness-audit
         self.redis_client = self._create_redis_client()
+
+        self.redis_client = CacheManager()
+ main
         self.failure_log_prefix = "failure_log:"
         self.recovery_queue_prefix = "recovery_queue:"
         self.dead_letter_queue = "dead_letter_queue"
