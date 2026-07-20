@@ -9,9 +9,8 @@ with (
 
 from fastapi.testclient import TestClient
 
-
-
 client = TestClient(app)
+
 
 def test_health():
     response = client.get("/health")
@@ -23,20 +22,15 @@ def test_health():
     assert "status" in data
     assert "timestamp" in data
 
+
 def test_start_interview_invalid_candidate_id():
     response = client.post(
         "/start-interview",
-        
         headers={"X-API-Token": "test-token"},
-        json={
-            "candidate_id": "@@@###",
-            "priority": "medium"
-        },
+        json={"candidate_id": "@@@###", "priority": "medium"},
     )
 
     assert response.status_code == 422
-
-
 
 
 @patch("orchestrator.main.session_manager.get_session")
@@ -47,11 +41,13 @@ def test_session_status_not_found(mock_get_session):
 
     assert response.status_code == 404
 
+
 def test_sync_to_database_without_token():
     response = client.post("/sync-to-database")
 
     assert response.status_code == 401
     assert response.json()["detail"] == "invalid or missing API token"
+
 
 def test_sync_to_database_with_token():
     response = client.post(
@@ -76,9 +72,7 @@ def test_start_interview_valid(
 
     mock_session_manager.update_session_status.return_value = None
 
-    mock_session_manager.get_session.return_value = {
-        "created_at": "2026-07-16T10:00:00Z"
-    }
+    mock_session_manager.get_session.return_value = {"created_at": "2026-07-16T10:00:00Z"}
 
     mock_scheduler.can_accept_task.return_value = True
 
@@ -94,9 +88,7 @@ def test_start_interview_valid(
         json={
             "candidate_id": "candidate-123",
             "priority": "medium",
-
-        },   
-             
+        },
     )
 
     assert response.status_code == 200
