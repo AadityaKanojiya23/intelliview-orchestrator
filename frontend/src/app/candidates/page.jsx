@@ -124,14 +124,14 @@ export default function CandidatesPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "0ms" }}>
+       <div className="glass-card p-4 animate-slide-in-up delay-0">
           <Stat
             label="Total candidates"
             value={isLoading ? <Skeleton className="h-7 w-12" /> : candidates.length}
             icon={<UserCircle size={16} />}
           />
         </div>
-        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "50ms" }}>
+         <div className="glass-card p-4 animate-slide-in-up delay-[50ms]">
           <Stat
             label="Avg success rate"
             value={
@@ -153,7 +153,7 @@ export default function CandidatesPage() {
             icon={<CheckCircle2 size={16} />}
           />
         </div>
-        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "100ms" }}>
+        <div className="glass-card p-4 animate-slide-in-up delay-100">
           <Stat
             label="Avg risk score"
             value={
@@ -172,7 +172,7 @@ export default function CandidatesPage() {
             icon={<AlertTriangle size={16} />}
           />
         </div>
-        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "150ms" }}>
+        <div className="glass-card p-4 animate-slide-in-up delay-150">
           <Stat
             label="Total sessions"
             value={
