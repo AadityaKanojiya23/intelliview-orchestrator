@@ -2,22 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 1. Default Variables (Your Dark Theme Values) */
 :root {
   color-scheme: dark;
+  --bg-main: #0a0a0f;
+  --bg-panel: #12121a;
+  --bg-card: #1a1a24;
+  --text-main: #e4e4e7;
+  --text-muted: #71717a;
+  --border-color: #27272a;
 }
 
-html, body {
-  background: #0a0a0f;
-  color: #e4e4e7;
-  -webkit-font-smoothing: antialiased;
-}
-
+/* 2. Light Theme Shifts */
 html.light {
   color-scheme: light;
+  --bg-main: #fafafa;
+  --bg-panel: #ffffff;
+  --bg-card: #f4f4f5;
+  --text-main: #18181b;
+  --text-muted: #a1a1aa;
+  --border-color: #e4e4e7;
 }
-html.light body {
-  background: #fafafa;
-  color: #18181b;
+
+/* 3. Apply variables to the document base */
+html, body {
+  background: var(--bg-main);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
 }
 
 * {

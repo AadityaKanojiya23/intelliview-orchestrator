@@ -6,13 +6,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bg: { DEFAULT: "#0a0a0f", panel: "#12121a", card: "#1a1a24" },
+        // Tie your system layouts to our changing CSS root variables
+        bg: { 
+          DEFAULT: "var(--bg-main)", 
+          panel: "var(--bg-panel)", 
+          card: "var(--bg-card)" 
+        },
         accent: { DEFAULT: "#6366f1", light: "#818cf8", dark: "#4f46e5" },
         success: "#10b981",
         warn: "#f59e0b",
         danger: "#ef4444",
-        muted: "#71717a",
-        border: "#27272a",
+        muted: "var(--text-muted)",
+        border: "var(--border-color)",
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
