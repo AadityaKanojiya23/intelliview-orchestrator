@@ -55,6 +55,7 @@ from orchestrator.session_manager import SessionManager
 from orchestrator.session_tracker import SessionTracker
 from orchestrator.state_sync import StateSynchronizer
 from orchestrator.worker_registry import WorkerRegistry
+from workers.bias_auditor import BiasAuditor
 
 # Configure logging after imports so startup messages are structured.
 configure_logging()
@@ -408,6 +409,23 @@ async def readiness_probe():
 async def get_dependency_statuses():
     """Deep health check of all dependencies (Redis, Postgres, Celery broker)."""
     return health_monitor._check_all_dependencies()
+
+
+@app.get("/admin/fairness-audit", dependencies=[Depends(require_token)])
+async def get_fairness_audit_report():
+    """Return a lightweight fairness audit report for recent scoring patterns.
+
+    This endpoint uses the existing BiasAuditor heuristic for scoring-dispersion
+    review. It is intentionally informational and does not replace a full
+    compliance or fairness assessment framework.
+    """
+    try:
+        auditor = BiasAuditor(db_session=None)
+        evaluations = []
+        return auditor.analyze_scoring_consistency(evaluations, "gender")
+    except Exception as exc:
+        logger.error("Fairness audit endpoint failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Fairness audit unavailable") from exc
 
 
 # ========== Prometheus Metrics Endpoint ==========

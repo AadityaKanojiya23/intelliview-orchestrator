@@ -31,6 +31,7 @@ class Settings(BaseSettings):
 
     # --- Service discovery ---
     redis_url: str = "redis://localhost:6379/0"
+    database_url: str = ""
 
     postgres_host: str = "localhost"
     postgres_port: int = 5432
@@ -122,7 +123,10 @@ class Settings(BaseSettings):
 
     # --- Derived ---
     @property
-    def database_url(self) -> str:
+    def resolved_database_url(self) -> str:
+        if self.database_url:
+            return self.database_url
+
         base = (
             f"postgresql://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
@@ -153,7 +157,7 @@ def get_settings() -> Settings:
 # `from config import REDIS_URL`. New code should use `get_settings()`.
 settings = get_settings()
 REDIS_URL = settings.redis_url
-DATABASE_URL = settings.database_url
+DATABASE_URL = settings.resolved_database_url
 WORKER_CONCURRENCY = settings.worker_concurrency
 API_TOKEN = settings.api_token
 CORS_ALLOW_ORIGINS = ",".join(settings.cors_allow_origins)
