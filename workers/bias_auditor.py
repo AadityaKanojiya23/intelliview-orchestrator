@@ -88,9 +88,7 @@ class BiasAuditor:
             )
             status = "ALERT"
         elif len(group_details) >= 2 and fairness_gap > self.REVIEW_THRESHOLD:
-            recommendations.append(
-                "Review scoring dispersion across demographic groups for potential bias."
-            )
+            recommendations.append("Review scoring dispersion across demographic groups for potential bias.")
             status = "REVIEW"
         else:
             status = "PASS"
