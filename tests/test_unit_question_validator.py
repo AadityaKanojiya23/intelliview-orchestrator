@@ -11,10 +11,10 @@ import pytest
 
 from workers.evaluation_pipeline import validate_generated_question
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _valid_question() -> str:
     """A well-formed, safe, open-ended technical question."""
@@ -24,6 +24,7 @@ def _valid_question() -> str:
 # ---------------------------------------------------------------------------
 # A. Banned topic detection
 # ---------------------------------------------------------------------------
+
 
 class TestBannedTopics:
     @pytest.mark.parametrize(
@@ -54,7 +55,7 @@ class TestBannedTopics:
     def test_unrelated_word_age_not_flagged_in_technical_context(self):
         """'age' inside a compound word must not false-positive via word boundary."""
         q = "How would you handle a database outage in production at scale?"
-        is_valid, reasons = validate_generated_question(q)
+        _, reasons = validate_generated_question(q)
         banned_hits = [r for r in reasons if "banned topic" in r]
         assert not banned_hits, f"False positive on 'outage': {reasons}"
 
@@ -67,6 +68,7 @@ class TestBannedTopics:
 # ---------------------------------------------------------------------------
 # B. Length validation
 # ---------------------------------------------------------------------------
+
 
 class TestLengthValidation:
     def test_too_short_is_rejected(self):
@@ -98,6 +100,7 @@ class TestLengthValidation:
 # ---------------------------------------------------------------------------
 # C. Question format
 # ---------------------------------------------------------------------------
+
 
 class TestQuestionFormat:
     def test_missing_question_mark_is_rejected(self):
@@ -134,11 +137,10 @@ class TestQuestionFormat:
         assert not any("does not end with" in r for r in reasons)
 
 
-
-
 # ---------------------------------------------------------------------------
 # E. Valid question — golden path
 # ---------------------------------------------------------------------------
+
 
 class TestValidQuestion:
     def test_well_formed_question_passes_all_checks(self):
@@ -165,6 +167,7 @@ class TestValidQuestion:
 # F. Integration: _llm_generate_question wires the validator
 # ---------------------------------------------------------------------------
 
+
 class TestLlmGenerateQuestionIntegration:
     def _patch_chat(self, return_value):
         """Return a context manager that patches chat_completion at import time."""
@@ -183,6 +186,7 @@ class TestLlmGenerateQuestionIntegration:
 
     def test_invalid_llm_response_returns_none_and_logs(self, caplog):
         import logging
+
         from workers.evaluation_pipeline import _llm_generate_question
 
         bad_q = "Do you have any children?"  # banned topic + yes/no
