@@ -1,4 +1,11 @@
-from workers.bias_auditor import BiasAuditor
+from workers.bias_auditor import ALERT_THRESHOLD, REVIEW_THRESHOLD, BiasAuditor
+
+
+def test_threshold_constants_are_defined_for_fairness_audits():
+    assert REVIEW_THRESHOLD == 0.1
+    assert ALERT_THRESHOLD == 0.2
+    assert BiasAuditor.REVIEW_THRESHOLD == REVIEW_THRESHOLD
+    assert BiasAuditor.ALERT_THRESHOLD == ALERT_THRESHOLD
 
 
 def test_analyze_scoring_consistency_detects_group_gap():

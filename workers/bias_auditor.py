@@ -8,9 +8,27 @@ from database.models import Candidate
 
 logger = logging.getLogger(__name__)
 
+# Thresholds used to flag fairness concerns when score averages differ across
+# demographic groups. These are intentionally simple heuristics for auditing
+# review purposes rather than a comprehensive fairness assessment.
+REVIEW_THRESHOLD = 0.1
+ALERT_THRESHOLD = 0.2
+
 
 class BiasAuditor:
-    """Performs fairness and bias analysis on interview evaluation results."""
+    """Perform a lightweight fairness audit over interview evaluation scores.
+
+    The current implementation uses the average score difference between
+    demographic groups as a simple heuristic for detecting potential scoring
+    disparities. It is not a comprehensive fairness evaluation and should not
+    be treated as a legal compliance metric. More advanced metrics such as
+    demographic parity, equalized odds, calibration, and subgroup-specific
+    analysis could be implemented later if deeper compliance auditing is
+    required.
+    """
+
+    REVIEW_THRESHOLD = REVIEW_THRESHOLD
+    ALERT_THRESHOLD = ALERT_THRESHOLD
 
     def __init__(self, db_session: Any):
         self.db_session = db_session
@@ -64,12 +82,12 @@ class BiasAuditor:
         fairness_gap = round(max(average_scores) - min(average_scores), 3) if len(average_scores) > 1 else 0.0
 
         recommendations: list[str] = []
-        if len(group_details) >= 2 and fairness_gap > 0.2:
+        if len(group_details) >= 2 and fairness_gap > self.ALERT_THRESHOLD:
             recommendations.append(
                 f"Investigate score differences for {demographic_attribute} before finalizing outcomes."
             )
             status = "ALERT"
-        elif len(group_details) >= 2 and fairness_gap > 0.1:
+        elif len(group_details) >= 2 and fairness_gap > self.REVIEW_THRESHOLD:
             recommendations.append(
                 "Review scoring dispersion across demographic groups for potential bias."
             )

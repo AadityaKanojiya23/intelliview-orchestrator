@@ -13,12 +13,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Any
- issue-128-fairness-audit
-import redis
 
 from orchestrator.redis_client import get_redis_client
-from orchestrator.cache_manager import CacheManager
-main
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +33,7 @@ class WorkerRegistry:
     def __init__(self):
         """Initialize worker registry"""
         try:
- issue-128-fairness-audit
             self.redis_client = self._create_redis_client()
-
-            self.redis_client = CacheManager()
- main
             self.local_workers: dict[str, dict[str, Any]] = {}
             self.lock = Lock()
             self._hydrated = False
@@ -52,13 +44,8 @@ class WorkerRegistry:
             self.redis_client = None
 
     def _create_redis_client(self) -> Any:
-        """Create a Redis client compatible with both runtime and unit tests."""
-        try:
-            client = redis.from_url("redis://localhost:6379/0", decode_responses=True)
-            client.ping()
-            return client
-        except Exception:
-            return get_redis_client()
+        """Create the shared Redis client used by the orchestrator."""
+        return get_redis_client()
 
     def _hydrate_from_redis(self) -> None:
         """Populate `local_workers` from Redis on first use so workers
