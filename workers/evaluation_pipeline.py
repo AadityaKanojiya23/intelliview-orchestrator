@@ -302,15 +302,26 @@ def _get_banned_patterns() -> list[re.Pattern[str]]:
             from config import BANNED_TOPICS
         except Exception:  # pragma: no cover — fallback if config is unavailable
             BANNED_TOPICS = [
-                "age", "how old", "old are you", "pregnant", "children",
-                "family planning", "religion", "religious", "citizenship",
-                "nationality", "marital status", "married", "disability",
-                "disabled", "medical condition", "health condition",
+                "age",
+                "how old",
+                "old are you",
+                "pregnant",
+                "children",
+                "family planning",
+                "religion",
+                "religious",
+                "citizenship",
+                "nationality",
+                "marital status",
+                "married",
+                "disability",
+                "disabled",
+                "medical condition",
+                "health condition",
             ]
-        _BANNED_TOPIC_PATTERNS = [
-            re.compile(r"\b" + kw + r"\b", re.IGNORECASE) for kw in BANNED_TOPICS
-        ]
+        _BANNED_TOPIC_PATTERNS = [re.compile(r"\b" + kw + r"\b", re.IGNORECASE) for kw in BANNED_TOPICS]
     return _BANNED_TOPIC_PATTERNS
+
 
 # Crude yes/no question detector: starts with a modal/auxiliary verb + subject.
 _YES_NO_RE = re.compile(
