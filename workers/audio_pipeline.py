@@ -16,9 +16,7 @@ HIGH/CRITICAL thresholds fire correctly without GPU dependencies.
 import logging
 import time
 from typing import Any, TypedDict
-
 from workers._stubs import _seeded_unit
-
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -30,20 +28,17 @@ class TranscriptionResult(TypedDict):
     language: str
     duration_seconds: float
     timestamp: float | None
-
 class BackgroundVoiceResult(TypedDict):
     background_voices_detected: bool
     voice_count: int
     confidence: float
     speaker_segments: list[dict[str, Any]]
     timestamps: list[dict[str, Any]]
-
 class SuspiciousPatternResult(TypedDict):
     suspicious_pattern_detected: bool
     pattern_type: str | None
     confidence: float
     details: dict[str, Any]
-
 class AudioAnalysisResult(TypedDict):
     session_id: str
     transcription: TranscriptionResult
