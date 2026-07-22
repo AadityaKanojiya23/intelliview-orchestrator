@@ -30,7 +30,7 @@ class TranscriptionResult(TypedDict):
     language: str
     duration_seconds: float
     timestamp: float | None
- 
+
 class BackgroundVoiceResult(TypedDict):
     background_voices_detected: bool
     voice_count: int
