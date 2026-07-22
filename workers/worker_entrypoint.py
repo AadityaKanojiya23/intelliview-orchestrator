@@ -54,29 +54,13 @@ def main() -> int:
     def _on_postrun(**_):
         agent.decrement_active()
 
-    # Heartbeat thread
-    stop_event = threading.Event()
-
-    def _hb_loop():
-        while not stop_event.is_set():
-            try:
-                agent._post(
-                    "/worker/heartbeat",
-                    {
-                        "worker_id": agent.worker_id,
-                        "active_tasks": agent.active_tasks,
-                    },
-                )
-            except Exception as exc:
-                logger.debug("Heartbeat error: %s", exc)
-            stop_event.wait(agent.heartbeat_interval)
-
-    threading.Thread(target=_hb_loop, daemon=True).start()
+     # Start the heartbeat loop managed by WorkerAgent
+    threading.Thread(target=agent.heartbeat_loop, daemon=True).start()
 
     def _shutdown(*_):
         logger.info("Shutting down worker")
+        agent._stop = True
         agent.deregister()
-        stop_event.set()
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, _shutdown)
@@ -85,7 +69,6 @@ def main() -> int:
     logger.info("Worker entrypoint ready; starting Celery")
     _run_celery()
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
