@@ -1,4 +1,3 @@
-import pytest
 
 from workers.risk_scoring_engine import RiskDecisionTree
 
