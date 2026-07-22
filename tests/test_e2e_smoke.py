@@ -118,3 +118,78 @@ def test_full_pipeline_completes(api_base_url):
         time.sleep(1.0)
     assert last is not None
     assert last["status"] in {"COMPLETED", "FAILED"}, f"Session stuck in {last['status']}"
+
+
+def test_candidate_lifecycle(api_base_url):
+    """End-to-end: create a candidate, then fetch it back by id, then list it."""
+    _wait_for_api(api_base_url)
+    email = f"e2e-{uuid.uuid4().hex[:8]}@example.com"
+    r = httpx.post(
+        f"{api_base_url}/candidates",
+        json={
+            "name": "E2E Test Candidate",
+            "email": email,
+            "skills": ["python", "testing"],
+        },
+        timeout=10.0,
+    )
+    assert r.status_code == 200, r.text
+    candidate = r.json()
+    candidate_id = candidate["candidate_id"]
+
+    r = httpx.get(f"{api_base_url}/candidates/{candidate_id}", timeout=5.0)
+    assert r.status_code == 200
+    assert r.json()["candidate_id"] == candidate_id
+
+    r = httpx.get(f"{api_base_url}/candidates/{candidate_id}/history", timeout=5.0)
+    assert r.status_code == 200
+    assert r.json()["candidate_id"] == candidate_id
+
+    # A non-existent candidate should 404, not 500.
+    r = httpx.get(f"{api_base_url}/candidates/does-not-exist", timeout=5.0)
+    assert r.status_code == 404
+
+
+def test_worker_lifecycle(api_base_url):
+    """End-to-end: register a worker, send a heartbeat, see it listed, then deregister it."""
+    _wait_for_api(api_base_url)
+    worker_id = f"e2e-worker-{uuid.uuid4().hex[:8]}"
+    headers = {"X-API-Token": "test-token"}
+
+    r = httpx.post(
+        f"{api_base_url}/register-worker",
+        json={"worker_id": worker_id, "capacity": 2},
+        headers=headers,
+        timeout=5.0,
+    )
+    assert r.status_code == 200, r.text
+
+    r = httpx.post(
+        f"{api_base_url}/worker/heartbeat",
+        json={"worker_id": worker_id, "active_tasks": 0},
+        headers=headers,
+        timeout=5.0,
+    )
+    assert r.status_code == 200, r.text
+
+    r = httpx.get(f"{api_base_url}/workers", timeout=5.0)
+    assert r.status_code == 200
+    worker_ids = {w.get("worker_id") for w in r.json().get("workers", [])}
+    assert worker_id in worker_ids
+
+    r = httpx.delete(
+        f"{api_base_url}/deregister-worker/{worker_id}",
+        headers=headers,
+        timeout=5.0,
+    )
+    assert r.status_code == 200, r.text
+
+
+def test_dead_letter_queue_reachable(api_base_url):
+    """The dead letter queue endpoint should always respond, even when empty."""
+    _wait_for_api(api_base_url)
+    r = httpx.get(f"{api_base_url}/dead-letter-queue", timeout=5.0)
+    assert r.status_code == 200
+    body = r.json()
+    assert "dead_letter_queue" in body
+    assert isinstance(body["dead_letter_queue"], list)
