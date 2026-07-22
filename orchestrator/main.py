@@ -19,7 +19,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
@@ -1822,7 +1822,24 @@ async def get_dashboard():
         logger.error(f"Error serving dashboard: {e!s}")
         raise HTTPException(status_code=500, detail=f"Error serving dashboard: {e!s}")
 
+from fastapi import Request
 
+@app.post("/metrics/web-vitals")
+async def receive_web_vitals(request: Request):
+    """Receive Web Vitals metrics from the frontend."""
+    try:
+        metric = await request.json()
+        logger.info(f"Web Vitals: {metric}")
+        return {
+            "status": "success",
+            "message": "Web Vitals received"
+        }
+    except Exception as e:
+        logger.error(f"Error receiving Web Vitals: {e!s}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error receiving Web Vitals: {e!s}"
+        )
 if __name__ == "__main__":
     import uvicorn
 

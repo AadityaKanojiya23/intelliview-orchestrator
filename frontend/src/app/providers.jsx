@@ -1,4 +1,5 @@
 "use client";
+import { initWebVitals } from "@/lib/webVitals";
 import { Suspense, lazy, useEffect, useState, useCallback } from "react";
 import { SWRConfig } from "swr";
 import { swrFetcher } from "@/lib/fetcher";
@@ -63,9 +64,10 @@ function ScreenLockWrapper() {
 
 export function ClientProviders({ children }) {
   useHydrateToken();
-  useEffect(() => {
-    hydrateTheme();
-  }, []);
+useEffect(() => {
+  hydrateTheme();
+  initWebVitals();
+}, []);
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
