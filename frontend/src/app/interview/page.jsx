@@ -22,8 +22,7 @@ import { endpoints } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { useMomentTracking } from "@/hooks/useMomentTracking";
-import { RiskTimeline } from "@/components/RiskTimeline";
+import  RiskTimeline  from "@/components/RiskTimeline";
 import { cn, riskColor } from "@/lib/utils";
 
 export default function InterviewPage() {
