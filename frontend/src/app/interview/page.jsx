@@ -22,7 +22,8 @@ import { endpoints } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { useMomentTracking, MomentTimeline } from "@/hooks/useMomentTracking";
+import { useMomentTracking } from "@/hooks/useMomentTracking";
+import { RiskTimeline } from "@/components/RiskTimeline";
 import { cn, riskColor } from "@/lib/utils";
 
 export default function InterviewPage() {
@@ -389,7 +390,7 @@ export default function InterviewPage() {
   }
 >
   {isLive ? (
-    <MomentTimeline moments={moments} />
+    <RiskTimeline moments={moments} />
   ) : (
     <div className="flex h-32 items-center justify-center text-center text-sm text-muted">
       Interview not started
@@ -402,3 +403,4 @@ export default function InterviewPage() {
     </div>
   );
 }
+
