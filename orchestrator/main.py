@@ -698,6 +698,7 @@ async def get_stuck_sessions(
 
 # ========== Statistics Endpoints ==========
 
+
 @app.get("/session-statistics")
 @http_cache.cached("session-statistics", ttl=2)
 async def get_session_statistics(
@@ -721,6 +722,7 @@ async def get_session_statistics(
         logger.error(f"Error generating statistics: {e!s}")
         raise HTTPException(status_code=500, detail="Error generating statistics")
 
+
 @app.get("/worker-distribution")
 async def get_worker_distribution(
     session_db: Session = Depends(get_db),
@@ -737,6 +739,7 @@ async def get_worker_distribution(
     except Exception as e:
         logger.error(f"Error fetching worker distribution: {e!s}")
         raise HTTPException(status_code=500, detail="Error fetching worker distribution")
+
 
 @app.get("/high-risk-sessions")
 async def get_high_risk_sessions(
@@ -763,6 +766,7 @@ async def get_high_risk_sessions(
 
 
 # ========== Cache Management Endpoints ==========
+
 
 @app.get("/cache-stats")
 async def get_cache_stats():
@@ -839,7 +843,6 @@ async def clear_session_cache():
 async def list_interviews(
     limit: int = 100,
     status: str | None = None,
-    session_db=Depends(get_db),
     session_db: Session = Depends(get_db),
 ):
     """
@@ -1842,4 +1845,3 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
