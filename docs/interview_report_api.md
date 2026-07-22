@@ -2,7 +2,10 @@
 
 ## `GET /interviews/{session_id}/report`
 
-Retrieves a comprehensive final interview report, including candidate details, all questions asked with corresponding answers and feedback, and overall AI-generated evaluations.
+Retrieves a comprehensive final report for a given interview session. It aggregates questions asked, candidate answers, and LLM-generated feedback into a structured format.
+
+> [!NOTE]
+> This endpoint is primarily intended for **completed** interview sessions. While it handles incomplete sessions gracefully (by returning `null` or empty arrays for missing data), the evaluation analysis and comprehensive feedback are only generated after the interview concludes.
 
 ### Response
 
