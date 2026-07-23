@@ -18,7 +18,6 @@ import time
 from typing import Any, TypedDict
 from workers._stubs import _seeded_unit
 logger = logging.getLogger(__name__)
-
 # ---------------------------------------------------------------------------
 # Real detection helpers (Whisper / pyannote / OpenAI) with fallback to stubs
 # ---------------------------------------------------------------------------
