@@ -15,9 +15,9 @@ import logging
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
-from orchestrator.retry_manager import RetryManager
 
 from orchestrator.redis_client import get_redis_client
+from orchestrator.retry_manager import RetryManager
 
 logger = logging.getLogger(__name__)
 
@@ -320,7 +320,7 @@ class FaultManager:
         except Exception as e:
             logger.error(f"Error moving to dead letter queue: {e!s}")
             return False
-    
+
     def handle_failed_session(self, session_id: str, reason: str,) -> bool:
         """
         Handle a failed session.

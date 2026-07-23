@@ -257,4 +257,4 @@ def get_session_metrics():
         "completed": SESSIONS_COMPLETED._value.get(),
         "failed": SESSIONS_FAILED._value.get(),
         "active": SESSIONS_ACTIVE._value.get(),
-    }    
+    }

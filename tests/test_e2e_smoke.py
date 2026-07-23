@@ -9,12 +9,12 @@ Run the stack first:
 Set API_BASE_URL to override the default http://localhost:8000.
 """
 
+import os
 import time
 import uuid
 
 import httpx
 import pytest
-import os
 
 API_HEADERS = {
     "X-API-Token": os.getenv("API_TOKEN", "dev-token-change-me")

@@ -14,33 +14,32 @@ from __future__ import annotations
 import json
 import logging
 import socket
-from datetime import datetime, timezone
 import time
+from datetime import datetime, timezone
 
 from celery import group
 from sqlalchemy import select
 
 from database.db import SessionLocal
 from database.models import InterviewSession
-from orchestrator.cache_manager import CacheManager
+from monitoring.prometheus_metrics import (
+    CELERY_ACTIVE_TASKS,
+    CELERY_TASK_RUNTIME,
+    CELERY_TASKS_PROCESSED_TOTAL,  # Updated custom counter
+    FAILURE_COUNT,
+    PIPELINE_LATENCY,
+    POSTGRES_HEALTH,
+    QUEUE_DEPTH,
+    REDIS_HEALTH,
+    RETRY_COUNT,
+    RISK_SCORE,
+    WORKERS_HEALTHY,
+)
 from orchestrator.session_manager import SessionManager
 from orchestrator.state_sync import StateSynchronizer
 from workers.celery_app import celery_app
 from workers.evaluation_pipeline import evaluate_answers
 from workers.risk_engine import RiskScoringEngine
-from monitoring.prometheus_metrics import (
-    CELERY_ACTIVE_TASKS,
-    CELERY_TASK_RUNTIME,
-    CELERY_TASKS_PROCESSED_TOTAL,  # Updated custom counter
-    RISK_SCORE,
-    PIPELINE_LATENCY,
-    RETRY_COUNT,
-    FAILURE_COUNT,
-    WORKERS_HEALTHY,
-    REDIS_HEALTH,
-    POSTGRES_HEALTH,
-    QUEUE_DEPTH,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +79,7 @@ def _update_infra_health(healthy: bool = True):
 @celery_app.task(bind=True, max_retries=3, name="workers.tasks._run_video")
 def _run_video(self, session_id: str) -> dict:
     from workers.video_pipeline import run_video_analysis
-    
+
     logger.info("Starting video analysis stage for session %s", session_id)
     start = time.perf_counter()
 
@@ -101,7 +100,7 @@ def _run_video(self, session_id: str) -> dict:
 @celery_app.task(bind=True, max_retries=3, name="workers.tasks._run_audio")
 def _run_audio(self, session_id: str) -> dict:
     from workers.audio_pipeline import run_audio_analysis
-    
+
     logger.info("Starting audio analysis stage for session %s", session_id)
     start = time.perf_counter()
 
@@ -130,10 +129,10 @@ def _after_parallel(self, session_id: str, video_result: dict, audio_result: dic
     try:
         logger.info("Parallel video+audio done for %s - running evaluation", session_id)
         session_manager.update_session_status(session_id, session_manager.EVALUATING, {"stage": "evaluation"})
-        
+
         start = time.perf_counter()
         evaluation_result = evaluate_answers(session_id)
-        
+
         latency = time.perf_counter() - start
         PIPELINE_LATENCY.labels(stage="evaluation").observe(latency)
         logger.info("Answer evaluation completed for session %s in %.2fs", session_id, latency)
@@ -143,7 +142,7 @@ def _after_parallel(self, session_id: str, video_result: dict, audio_result: dic
         )
         final_risk_score = risk_report["final_risk_score"]
         RISK_SCORE.observe(final_risk_score)
-        
+
         risk_classification = risk_report["risk_classification"]
         logger.info("Risk report: %s (score: %s)", risk_classification, final_risk_score)
 
@@ -167,7 +166,7 @@ def _after_parallel(self, session_id: str, video_result: dict, audio_result: dic
         session_manager.mark_session_completed(session_id, final_risk_score)
         state_sync.delete_session_state(session_id)
         logger.info("Successfully completed processing for session %s", session_id)
-        
+
     except Exception as exc:
         logger.error("Post-parallel stage failed for %s: %s", session_id, exc, exc_info=True)
         FAILURE_COUNT.labels(failure_type="post_parallel_error").inc()
@@ -185,13 +184,13 @@ def process_interview_session(self, session_id):
     logger.info("PROCESS_INTERVIEW_SESSION STARTED")
     logger.info("Session = %s", session_id)
     logger.info("==============================")
-    
+
     task_name = self.name
     start_time = time.perf_counter()
 
     # Track currently active task tracking gauge
     CELERY_ACTIVE_TASKS.labels(task_name=task_name).inc()
-    
+
     # Assert worker and backend services are active
     _update_infra_health(True)
 
@@ -278,7 +277,7 @@ def process_interview_session(self, session_id):
             _run_audio.s(session_id),
         )
         result = parallel_group.apply_async()
-        
+
         from celery.result import allow_join_result
         with allow_join_result():
             video_result, audio_result = result.get(timeout=600)
@@ -289,7 +288,7 @@ def process_interview_session(self, session_id):
         # Record total runtime metrics
         runtime = time.perf_counter() - start_time
         CELERY_TASK_RUNTIME.labels(task_name=task_name).observe(runtime)
-        
+
         # 🌟 Target custom metric incremented upon successful completion
         CELERY_TASKS_PROCESSED_TOTAL.labels(task="process_interview_session").inc()
         logger.info("Incremented processed metric for %s", task_name)
@@ -304,7 +303,7 @@ def process_interview_session(self, session_id):
 
     except Exception as exc:
         retry_delay = 2 ** (self.request.retries + 1)
-        
+
         # 🌟 Increments total failure counters explicitly
         FAILURE_COUNT.labels(failure_type="celery_task_error").inc()
 
@@ -318,11 +317,11 @@ def process_interview_session(self, session_id):
         )
         RETRY_COUNT.inc()
         raise self.retry(exc=exc, countdown=retry_delay)
-        
+
     finally:
         # Decouple the active gauge count
         CELERY_ACTIVE_TASKS.labels(task_name=task_name).dec()
-        
+
         # 🌟 Explicitly clear backlog gauge to show 0 execution depth remaining
         QUEUE_DEPTH.set(0.0)
 

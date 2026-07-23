@@ -15,8 +15,8 @@ Integrates:
 import io
 import logging
 import re
-import time as _time
 import time
+import time as _time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -28,7 +28,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
-from monitoring.prometheus_metrics import (REQUEST_COUNT,REQUEST_DURATION,)
 
 from config import (
     API_TOKEN,
@@ -37,10 +36,13 @@ from config import (
     MAX_REQUEST_BODY_BYTES,
 )
 from database.db import engine, get_db
-from database.models import Base, InterviewSession, Candidate
-from sqlalchemy import select
+from database.models import Base, Candidate, InterviewSession
 from monitoring.dashboard_api import create_dashboard_routes
 from monitoring.metrics_collector import MetricsCollector
+from monitoring.prometheus_metrics import (
+    REQUEST_COUNT,
+    REQUEST_DURATION,
+)
 from monitoring.websocket_manager import ws_manager
 from orchestrator import http_cache
 from orchestrator.candidate_manager import CandidateManager
@@ -704,7 +706,7 @@ async def get_interview_report(
         q_asked = session_obj.questions_asked or []
         a_provided = session_obj.answers_provided or []
         f_generated = session_obj.feedback_generated or []
-        
+
         # Build question lookup
         q_dict = {q.get("question_id"): q for q in q_asked}
         for a in a_provided:
@@ -716,7 +718,7 @@ async def get_interview_report(
             if q_id in q_dict:
                 q_dict[q_id]["feedback"] = f.get("feedback")
                 q_dict[q_id]["score"] = f.get("score")
-                
+
         questions_list = []
         for q_id, q_data in q_dict.items():
             questions_list.append(
@@ -728,17 +730,17 @@ async def get_interview_report(
                     feedback=q_data.get("feedback")
                 )
             )
-            
+
         eval_analysis = session_obj.evaluation_analysis or {}
         llm_feedback = eval_analysis.get("llm_feedback", {})
-        
-        # Since evaluation_analysis structure might differ based on other PRs, 
+
+        # Since evaluation_analysis structure might differ based on other PRs,
         # we will handle nested or flat structures for strengths/improvements.
         strengths = eval_analysis.get("strengths", llm_feedback.get("strengths", []))
         improvements = eval_analysis.get("improvements", llm_feedback.get("improvements", []))
         recommendation = eval_analysis.get("recommendation", llm_feedback.get("recommendation"))
         detailed_feedback = eval_analysis.get("detailed_feedback", llm_feedback.get("detailed_feedback"))
-        
+
         # Determine risk classification
         risk_score = session_obj.risk_score
         classification = "LOW"

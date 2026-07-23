@@ -49,13 +49,13 @@ class Scheduler:
         logger.info("Scheduler initialized with Least Loaded strategy")
 
     def schedule_task(
-       
+
         self,
         session_id: str,
         priority: TaskPriority = TaskPriority.MEDIUM,
         delay_seconds: int = 0,
     ) -> bool:
-     
+
 
         """
         Schedule an interview task for execution

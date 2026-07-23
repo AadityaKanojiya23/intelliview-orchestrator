@@ -20,7 +20,7 @@ def test_process_interview_session_pipeline(
     Only verifies pipeline orchestration.
     """
 
-   
+
     mock_db = MagicMock()
     mock_session_local.return_value = mock_db
 
@@ -42,7 +42,7 @@ def test_process_interview_session_pipeline(
 
     result = process_interview_session.run("test-session-001")
 
-  
+
 
     assert result["session_id"] == "test-session-001"
     assert result["status"] == "processing_parallel"
