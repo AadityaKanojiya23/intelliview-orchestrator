@@ -26,7 +26,7 @@ def test_health():
 def test_start_interview_invalid_candidate_id():
     response = client.post(
         "/start-interview",
-        headers={"X-API-Token": "test-token"},
+        headers={"X-API-Token": "ci-test-token"},
         json={"candidate_id": "@@@###", "priority": "medium"},
     )
 
@@ -52,7 +52,7 @@ def test_sync_to_database_without_token():
 def test_sync_to_database_with_token():
     response = client.post(
         "/sync-to-database",
-        headers={"X-API-Token": "test-token"},
+        headers={"X-API-Token": "ci-test-token"},
     )
 
     assert response.status_code == 200
@@ -84,7 +84,7 @@ def test_start_interview_valid(
 
     response = client.post(
         "/start-interview",
-        headers={"X-API-Token": "test-token"},
+        headers={"X-API-Token": "ci-test-token"},
         json={
             "candidate_id": "candidate-123",
             "priority": "medium",
