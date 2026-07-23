@@ -21,7 +21,7 @@ from sqlalchemy import select
 
 from database.db import SessionLocal
 from database.models import InterviewSession
-from orchestrator.redis_client import get_redis_client
+from orchestrator.cache_manager import CacheManager
 from orchestrator.session_manager import SessionManager
 from orchestrator.state_sync import StateSynchronizer
 from workers.celery_app import celery_app
@@ -60,12 +60,11 @@ def _run_audio(self, session_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(name="workers.tasks._after_parallel")
-def _after_parallel(session_id: str, video_result: dict, audio_result: dict):
+@celery_app.task(bind=True, max_retries=3, name="workers.tasks._after_parallel")
+def _after_parallel(self, session_id: str, video_result: dict, audio_result: dict):
     """Runs after video + audio group completes; then evaluation + risk."""
     try:
         logger.info("Parallel video+audio done for %s - running evaluation", session_id)
-
         session_manager.update_session_status(session_id, session_manager.EVALUATING, {"stage": "evaluation"})
         evaluation_result = evaluate_answers(session_id)
         logger.info("Answer evaluation completed for session %s", session_id)
@@ -99,8 +98,16 @@ def _after_parallel(session_id: str, video_result: dict, audio_result: dict):
 
         logger.info("Successfully completed processing for session %s", session_id)
     except Exception as exc:
-        logger.error("Post-parallel stage failed for %s: %s", session_id, exc, exc_info=True)
-        session_manager.mark_session_failed(session_id, f"Post-parallel stage failed: {exc}")
+        retry_delay = 2 ** (self.request.retries + 1)
+        logger.warning(
+            "Post-parallel stage failed for %s (attempt %d/3), retrying in %ds: %s",
+            session_id,
+            self.request.retries + 1,
+            retry_delay,
+            exc,
+            exc_info=True,
+        )
+        raise self.retry(exc=exc, countdown=retry_delay)
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +207,7 @@ def scan_and_dispatch_retries():
     passed and re-dispatch the corresponding session through the normal
     scheduling path.  Runs every 60 s via Celery Beat.
     """
-    redis_client = get_redis_client()
+    redis_client = CacheManager()
 
     retry_scheduled_prefix = "retry_scheduled:"
 
