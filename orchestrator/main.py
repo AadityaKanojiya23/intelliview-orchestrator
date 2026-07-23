@@ -1791,7 +1791,6 @@ async def retry_failed_session(session_id: str):
         retry_info = retry_manager.get_retry_info(session_id)
 
         # Schedule retry with exponential backoff
-        # Schedule retry
         retry_scheduled = retry_manager.schedule_retry(session_id)
 
         if not retry_scheduled:
@@ -1800,26 +1799,13 @@ async def retry_failed_session(session_id: str):
                 detail=f"Failed to schedule retry for session {session_id}",
             )
 
-        # -----------------------------
-        # Actually requeue the interview
-        # -----------------------------
-        from orchestrator.scheduler import TaskPriority
-
-        scheduler.schedule_task(
-            session_id=session_id,
-            priority=TaskPriority.MEDIUM
-        )
-
-        logger.info(
-            "Session %s requeued successfully after retry scheduling.",
-            session_id,
-        )
+        logger.info(f"Session {session_id} scheduled for retry: {retry_info}")
 
         return {
             "status": "success",
-            "message": f"Session {session_id} scheduled and requeued",
+            "message": f"Session {session_id} scheduled for retry",
             "session_id": session_id,
-            "retry_info": retry_manager.get_retry_info(session_id),
+            "retry_info": retry_info,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except HTTPException:
