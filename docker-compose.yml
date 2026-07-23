@@ -96,6 +96,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: ai-interview-worker
+    
     environment:
       REDIS_URL: redis://redis:6379/0
       POSTGRES_HOST: postgres
