@@ -62,7 +62,5 @@ function RootLayout({ children }) {
   });
 }
 
-export {
-  RootLayout as default,
-  metadata,
-};
+export { metadata };
+export default RootLayout;

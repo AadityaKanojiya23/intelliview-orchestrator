@@ -2,12 +2,14 @@ import { onCLS, onFCP, onINP, onLCP, onTTFB } from "web-vitals";
 
 export function reportWebVitals() {
   const logMetric = (metric) => {
-    console.log("Web Vital:", {
-      name: metric.name,
-      value: metric.value,
-      rating: metric.rating,
-      id: metric.id,
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Web Vital:", {
+        name: metric.name,
+        value: metric.value,
+        rating: metric.rating,
+        id: metric.id,
+      });
+    }
 
     // Optional: Send to backend API
     /*
