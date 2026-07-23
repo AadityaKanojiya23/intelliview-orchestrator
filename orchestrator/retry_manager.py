@@ -144,7 +144,7 @@ class RetryManager:
                 "strategy": self.strategy.value,
             }
 
-            
+
 
             if self.redis_client:
 
@@ -254,8 +254,8 @@ class RetryManager:
         except Exception as e:
             logger.error(f"Error incrementing retry count: {e!s}")
             return 1
-        
-    
+
+
     def get_retry_info(self, session_id: str) -> dict[str, Any]:
         """
         Get detailed retry information for a session

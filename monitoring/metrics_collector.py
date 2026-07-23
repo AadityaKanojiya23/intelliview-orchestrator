@@ -436,4 +436,4 @@ class MetricsCollector:
         "completed": metrics["completed"],
         "failed": metrics["failed"],
         "total": total,
-      }        
+      }

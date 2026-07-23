@@ -111,14 +111,17 @@ class SessionManager:
             )
 
             session_db.add(interview_session)
-            
-            from monitoring.prometheus_metrics import (SESSIONS_CREATED,SESSIONS_ACTIVE,)
-            
+
+            from monitoring.prometheus_metrics import (
+                SESSIONS_ACTIVE,
+                SESSIONS_CREATED,
+            )
+
             session_db.commit()
-            
+
             SESSIONS_CREATED.inc()
-         
-           
+
+
             SESSIONS_ACTIVE.inc()
             logger.info("Prometheus session metrics updated")
 
@@ -189,7 +192,11 @@ class SessionManager:
             interview.status = new_status
             interview.updated_at = _utcnow()
             session_db.commit()
-            from monitoring.prometheus_metrics import (SESSIONS_ACTIVE,SESSIONS_COMPLETED,SESSIONS_FAILED,)
+            from monitoring.prometheus_metrics import (
+                SESSIONS_ACTIVE,
+                SESSIONS_COMPLETED,
+                SESSIONS_FAILED,
+            )
 
             if new_status == self.COMPLETED:
               SESSIONS_COMPLETED.inc()
@@ -290,7 +297,10 @@ class SessionManager:
         Returns:
             bool: True if successful
         """
-        from monitoring.prometheus_metrics import (SESSIONS_FAILED,SESSIONS_ACTIVE,)
+        from monitoring.prometheus_metrics import (
+            SESSIONS_ACTIVE,
+            SESSIONS_FAILED,
+        )
         SESSIONS_FAILED.inc()
         print("SESSIONS_FAILED =", SESSIONS_FAILED._value.get())
         SESSIONS_ACTIVE.dec()
@@ -324,8 +334,13 @@ class SessionManager:
             interview.risk_score = risk_score
             interview.end_time = _utcnow()
             interview.updated_at = _utcnow()
-           
-            from monitoring.prometheus_metrics import (SESSIONS_COMPLETED,SESSIONS_ACTIVE,RISK_SCORE,SESSION_PROCESSING_DURATION,)
+
+            from monitoring.prometheus_metrics import (
+                RISK_SCORE,
+                SESSION_PROCESSING_DURATION,
+                SESSIONS_ACTIVE,
+                SESSIONS_COMPLETED,
+            )
             session_db.commit()
             SESSIONS_COMPLETED.inc()
             print("SESSIONS_COMPLETED =", SESSIONS_COMPLETED._value.get())

@@ -19,13 +19,8 @@ from kombu import Queue
 
 """
 from celery import Celery, signals
-from kombu import Queue
+
 from config import REDIS_URL
-from workers.metrics_server import start_worker_metrics
-
-
-
-
 
 celery_app = Celery("interview_tasks", broker=REDIS_URL, backend=REDIS_URL)
 
@@ -48,7 +43,7 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
 
     broker_connection_retry_on_startup=True,
-   
+
     # Periodic beat schedule — scan for due retries every 60 seconds
     beat_schedule={
         "scan-due-retries": {

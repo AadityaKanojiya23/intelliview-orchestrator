@@ -16,13 +16,10 @@ suite runs completely offline.
 
 from __future__ import annotations
 
-import importlib
 import sys
 import types
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 # ---------------------------------------------------------------------------
 # Stub out the heavy dependencies that celery_app.py drags in at import time.
@@ -50,8 +47,7 @@ def _install_stubs():
 _install_stubs()
 
 # Now we can safely import the module under test.
-import workers.celery_app as celery_app_module  # noqa: E402
-from workers.celery_app import _extract_session_id, _on_task_failure, _SESSION_TASK_NAMES  # noqa: E402
+from workers.celery_app import _SESSION_TASK_NAMES, _extract_session_id, _on_task_failure  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants

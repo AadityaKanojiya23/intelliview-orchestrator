@@ -1,4 +1,5 @@
 from prometheus_client import start_http_server
+
 from monitoring.prometheus_metrics import registry
 
 
