@@ -16,19 +16,37 @@ from workers.celery_app import celery_app
 from workers.worker_agent import WorkerAgent
 
 logger = logging.getLogger(__name__)
+SUPPORTED_POOL = "solo"
+
 
 
 def _run_celery() -> None:
+    # Validate the configured Celery pool before starting.
+    # The active task counter is process-local, so only the
+    # solo pool is supported.
+    pool = os.getenv("CELERY_POOL", SUPPORTED_POOL)
+
+    if pool != SUPPORTED_POOL:
+        raise RuntimeError(
+            f"Unsupported Celery pool '{pool}'. "
+            f"Only '{SUPPORTED_POOL}' is supported because the "
+            "active task counter is process-local and cannot be "
+            "reported accurately across multiple worker processes."
+        )
+
     argv = [
         "-A",
         "workers.celery_app",
         "worker",
         "--loglevel=info",
-        f"--concurrency={os.getenv('WORKER_CONCURRENCY', WORKER_CONCURRENCY)}",
+        "--pool=solo",
+        "--concurrency=1",
         "--time-limit=1800",
         "--soft-time-limit=1500",
     ]
+
     celery_app.worker_main(argv)
+
 
 
 def main() -> int:
