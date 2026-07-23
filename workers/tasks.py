@@ -22,7 +22,7 @@ from sqlalchemy import select
 
 from database.db import SessionLocal
 from database.models import InterviewSession
-from orchestrator.redis_client import get_redis_client
+from orchestrator.cache_manager import CacheManager
 from orchestrator.session_manager import SessionManager
 from orchestrator.state_sync import StateSynchronizer
 from workers.celery_app import celery_app
@@ -112,8 +112,8 @@ def _run_audio(self, session_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(name="workers.tasks._after_parallel")
-def _after_parallel(session_id: str, video_result: dict, audio_result: dict):
+@celery_app.task(bind=True, max_retries=3, name="workers.tasks._after_parallel")
+def _after_parallel(self, session_id: str, video_result: dict, audio_result: dict):
     """Runs after video + audio group completes; then evaluation + risk."""
     try:
         logger.info("Parallel video+audio done for %s - running evaluation", session_id)

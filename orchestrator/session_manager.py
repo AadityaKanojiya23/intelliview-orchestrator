@@ -132,6 +132,7 @@ class SessionManager:
                 "created_at": _utcnow().isoformat(),
                 "updated_at": _utcnow().isoformat(),
                 "risk_score": None,
+                "max_task_retries" : 3,
             }
             self.state_sync.set_session_state(session_id, session_data)
 
