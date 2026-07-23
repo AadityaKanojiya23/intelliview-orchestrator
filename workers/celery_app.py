@@ -5,10 +5,23 @@ and a `session_failed` signal that lets us mark the DB session as
 FAILED only after Celery has exhausted its retries (rather than on
 every transient exception).
 """
+"""
+# TODO:
+ Separate worker deployment is pending.
+ These queues prepare task routing for future deployment where:
+ - interview queue will be processed by workers with
+   worker_prefetch_multiplier=1 for long-running tasks.
+ - maintenance queue will be processed by dedicated workers with a
+   higher worker_prefetch_multiplier for short-running tasks.
 
+ Docker Compose / worker deployment will be handled separately.
+
+"""
 from celery import Celery, signals
-
+from kombu import Queue
 from config import REDIS_URL
+
+
 
 celery_app = Celery("interview_tasks", broker=REDIS_URL, backend=REDIS_URL)
 
@@ -19,13 +32,41 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     task_track_started=True,
-    task_time_limit=30 * 60,  # 30 minutes hard limit
-    task_soft_time_limit=25 * 60,  # 25 minutes soft limit
-    task_acks_late=True,  # re-deliver if worker dies mid-task
+    task_time_limit=30 * 60,
+    task_soft_time_limit=25 * 60,
+    task_acks_late=True,
     task_reject_on_worker_lost=True,
-    worker_prefetch_multiplier=1,  # fair distribution across workers
+
+    # Long-running interview tasks should reserve only one task at a time
+    worker_prefetch_multiplier=1,
+
     broker_connection_retry_on_startup=True,
-    # Periodic beat schedule — scan for due retries every 60 seconds
+
+  # Queue definitions for future dedicated workers.
+    task_queues=(
+        Queue("interview"),
+        Queue("maintenance"),
+    ),
+
+    # NEW: Route tasks
+    task_routes={
+        "workers.tasks.process_interview_session": {
+            "queue": "interview",
+        },
+        "workers.tasks._run_video": {
+            "queue": "interview",
+        },
+        "workers.tasks._run_audio": {
+            "queue": "interview",
+        },
+        "workers.tasks._after_parallel": {
+            "queue": "interview",
+        },
+        "workers.tasks.scan_and_dispatch_retries": {
+            "queue": "maintenance",
+        },
+    },
+
     beat_schedule={
         "scan-due-retries": {
             "task": "workers.tasks.scan_and_dispatch_retries",
