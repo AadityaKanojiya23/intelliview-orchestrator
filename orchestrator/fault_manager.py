@@ -60,6 +60,10 @@ class FaultManager:
 
         logger.info(f"FaultManager initialized with debounce_time={debounce_time}s")
 
+    def _create_redis_client(self) -> Any:
+        """Create the shared Redis client used by the orchestrator."""
+        return get_redis_client()
+
     def detect_failed_sessions(self, timeout_seconds: int = 1800) -> list[str]:
         """
         Detect sessions that have been stuck in PROCESSING state too long
