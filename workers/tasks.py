@@ -48,6 +48,18 @@ logger = logging.getLogger(__name__)
 session_manager = SessionManager()
 state_sync = StateSynchronizer()
 
+# Redelivered tasks (task_acks_late + task_reject_on_worker_lost) re-run
+# from the top with the same session_id while the DB row may still be
+# active. task_time_limit tells us when a stuck attempt is provably dead.
+REDELIVERY_STALE_AFTER_SECONDS = celery_app.conf.task_time_limit + 60
+
+ACTIVE_PROCESSING_STATUSES = {
+    session_manager.PROCESSING,
+    session_manager.VIDEO_PROCESSING,
+    getattr(session_manager, "AUDIO_PROCESSING", "AUDIO_PROCESSING"),
+    session_manager.EVALUATING,
+}
+
 
 # ---------------------------------------------------------------------------
 # Helper methods
@@ -64,19 +76,6 @@ def _update_session_state(session_id: str, **kwargs):
     state = _get_session_state(session_id)
     state.update(kwargs)
     state_sync.set_session_state(session_id, state)
-
-
-# Redelivered tasks (task_acks_late + task_reject_on_worker_lost) re-run
-# from the top with the same session_id while the DB row may still be
-# active. task_time_limit tells us when a stuck attempt is provably dead.
-REDELIVERY_STALE_AFTER_SECONDS = celery_app.conf.task_time_limit + 60
-
-ACTIVE_PROCESSING_STATUSES = {
-    session_manager.PROCESSING,
-    session_manager.VIDEO_PROCESSING,
-    getattr(session_manager, "AUDIO_PROCESSING", "AUDIO_PROCESSING"),
-    session_manager.EVALUATING,
-}
 
 
 # ---------------------------------------------------------------------------
