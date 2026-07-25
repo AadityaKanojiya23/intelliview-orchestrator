@@ -35,30 +35,16 @@ export default function VideoPlayer() {
     return () => URL.revokeObjectURL(nextUrl);
   }, [captionFile]);
 
-  useEffect(() => {
-    if (!captionUrl || !videoRef.current) return;
-
-    const video = videoRef.current;
-    const showCaptionTrack = () => {
-      if (video.textTracks.length > 0) {
-        video.textTracks[0].mode = "showing";
-      }
-    };
-
-    video.addEventListener("loadedmetadata", showCaptionTrack);
-    showCaptionTrack();
-
-    return () => video.removeEventListener("loadedmetadata", showCaptionTrack);
-  }, [captionUrl]);
-
   const handleVideoChange = (event) => {
     const file = event.target.files?.[0];
     if (file) setVideoFile(file);
+    event.target.value = "";
   };
 
   const handleCaptionChange = (event) => {
     const file = event.target.files?.[0];
     if (file) setCaptionFile(file);
+    event.target.value = "";
   };
 
   const clearFiles = () => {
@@ -85,10 +71,15 @@ export default function VideoPlayer() {
               <track
                 key={captionUrl}
                 default
-                kind="subtitles"
+                kind="captions"
                 label="English"
                 src={captionUrl}
                 srcLang="en"
+                onLoad={() => {
+                  if (videoRef.current?.textTracks?.[0]) {
+                    videoRef.current.textTracks[0].mode = "showing";
+                  }
+                }}
               />
             )}
             Your browser does not support the video tag.
