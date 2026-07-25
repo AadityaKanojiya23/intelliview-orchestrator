@@ -83,14 +83,19 @@ function filterByDate(sessions,range){
 
  const now=Date.now();
 
- const ms={
-  "24h":86400000,
-  "7d":604800000,
-  "30d":2592000000
- }[range];
+ const msMap = {
+  "24h": 86400000,
+  "7d": 604800000,
+  "30d": 2592000000,
+};
 
+const ms = msMap[range];
 
- return sessions.filter((s)=>{
+if (typeof ms !== "number") {
+  return sessions;
+}
+
+return sessions.filter((s) => {
 
  const t=new Date(
  s.updated_at ||
@@ -132,9 +137,9 @@ function RiskDistribution({
  const r=s?.risk_score;
 
 
- if(typeof r!=="number")
- return;
-
+ if (typeof r !== "number" || Number.isNaN(r)) {
+  return;
+}
 
  if(r<0.3)
  counts[0].value++;
