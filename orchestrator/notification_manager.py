@@ -1,7 +1,7 @@
 import logging
+
 from database.db import SessionLocal
 from database.models import Notification
-from typing import List
 
 logger = logging.getLogger(__name__)
 class NotificationManager:
@@ -27,7 +27,7 @@ class NotificationManager:
 
         return notification
 
-    def get_notifications(self,user_id: str,skip: int = 0,limit: int = 20,) -> List[Notification]:
+    def get_notifications(self,user_id: str,skip: int = 0,limit: int = 20,) -> list[Notification]:
 
         return (
             self.db.query(Notification)
@@ -37,7 +37,7 @@ class NotificationManager:
             .limit(limit)
             .all()
         )
-    
+
     def mark_as_read(self,notification_id: int,user_id: str,) -> Notification | None:
         """Mark a user's notification as read."""
 
