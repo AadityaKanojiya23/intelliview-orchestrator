@@ -14,10 +14,15 @@ HIGH/CRITICAL thresholds fire correctly without GPU dependencies.
 """
 
 import logging
+import os
 import time
 from typing import Any, TypedDict
+
 from workers._stubs import _seeded_unit
+
 logger = logging.getLogger(__name__)
+AUDIO_TEMP_DIR = os.getenv("AUDIO_TEMP_DIR", "/tmp")
+
 # ---------------------------------------------------------------------------
 # Real detection helpers (Whisper / pyannote / OpenAI) with fallback to stubs
 # ---------------------------------------------------------------------------
@@ -50,7 +55,10 @@ def _real_transcribe(session_id: str) -> dict[str, Any] | None:
     try:
         from workers.ai_client import transcribe_audio_file
 
-        audio_path = f"/tmp/interview_{session_id}.wav"
+        audio_path = f"{AUDIO_TEMP_DIR}/interview_{session_id}.wav"
+        if not os.path.exists(audio_path):
+            logger.warning("Audio file not found: %s", audio_path)
+            return None
         result = transcribe_audio_file(audio_path)
         if result is None:
             return None
@@ -72,7 +80,10 @@ def _real_detect_background_voices(session_id: str) -> dict[str, Any] | None:
     try:
         from workers.ai_client import detect_speaker_segments
 
-        audio_path = f"/tmp/interview_{session_id}.wav"
+        audio_path = f"{AUDIO_TEMP_DIR}/interview_{session_id}.wav"
+        if not os.path.exists(audio_path):
+            logger.warning("Audio file not found: %s", audio_path)
+            return None
         segments = detect_speaker_segments(audio_path)
         if segments is None:
             return None
