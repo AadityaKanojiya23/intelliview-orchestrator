@@ -6,6 +6,19 @@ from unittest.mock import patch
 from orchestrator.fault_manager import FailureType, FaultManager
 
 
+# def _manager():
+#     with patch("orchestrator.fault_manager.redis.from_url") as mock_redis:
+#         client = mock_redis.return_value
+#         client.ping.return_value = True
+#         client.lpush.return_value = 1
+#         client.ltrim.return_value = True
+#         client.expire.return_value = True
+#         client.scan.return_value = (0, [])
+#         client.lrange.return_value = []
+#         client.get.return_value = None
+#         client.setex.return_value = True
+#         client.incr.return_value = 1
+#         return FaultManager()
 def _manager():
     with patch("orchestrator.fault_manager.get_redis_client") as mock_get_redis_client:
         client = mock_get_redis_client.return_value
@@ -19,7 +32,6 @@ def _manager():
         client.set.return_value = True
         client.incr.return_value = 1
 
-        return FaultManager()
         return FaultManager()
 
 
