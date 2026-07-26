@@ -9,21 +9,13 @@ import { Skeleton, ErrorState, EmptyState } from "@/components/States";
 import { SearchInput } from "@/components/ui";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui";
 import { formatPercent, formatRelative } from "@/lib/utils";
-import SortableHeader from "@/app/components/SortableHeader";
 
 export default function WorkersPage() {
   const workers = useSWR("/workers", { refreshInterval: 4000 });
   const stats = useSWR("/worker-statistics", { refreshInterval: 5000 });
   const scheduling = useSWR("/scheduling-status", { refreshInterval: 5000 });
+  const [search, setSearch] = useState("");
 
-   const [search, setSearch] = useState("");
-  const [sortConfig, setSortConfig] = useState({
-    key: null,
-    order: null
-   });
-  const handleSort = (columnKey, order) => {
-    setSortConfig({ key: columnKey, order });
-  };
   const filtered = useMemo(() => {
     if (!workers.data?.workers) return [];
     if (!search.trim()) return workers.data.workers;
@@ -54,14 +46,14 @@ export default function WorkersPage() {
 
     return data;
   }, [workers.data?.workers, search, sortConfig]);
+    return workers.data.workers.filter((w) => w.worker_id.toLowerCase().includes(q));
+  }, [workers.data?.workers, search]);
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-semibold text-zinc-50">Workers</h1>
-        <p className="text-sm text-muted">
-          Registered worker nodes, capacity, and live utilization.
-        </p>
+        <p className="text-sm text-muted">Registered worker nodes, capacity, and live utilization.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -179,29 +171,24 @@ export default function WorkersPage() {
             </Tbody>
           </Table>
           <div className="overflow-x-auto"> 
+          <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-muted">
                 <tr>
-                  {     }
-                  <SortableHeader label="Worker" columnKey="worker_id" onSort={handleSort} activeSort={sortConfig} />
-                  <SortableHeader label="Status" columnKey="health_status" onSort={handleSort} activeSort={sortConfig} />
-                  <SortableHeader label="Active" columnKey="active_tasks" onSort={handleSort} activeSort={sortConfig} />
-                  <SortableHeader label="Capacity" columnKey="capacity" onSort={handleSort} activeSort={sortConfig} />
-                  <SortableHeader label="Utilization" columnKey="active_tasks" onSort={handleSort} activeSort={sortConfig} />
-                  <SortableHeader label="Heartbeat" columnKey="last_heartbeat" onSort={handleSort} activeSort={sortConfig} />
+                  <th className="py-2 pr-4">Worker</th>
+                  <th className="py-2 pr-4">Status</th>
+                  <th className="py-2 pr-4">Active</th>
+                  <th className="py-2 pr-4">Capacity</th>
+                  <th className="py-2 pr-4">Utilization</th>
+                  <th className="py-2 pr-4">Heartbeat</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((w) => {
-                  const util = w.capacity
-                    ? (w.active_tasks / w.capacity) * 100
-                    : 0;
-
+                  const util = w.capacity ? (w.active_tasks / w.capacity) * 100 : 0;
                   return (
                     <tr key={w.worker_id} className="border-t border-border">
-                      <td className="py-2 pr-4 font-mono text-xs text-zinc-200">
-                        {w.worker_id}
-                      </td>
+                      <td className="py-2 pr-4 font-mono text-xs text-zinc-200">{w.worker_id}</td>
                       <td className="py-2 pr-4">
                         <StatusBadge status={w.health_status} />
                       </td>
@@ -212,9 +199,7 @@ export default function WorkersPage() {
                           {formatPercent(util)}
                         </Badge>
                       </td>
-                      <td className="py-2 pr-4 text-muted">
-                        {formatRelative(w.last_heartbeat)}
-                      </td>
+                      <td className="py-2 pr-4 text-muted">{formatRelative(w.last_heartbeat)}</td>
                     </tr>
                   );
                 })}
@@ -225,4 +210,4 @@ export default function WorkersPage() {
       </Card>
     </div>
   );
- }
+}
