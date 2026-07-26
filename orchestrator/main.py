@@ -124,6 +124,22 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SimpleSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+import logging
+logging.getLogger("opentelemetry.exporter.otlp.proto.grpc.exporter").setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
+
+trace.set_tracer_provider(TracerProvider())
+tracer_provider = trace.get_tracer_provider()
+otlp_exporter = OTLPSpanExporter(endpoint="http://jaeger:4317", insecure=True)
+tracer_provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+
+FastAPIInstrumentor.instrument_app(app)
 
 
 @app.middleware("http")
@@ -165,6 +181,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         incoming = request.headers.get("x-request-id", "").strip()
         request_id = incoming if _VALID_ID_RE.match(incoming) else uuid4().hex
         request.state.request_id = request_id
+        trace.get_current_span().set_attribute("request_id", request_id)
         start = _time.perf_counter()
         try:
             response = await call_next(request)

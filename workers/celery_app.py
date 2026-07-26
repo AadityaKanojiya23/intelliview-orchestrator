@@ -10,6 +10,8 @@ from celery import Celery, signals
 from config import REDIS_URL
 
 celery_app = Celery("interview_tasks", broker=REDIS_URL, backend=REDIS_URL)
+from opentelemetry.instrumentation.celery import CeleryInstrumentor
+CeleryInstrumentor().instrument()
 
 
 celery_app.conf.update(
