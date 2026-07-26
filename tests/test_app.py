@@ -1,7 +1,10 @@
 import uuid
-from fastapi.testclient import TestClient
-from app import app
 from concurrent.futures import ThreadPoolExecutor
+
+from fastapi.testclient import TestClient
+
+from app import app
+
 client = TestClient(app)
 
 HEADERS = {
@@ -15,14 +18,10 @@ def test_valid_webhook():
         "event_id": str(uuid.uuid4()),
         "email": "user@gmail.com",
         "event": "sent",
-        "timestamp": "2026-07-11T10:00:00"
+        "timestamp": "2026-07-11T10:00:00",
     }
 
-    response = client.post(
-        "/webhook",
-        json=payload,
-        headers=HEADERS
-    )
+    response = client.post("/webhook", json=payload, headers=HEADERS)
 
     assert response.status_code == 200
 
@@ -33,14 +32,10 @@ def test_invalid_event():
         "event_id": str(uuid.uuid4()),
         "email": "user@gmail.com",
         "event": "invalid",
-        "timestamp": "2026-07-11T10:00:00"
+        "timestamp": "2026-07-11T10:00:00",
     }
 
-    response = client.post(
-        "/webhook",
-        json=payload,
-        headers=HEADERS
-    )
+    response = client.post("/webhook", json=payload, headers=HEADERS)
 
     assert response.status_code == 400
 
@@ -51,20 +46,12 @@ def test_duplicate_event():
         "event_id": str(uuid.uuid4()),
         "email": "user@gmail.com",
         "event": "sent",
-        "timestamp": "2026-07-11T10:00:00"
+        "timestamp": "2026-07-11T10:00:00",
     }
 
-    first = client.post(
-        "/webhook",
-        json=payload,
-        headers=HEADERS
-    )
+    first = client.post("/webhook", json=payload, headers=HEADERS)
 
-    second = client.post(
-        "/webhook",
-        json=payload,
-        headers=HEADERS
-    )
+    second = client.post("/webhook", json=payload, headers=HEADERS)
 
     assert first.status_code == 200
     assert second.status_code == 400
@@ -76,14 +63,10 @@ def test_mixed_case_event():
         "event_id": str(uuid.uuid4()),
         "email": "user@gmail.com",
         "event": "Delivered",
-        "timestamp": "2026-07-11T10:00:00"
+        "timestamp": "2026-07-11T10:00:00",
     }
 
-    client.post(
-        "/webhook",
-        json=payload,
-        headers=HEADERS
-    )
+    client.post("/webhook", json=payload, headers=HEADERS)
 
     analytics = client.get("/analytics")
 
@@ -97,14 +80,10 @@ def test_invalid_email():
         "event_id": str(uuid.uuid4()),
         "email": "not-email",
         "event": "sent",
-        "timestamp": "2026-07-11T10:00:00"
+        "timestamp": "2026-07-11T10:00:00",
     }
 
-    response = client.post(
-        "/webhook",
-        json=payload,
-        headers=HEADERS
-    )
+    response = client.post("/webhook", json=payload, headers=HEADERS)
 
     assert response.status_code == 422
 
@@ -115,22 +94,16 @@ def test_invalid_timestamp():
         "event_id": str(uuid.uuid4()),
         "email": "user@gmail.com",
         "event": "sent",
-        "timestamp": "wrong-date"
+        "timestamp": "wrong-date",
     }
 
-    response = client.post(
-        "/webhook",
-        json=payload,
-        headers=HEADERS
-    )
+    response = client.post("/webhook", json=payload, headers=HEADERS)
 
     assert response.status_code == 422
+
+
 def send_request(payload):
-    return client.post(
-        "/webhook",
-        json=payload,
-        headers=HEADERS
-    )
+    return client.post("/webhook", json=payload, headers=HEADERS)
 
 
 def test_concurrent_duplicate_webhook():
@@ -139,7 +112,7 @@ def test_concurrent_duplicate_webhook():
         "event_id": str(uuid.uuid4()),
         "email": "user@gmail.com",
         "event": "sent",
-        "timestamp": "2026-07-11T10:00:00"
+        "timestamp": "2026-07-11T10:00:00",
     }
 
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -149,8 +122,6 @@ def test_concurrent_duplicate_webhook():
         response1 = future1.result()
         response2 = future2.result()
 
-    status_codes = sorted(
-        [response1.status_code, response2.status_code]
-    )
+    status_codes = sorted([response1.status_code, response2.status_code])
 
     assert status_codes == [200, 400]
