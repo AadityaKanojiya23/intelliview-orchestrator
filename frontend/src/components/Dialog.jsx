@@ -1,4 +1,8 @@
 "use client";
+/**
+ * Reusable Modal/Dialog component.
+ * Used in: CommandPalette.jsx, SessionDetail.jsx, ShortcutsHelp.jsx
+ */
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { useEffect, useRef } from "react";
