@@ -6,6 +6,7 @@ Revises:
 Create Date: 2026-07-11 14:50:22.937273
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -13,7 +14,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'd7d869570be9'
+revision: str = "d7d869570be9"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -120,4 +121,3 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_candidates_candidate_id"), table_name="candidates")
     op.drop_table("candidates")
     # ### end Alembic commands ###
-
