@@ -95,9 +95,25 @@ def _real_transcribe(session_id: str) -> dict[str, Any] | None:
             "timestamp": time.time(),
         }
 
-    except Exception as exc:
-        logger.debug("Real transcription unavailable: %s", exc)
+    except ImportError:
+        logger.info("Whisper not installed, using stub fallback")
         return None
+
+    except FileNotFoundError:
+        logger.warning(
+            "Audio file not found for session %s",
+            session_id,
+        )
+        return None
+
+    except Exception as exc:
+        logger.warning(
+            "Real transcription failed for session %s: %s",
+            session_id,
+            exc,
+            exc_info=True,
+        )
+    return None
 
 
 def _real_detect_background_voices(session_id: str) -> dict[str, Any] | None:
@@ -128,8 +144,24 @@ def _real_detect_background_voices(session_id: str) -> dict[str, Any] | None:
                 for s in segments
             ],
         }
+    except ImportError:
+        logger.info("pyannote not installed, using stub fallback")
+        return None
+
+    except FileNotFoundError:
+        logger.warning(
+            "Audio file not found for session %s",
+            session_id,
+        )
+        return None
+
     except Exception as exc:
-        logger.debug("Real background voice detection unavailable: %s", exc)
+        logger.warning(
+            "Real background voice detection failed for session %s: %s",
+            session_id,
+            exc,
+            exc_info=True,
+        )
         return None
 
 
@@ -178,8 +210,24 @@ def _real_detect_suspicious(session_id: str) -> dict[str, Any] | None:
             }
         except (json.JSONDecodeError, KeyError):
             return None
+    except ImportError:
+        logger.info("LLM client not installed, using stub fallback")
+        return None
+
+    except FileNotFoundError:
+        logger.warning(
+            "Audio file not found for session %s",
+            session_id,
+        )
+        return None
+
     except Exception as exc:
-        logger.debug("Real suspicious pattern detection unavailable: %s", exc)
+        logger.warning(
+            "Real suspicious pattern detection failed for session %s: %s",
+            session_id,
+            exc,
+            exc_info=True,
+        )
         return None
 
 
