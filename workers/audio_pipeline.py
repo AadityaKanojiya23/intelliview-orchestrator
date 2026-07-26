@@ -66,14 +66,13 @@ def _real_detect_background_voices(session_id: str) -> dict[str, Any] | None:
             "confidence": 0.85,
             "speaker_segments": segments,
             "timestamps": [
-    {
-        "speaker": s["speaker_id"],
-        "start": s["start"],
-        "end": s["end"],
-    }
-    for s in segments
-],
-
+                {
+                    "speaker": s["speaker_id"],
+                    "start": s["start"],
+                    "end": s["end"],
+                }
+                for s in segments
+            ],
         }
     except Exception as exc:
         logger.debug("Real background voice detection unavailable: %s", exc)
