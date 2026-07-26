@@ -22,7 +22,12 @@ def _new_registry():
 
         mock_get_redis.return_value = mock_redis
 
-        return WorkerRegistry()
+        reg = WorkerRegistry()
+
+    # Assign mock directly so post-construction calls (register, heartbeat …)
+    # also use the fake client, not a real Redis connection.
+    reg.redis_client = mock_redis
+    return reg
 
 
 def test_register_worker_records_capacity():
