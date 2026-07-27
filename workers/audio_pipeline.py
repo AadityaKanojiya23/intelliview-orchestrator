@@ -95,9 +95,25 @@ def _real_transcribe(session_id: str) -> dict[str, Any] | None:
             "timestamp": time.time(),
         }
 
-    except Exception as exc:
-        logger.debug("Real transcription unavailable: %s", exc)
+    except ImportError:
+        logger.info("Whisper not installed, using stub fallback")
         return None
+
+    except FileNotFoundError:
+        logger.warning(
+            "Audio file not found for session %s",
+            session_id,
+        )
+        return None
+
+    except Exception as exc:
+        logger.warning(
+            "Real transcription failed for session %s: %s",
+            session_id,
+            exc,
+            exc_info=True,
+        )
+    return None
 
 
 def _real_detect_background_voices(session_id: str) -> dict[str, Any] | None:
@@ -119,10 +135,33 @@ def _real_detect_background_voices(session_id: str) -> dict[str, Any] | None:
             "voice_count": voice_count,
             "confidence": 0.85,
             "speaker_segments": segments,
-            "timestamps": [],
+            "timestamps": [
+                {
+                    "speaker": s["speaker_id"],
+                    "start": s["start"],
+                    "end": s["end"],
+                }
+                for s in segments
+            ],
         }
+    except ImportError:
+        logger.info("pyannote not installed, using stub fallback")
+        return None
+
+    except FileNotFoundError:
+        logger.warning(
+            "Audio file not found for session %s",
+            session_id,
+        )
+        return None
+
     except Exception as exc:
-        logger.debug("Real background voice detection unavailable: %s", exc)
+        logger.warning(
+            "Real background voice detection failed for session %s: %s",
+            session_id,
+            exc,
+            exc_info=True,
+        )
         return None
 
 
@@ -171,8 +210,24 @@ def _real_detect_suspicious(session_id: str) -> dict[str, Any] | None:
             }
         except (json.JSONDecodeError, KeyError):
             return None
+    except ImportError:
+        logger.info("LLM client not installed, using stub fallback")
+        return None
+
+    except FileNotFoundError:
+        logger.warning(
+            "Audio file not found for session %s",
+            session_id,
+        )
+        return None
+
     except Exception as exc:
-        logger.debug("Real suspicious pattern detection unavailable: %s", exc)
+        logger.warning(
+            "Real suspicious pattern detection failed for session %s: %s",
+            session_id,
+            exc,
+            exc_info=True,
+        )
         return None
 
 
@@ -241,6 +296,7 @@ def detect_background_voices(session_id: str) -> dict[str, Any]:
         "background_voices_detected": multi,
         "voice_count": 2 if multi else 1,
         "confidence": round(_seeded_unit(session_id, "bg_conf"), 3),
+        "speaker_segments": [],
         "timestamps": [],
     }
 
@@ -261,7 +317,19 @@ def detect_suspicious_conversation(session_id: str) -> dict[str, Any]:
         "suspicious_pattern_detected": suspicious,
         "pattern_type": pattern if suspicious else None,
         "confidence": round(_seeded_unit(session_id, "susp_conf"), 3),
-        "details": {},
+        "details": {
+            "indicators": [
+                "monotone_delivery",
+                "scripted_phrasing",
+            ],
+            "flagged_segments": [
+                round(_seeded_unit(session_id, "seg1") * 200),
+                round(_seeded_unit(session_id, "seg2") * 200),
+            ],
+            "analysis_version": "stub-v1",
+        }
+        if suspicious
+        else {},
     }
 
 
