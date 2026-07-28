@@ -9,6 +9,7 @@ Strategies:
 """
 
 import logging
+import time
 from enum import Enum
 from typing import Any
 
@@ -40,8 +41,11 @@ class LoadBalancer:
         self.worker_registry = WorkerRegistry()
         self.strategy = strategy
         self.round_robin_index = 0
+        self._worker_cache = None
+        self._cache_timestamp = 0
+        self._cache_ttl = 5  # Cache valid for 5 seconds
         logger.info(f"Load Balancer initialized with strategy: {strategy.value}")
-
+    
     def select_worker(self) -> dict[str, Any] | None:
         """
         Select a worker for task execution based on current strategy
@@ -68,7 +72,7 @@ class LoadBalancer:
         Returns:
             dict: Next worker in rotation or None if no workers available
         """
-        available = self.worker_registry.get_available_workers()
+        available = self._get_cached_workers()
 
         if not available:
             logger.warning("No workers available for Round Robin selection")
@@ -132,6 +136,25 @@ class LoadBalancer:
         self.strategy = strategy
         logger.info(f"Switched to {strategy.value} strategy")
 
+
+    def _get_cached_workers(self) -> list[dict[str, Any]]:
+        """
+            Return cached workers if cache is still valid.
+        """
+        current_time = time.time()
+
+        if (
+            self._worker_cache is None
+            or current_time - self._cache_timestamp > self._cache_ttl
+        ):
+            self._worker_cache = self.worker_registry.get_available_workers()
+            self._cache_timestamp = current_time
+
+        return self._worker_cache
+
+
+    
+
     def get_best_worker_for_priority(self, priority: str) -> dict[str, Any] | None:
         """
         Select worker considering task priority
@@ -142,7 +165,7 @@ class LoadBalancer:
         Returns:
             dict: Selected worker or None
         """
-        available = self.worker_registry.get_available_workers()
+        available = self._get_cached_workers()
 
         if not available:
             return None
@@ -188,7 +211,7 @@ class LoadBalancer:
     def get_load_status(self) -> dict[str, Any]:
         """Get current system load status"""
         stats = self.worker_registry.get_worker_statistics()
-        available_workers = len(self.worker_registry.get_available_workers())
+        available_workers = len(self._get_cached_workers())
 
         return {
             "strategy": self.strategy.value,
