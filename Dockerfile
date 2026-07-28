@@ -1,5 +1,9 @@
 # syntax=docker/dockerfile:1.6
-FROM python:3.11-slim AS base
+
+# ============================================================================
+# Stage 1: Builder
+# ============================================================================
+FROM python:3.11-slim AS builder
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
