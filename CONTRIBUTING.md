@@ -63,15 +63,10 @@ docker compose up -d --build
    (`Fix CORS env var typo`, not `fixed stuff`).
 3. Push and open a PR against `main`.
 4. Fill in the PR template (auto-loaded from `.github/` if present).
-5. Wait for CI to pass. `.github/workflows/ci.yml` runs three jobs on every
-   push and PR against `main`:
-   - **`test`** — Ruff lint, Ruff format check, then `pytest tests/
-     --ignore=tests/test_e2e_smoke.py -v` (88 tests, all must be green).
+5. Wait for CI to pass. `.github/workflows/ci.yml` runs three jobs on every push and PR against `main`:
+   - **`test`** — Ruff lint, Ruff format check, then `pytest tests/ --ignore=tests/test_e2e_smoke.py -v` (88 tests, all must be green).
    - **`frontend`** — installs frontend deps and runs `npm run lint`.
-   - **`docker-build`** — builds the `fastapi` and `worker` images via
-     `docker compose build --progress=plain fastapi worker`, then lists
-     the resulting images. Fails automatically if either image fails
-     to build.
+   - **`docker-build`** — builds the `fastapi` and `worker` images via `docker compose --progress=plain build fastapi worker`, then lists the resulting images. Fails automatically if either image fails to build.
 6. Address review feedback by pushing additional commits (don't force-push
    while the PR is open unless asked).
 

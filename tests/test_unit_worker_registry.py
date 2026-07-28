@@ -22,7 +22,6 @@ def _new_registry():
         mock_redis.hgetall.return_value = {}
 
         mock_get_redis.return_value = mock_redis
-
         return WorkerRegistry()
 
 

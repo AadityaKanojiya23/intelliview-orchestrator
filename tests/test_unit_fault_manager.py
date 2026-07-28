@@ -18,7 +18,6 @@ def _manager():
         client.get.return_value = None
         client.set.return_value = True
         client.incr.return_value = 1
-
         return FaultManager()
 
 
@@ -66,6 +65,8 @@ def test_handle_worker_failure_reassigns_tasks_and_logs():
 
 
 def test_reassign_increments_counter_and_persists():
+    fm = _manager()
+    fm.redis_client.incr.return_value = 2
     fm = _manager()
     fm.redis_client.incr.return_value = 2
     assert fm.reassign_task("s3", original_worker="w_dead") is True
