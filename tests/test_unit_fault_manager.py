@@ -7,8 +7,8 @@ from orchestrator.fault_manager import FailureType, FaultManager
 
 
 def _manager():
-    with patch("orchestrator.fault_manager.redis.from_url") as mock_redis:
-        client = mock_redis.return_value
+    with patch("orchestrator.fault_manager.get_redis_client") as mock_get_redis_client:
+        client = mock_get_redis_client.return_value
         client.ping.return_value = True
         client.lpush.return_value = 1
         client.ltrim.return_value = True
@@ -16,8 +16,9 @@ def _manager():
         client.scan.return_value = (0, [])
         client.lrange.return_value = []
         client.get.return_value = None
-        client.setex.return_value = True
+        client.set.return_value = True
         client.incr.return_value = 1
+
         return FaultManager()
 
 
@@ -49,8 +50,6 @@ def test_get_failure_log_decodes_json_entries():
     log = fm.get_failure_log(limit=10)
     assert all(entry["session_id"] == "s1" for entry in log)
     assert all(entry["failure_type"] == "task_exception" for entry in log)
-    # The first decoded entry must be the latest; subsequent duplicates from
-    # the 7-day scan window are tolerated (operator-facing behaviour).
     assert log[0]["worker_id"] == "w1"
 
 
@@ -70,6 +69,4 @@ def test_reassign_increments_counter_and_persists():
     fm = _manager()
     fm.redis_client.incr.return_value = 2
     assert fm.reassign_task("s3", original_worker="w_dead") is True
-    # The modern redis-py uses `set(key, value, ex=ttl)` instead of the
-    # deprecated `setex(key, ttl, value)`.
     fm.redis_client.set.assert_called()

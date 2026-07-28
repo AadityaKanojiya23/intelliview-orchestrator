@@ -81,7 +81,7 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Lint
         run: npm run lint
-           
+
   docker-build:
     name: Docker build validation
     runs-on: ubuntu-latest
@@ -90,4 +90,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build Docker images
-        run: docker compose build fastapi worker
+        run: docker compose build --progress=plain fastapi worker
+      - name: Verify built images
+        run: docker compose images fastapi worker
