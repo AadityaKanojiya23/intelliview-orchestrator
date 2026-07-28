@@ -41,17 +41,13 @@ def test_move_to_dlq_uses_dead_letter_queue_key():
 
 def test_get_failure_log_decodes_json_entries():
     fm = _manager()
-    iso_now = datetime.now(timezone.utc).isoformat()
-    payload = (
-    '{"failure_type": "task_exception", "error_message": "x", "worker_id": "w1"}'
-    )
-    fm.redis_client.lrange.return_value = [payload]
-
-    fm = _manager()
+    fm.redis_client.lrange.return_value = [
+        '{"session_id": "s1", "failure_type": "task_exception", "worker_id": "w1"}'
+    ]
     log = fm.get_failure_log(limit=10)
     assert all(entry["session_id"] == "s1" for entry in log)
     assert all(entry["failure_type"] == "task_exception" for entry in log)
-    assert log[0]["worker_id"] == "w1"
+    assert log[0]["worker_id"] == "w1"  
     
 def test_handle_worker_failure_reassigns_tasks_and_logs():
     fm = _manager()
