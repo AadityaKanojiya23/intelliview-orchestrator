@@ -18,6 +18,7 @@ def _manager():
         client.get.return_value = None
         client.set.return_value = True
         client.incr.return_value = 1
+
         return FaultManager()
 
 
@@ -46,12 +47,13 @@ def test_get_failure_log_decodes_json_entries():
         '"failure_type": "task_exception", "error_message": "x", "worker_id": "w1"}'
     )
     fm.redis_client.lrange.return_value = [payload]
+def test_get_failure_log_decodes_json_entries():
+    fm = _manager()
     log = fm.get_failure_log(limit=10)
     assert all(entry["session_id"] == "s1" for entry in log)
     assert all(entry["failure_type"] == "task_exception" for entry in log)
     assert log[0]["worker_id"] == "w1"
-
-
+    
 def test_handle_worker_failure_reassigns_tasks_and_logs():
     fm = _manager()
     with (
@@ -65,8 +67,6 @@ def test_handle_worker_failure_reassigns_tasks_and_logs():
 
 
 def test_reassign_increments_counter_and_persists():
-    fm = _manager()
-    fm.redis_client.incr.return_value = 2
     fm = _manager()
     fm.redis_client.incr.return_value = 2
     assert fm.reassign_task("s3", original_worker="w_dead") is True
