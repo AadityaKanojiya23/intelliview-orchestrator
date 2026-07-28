@@ -151,7 +151,7 @@ services:
       - ai-interview-network
     command: celery -A workers.celery_app.celery_app flower --url_prefix=flower
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:5555/flower"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:5555/flower/"]
       interval: 30s
       timeout: 5s
       start_period: 15s
