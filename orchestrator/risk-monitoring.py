@@ -34,14 +34,23 @@ class RiskMonitoringService:
     @staticmethod
     def get_metrics(db: Session) -> Dict[str, Any]:
         """Calculates the analytics requested in the issue."""
-        query = db.query(RiskPredictionMonitoring).filter(RiskPredictionMonitoring.predicted_risk_level == "HIGH")
+        base_query = db.query(RiskPredictionMonitoring).filter(
+            RiskPredictionMonitoring.predicted_risk_level == "HIGH"
+        )
         
-        total_high = query.count()
-        confirmed = query.filter(RiskPredictionMonitoring.recruiter_outcome == "CONFIRM").count()
-        false_positives = query.filter(RiskPredictionMonitoring.is_false_positive == True).count()
+        total_high = base_query.count()
+        
+        # Branch filters from base_query without mutating it, or filter separately
+        confirmed = base_query.filter(
+            RiskPredictionMonitoring.recruiter_outcome == "CONFIRM"
+        ).count()
+        
+        false_positives = base_query.filter(
+            RiskPredictionMonitoring.is_false_positive.is_(True)
+        ).count()
         
         reviewed = confirmed + false_positives
-        fp_rate = (false_positives / reviewed * 100) if reviewed > 0 else 0.0
+        fp_rate = ((false_positives / reviewed) * 100) if reviewed > 0 else 0.0
 
         return {
             "total_high_predictions": total_high,
