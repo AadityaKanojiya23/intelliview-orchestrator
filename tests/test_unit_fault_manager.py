@@ -43,11 +43,10 @@ def test_get_failure_log_decodes_json_entries():
     fm = _manager()
     iso_now = datetime.now(timezone.utc).isoformat()
     payload = (
-        '{"timestamp": "' + iso_now + '", "session_id": "s1", '
-        '"failure_type": "task_exception", "error_message": "x", "worker_id": "w1"}'
+    '{"failure_type": "task_exception", "error_message": "x", "worker_id": "w1"}'
     )
     fm.redis_client.lrange.return_value = [payload]
-def test_get_failure_log_decodes_json_entries():
+
     fm = _manager()
     log = fm.get_failure_log(limit=10)
     assert all(entry["session_id"] == "s1" for entry in log)
