@@ -44,8 +44,9 @@ class LoadBalancer:
         self._worker_cache = None
         self._cache_timestamp = 0
         self._cache_ttl = 5  # Cache valid for 5 seconds
+        self._registry_lookup_count = 0
         logger.info(f"Load Balancer initialized with strategy: {strategy.value}")
-    
+
     def select_worker(self) -> dict[str, Any] | None:
         """
         Select a worker for task execution based on current strategy
@@ -136,24 +137,20 @@ class LoadBalancer:
         self.strategy = strategy
         logger.info(f"Switched to {strategy.value} strategy")
 
-
     def _get_cached_workers(self) -> list[dict[str, Any]]:
         """
-            Return cached workers if cache is still valid.
+        Return cached workers if cache is still valid.
         """
         current_time = time.time()
 
-        if (
-            self._worker_cache is None
-            or current_time - self._cache_timestamp > self._cache_ttl
-        ):
+        if self._worker_cache is None or current_time - self._cache_timestamp > self._cache_ttl:
+            self._registry_lookup_count += 1
+
+            logger.debug(f"Refreshing worker cache (Registry Lookup #{self._registry_lookup_count})")
             self._worker_cache = self.worker_registry.get_available_workers()
             self._cache_timestamp = current_time
 
         return self._worker_cache
-
-
-    
 
     def get_best_worker_for_priority(self, priority: str) -> dict[str, Any] | None:
         """
@@ -217,6 +214,7 @@ class LoadBalancer:
             "strategy": self.strategy.value,
             "worker_stats": stats,
             "available_workers": available_workers,
+            "registry_lookups": self._registry_lookup_count,
             "system_overloaded": self.is_system_overloaded(),
             "timestamp": None,
         }
