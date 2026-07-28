@@ -296,6 +296,7 @@ def detect_background_voices(session_id: str) -> dict[str, Any]:
         "background_voices_detected": multi,
         "voice_count": 2 if multi else 1,
         "confidence": round(_seeded_unit(session_id, "bg_conf"), 3),
+        "speaker_segments": [],
         "timestamps": [],
     }
 
@@ -316,7 +317,19 @@ def detect_suspicious_conversation(session_id: str) -> dict[str, Any]:
         "suspicious_pattern_detected": suspicious,
         "pattern_type": pattern if suspicious else None,
         "confidence": round(_seeded_unit(session_id, "susp_conf"), 3),
-        "details": {},
+        "details": {
+            "indicators": [
+                "monotone_delivery",
+                "scripted_phrasing",
+            ],
+            "flagged_segments": [
+                round(_seeded_unit(session_id, "seg1") * 200),
+                round(_seeded_unit(session_id, "seg2") * 200),
+            ],
+            "analysis_version": "stub-v1",
+        }
+        if suspicious
+        else {},
     }
 
 

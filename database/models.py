@@ -11,9 +11,11 @@ from sqlalchemy import (
     Column,
     DateTime,
     Float,
+    ForeignKey,
     Integer,
     String,
 )
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func  # noqa: F401  (re-exported for ORM consumers)
 
 from database.db import Base
@@ -57,10 +59,24 @@ class InterviewSession(Base):
             name="ck_overall_score_non_negative",
         ),
     )
+    #
 
     session_id = Column(String(255), primary_key=True, index=True, nullable=False)
-    candidate_id = Column(String(255), nullable=False, index=True)
-    status = Column(String(50), nullable=False, default="pending", index=True)
+
+    candidate_id = Column(
+        String(255),
+        ForeignKey("candidates.candidate_id"),
+        nullable=False,
+        index=True,
+    )
+
+    status = Column(
+        String(50),
+        nullable=False,
+        default="pending",
+        index=True,
+    )
+
     assigned_node = Column(String(255), nullable=True)
     start_time = Column(DateTime, nullable=True, default=utcnow)
     end_time = Column(DateTime, nullable=True)
@@ -76,14 +92,34 @@ class InterviewSession(Base):
     questions_asked = Column(JSON, nullable=True, default=list)
     answers_provided = Column(JSON, nullable=True, default=list)
     feedback_generated = Column(JSON, nullable=True, default=list)
+
     overall_score = Column(Float, nullable=True, index=True)
-    template_id = Column(String(255), nullable=True, index=True)
+
+    template_id = Column(
+        String(255),
+        ForeignKey("interview_templates.template_id"),
+        nullable=True,
+        index=True,
+    )
 
     created_at = Column(DateTime, nullable=False, default=utcnow)
     updated_at = Column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+    candidate = relationship(
+        "Candidate",
+        back_populates="interview_sessions",
+    )
+
+    template = relationship(
+        "InterviewTemplate",
+        back_populates="interview_sessions",
+    )
 
     def __repr__(self):
-        return f"<InterviewSession(session_id='{self.session_id}', candidate_id='{self.candidate_id}', status='{self.status}', risk_score={self.risk_score})>"
+        return (
+            f"<InterviewSession(session_id='{self.session_id}', "
+            f"candidate_id='{self.candidate_id}', "
+            f"status='{self.status}', risk_score={self.risk_score})>"
+        )
 
 
 class Question(Base):
@@ -103,7 +139,11 @@ class Question(Base):
     updated_at = Column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
 
     def __repr__(self):
-        return f"<Question(question_id='{self.question_id}', category='{self.category}', difficulty='{self.difficulty}')>"
+        return (
+            f"<Question(question_id='{self.question_id}', "
+            f"category='{self.category}', "
+            f"difficulty='{self.difficulty}')>"
+        )
 
 
 class Candidate(Base):
@@ -125,6 +165,11 @@ class Candidate(Base):
 
     created_at = Column(DateTime, nullable=False, default=utcnow)
     updated_at = Column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+    interview_sessions = relationship(
+        "InterviewSession",
+        back_populates="candidate",
+    )
 
     def __repr__(self):
         return f"<Candidate(candidate_id='{self.candidate_id}', name='{self.name}')>"
@@ -148,6 +193,14 @@ class InterviewTemplate(Base):
 
     created_at = Column(DateTime, nullable=False, default=utcnow)
     updated_at = Column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+    interview_sessions = relationship(
+        "InterviewSession",
+        back_populates="template",
+    )
 
     def __repr__(self):
-        return f"<InterviewTemplate(template_id='{self.template_id}', name='{self.name}', type='{self.interview_type}')>"
+        return (
+            f"<InterviewTemplate(template_id='{self.template_id}', "
+            f"name='{self.name}', "
+            f"type='{self.interview_type}')>"
+        )
