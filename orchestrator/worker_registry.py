@@ -18,7 +18,7 @@ from threading import Lock
 from typing import Any
 
 # Import Prometheus worker monitoring metrics
-from monitoring.prometheus_metrics import (
+from metrics.prometheus_metrics import (
     WORKER_ACTIVE_TASKS,
     WORKER_CAPACITY,
     WORKERS_HEALTHY,
