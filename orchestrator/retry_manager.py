@@ -236,7 +236,7 @@ class RetryManager:
                 return 1
 
             count_key = f"{self.retry_count_key}{session_id}"
-            
+
             # Use MULTI/EXEC pipeline to atomically INCR and EXPIRE
             client = getattr(self.redis_client, "raw", self.redis_client)
             if hasattr(client, "pipeline"):

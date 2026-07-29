@@ -76,7 +76,7 @@ class LoadBalancer:
 
         # Sort for deterministic ordering
         available.sort(key=lambda w: w["worker_id"])
-        
+
         idx = 0
         if hasattr(self, "last_assigned_worker_id") and self.last_assigned_worker_id:
             for i, w in enumerate(available):

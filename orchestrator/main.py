@@ -37,8 +37,6 @@ from config import (
 )
 from database.db import engine, get_db
 from database.models import Base, Candidate, InterviewSession
-from monitoring.dashboard_api import create_dashboard_routes
-from monitoring.metrics_collector import MetricsCollector
 from metrics.prometheus_metrics import (
     POSTGRES_HEALTH,
     REDIS_HEALTH,
@@ -53,6 +51,8 @@ from metrics.prometheus_metrics import (
     WORKERS_REGISTERED,
     WORKERS_UNHEALTHY,
 )
+from monitoring.dashboard_api import create_dashboard_routes
+from monitoring.metrics_collector import MetricsCollector
 from monitoring.websocket_manager import ws_manager
 from orchestrator import http_cache
 from orchestrator.auth import create_access_token

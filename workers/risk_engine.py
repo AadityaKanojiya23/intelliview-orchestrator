@@ -153,9 +153,9 @@ class RiskScoringEngine:
         """Apply rule-based overrides to the linear combined risk score."""
         if risk_classification == "CRITICAL":
             return max(final_risk, 0.95)
-        elif risk_classification == "HIGH":
+        if risk_classification == "HIGH":
             return max(final_risk, 0.8)
-        elif risk_classification == "MEDIUM":
+        if risk_classification == "MEDIUM":
             return max(final_risk, 0.6)
         return final_risk
 
