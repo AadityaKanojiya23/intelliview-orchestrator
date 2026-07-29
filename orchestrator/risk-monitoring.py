@@ -63,3 +63,5 @@ class RiskMonitoringService:
             "false_positive_count": false_positives,
             "false_positive_rate_percent": round(fp_rate, 2),
         }
+
+
