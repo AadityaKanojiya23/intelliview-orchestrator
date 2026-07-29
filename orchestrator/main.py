@@ -39,7 +39,7 @@ from database.db import engine, get_db
 from database.models import Base, Candidate, InterviewSession
 from monitoring.dashboard_api import create_dashboard_routes
 from monitoring.metrics_collector import MetricsCollector
-from monitoring.prometheus_metrics import (
+from metrics.prometheus_metrics import (
     POSTGRES_HEALTH,
     REDIS_HEALTH,
     REQUEST_COUNT,
@@ -92,11 +92,14 @@ async def lifespan(app: FastAPI):
     Shutdown: best-effort graceful drain — flush the request-id log line,
     close the shared Redis client, and notify clients.
     """
-    Base.metadata.create_all(bind=engine)
+    # Schema is managed by Alembic migrations (run `alembic upgrade head` before
+    # starting the server). Do NOT call Base.metadata.create_all() here — it
+    # blocks the event loop with synchronous DDL and delays the port binding,
+    # which causes health-check timeouts in Docker.
     if API_TOKEN == "dev-token-change-me":
-        logger.warning(
-            "API_TOKEN is the built-in dev default — set a strong token "
-            "in production via the API_TOKEN env var."
+        raise RuntimeError(
+            "CRITICAL SECURITY ERROR: Default API_TOKEN detected! "
+            "You MUST set a secure API_TOKEN environment variable."
         )
     logger.info("AI Interview Orchestrator server starting...")
     try:
@@ -521,7 +524,7 @@ async def liveness_probe():
 @app.get("/readyz")
 async def readiness_probe():
     """Kubernetes-style readiness probe. Returns 200 only when all dependencies are up."""
-    result = health_monitor.readiness_check()
+    result = await health_monitor.readiness_check()
     if not result["ready"]:
         from fastapi.responses import JSONResponse as _JSONResponse
 
@@ -532,7 +535,7 @@ async def readiness_probe():
 @app.get("/dependencies")
 async def get_dependency_statuses():
     """Deep health check of all dependencies (Redis, Postgres, Celery broker)."""
-    return health_monitor._check_all_dependencies()
+    return await health_monitor._check_all_dependencies()
 
 
 @app.get("/admin/fairness-audit", dependencies=[Depends(require_token)])
@@ -558,13 +561,13 @@ async def get_fairness_audit_report():
 if ENABLE_PROMETHEUS:
     from fastapi.responses import Response as _Response
 
-    from monitoring.prometheus_metrics import get_metrics_text
+    from metrics.prometheus_metrics import get_metrics_text
 
     @app.get("/metrics")
     async def prometheus_metrics():
         """Prometheus metrics endpoint."""
         # Dynamic check of dependency statuses
-        deps = health_monitor._check_all_dependencies()
+        deps = await health_monitor._check_all_dependencies()
         REDIS_HEALTH.set(1 if deps.get("redis", {}).get("status") == "healthy" else 0)
         POSTGRES_HEALTH.set(1 if deps.get("postgres", {}).get("status") == "healthy" else 0)
 
