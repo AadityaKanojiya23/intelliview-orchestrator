@@ -17,7 +17,6 @@ from sqlalchemy import (
     String,
 )
 from sqlalchemy.orm import relationship
-
 from sqlalchemy.sql import func  # noqa: F401  (re-exported for ORM consumers)
 
 from database.db import Base

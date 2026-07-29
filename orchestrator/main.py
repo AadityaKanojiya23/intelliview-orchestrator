@@ -71,6 +71,7 @@ from orchestrator.health_monitor import HealthMonitor
 from orchestrator.interview_templates import InterviewTemplateManager
 from orchestrator.load_balancer import BalancingStrategy, LoadBalancer
 from orchestrator.logging_config import configure_logging, log_event
+from orchestrator.notification_manager import NotificationManager
 from orchestrator.question_bank import QuestionBank
 from orchestrator.rate_limiter import RateLimiterMiddleware
 from orchestrator.redis_client import (
@@ -85,10 +86,7 @@ from orchestrator.session_manager import SessionManager
 from orchestrator.session_tracker import SessionTracker
 from orchestrator.state_sync import StateSynchronizer
 from orchestrator.worker_registry import WorkerRegistry
-
-from workers.bias_auditor import BiasAudito
-from orchestrator.notification_manager import NotificationManager
-
+from workers.bias_auditor import BiasAuditor
 
 # Configure logging after imports so startup messages are structured.
 configure_logging()
