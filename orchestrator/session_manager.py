@@ -60,14 +60,7 @@ class SessionManager:
             FAILED,
             TIMEOUT,
         ],
-        VIDEO_PROCESSING: [
-            AUDIO_PROCESSING,
-            PROCESSING,
-            EVALUATING,
-            COMPLETED,
-            FAILED,
-            TIMEOUT,
-        ],
+        VIDEO_PROCESSING: [AUDIO_PROCESSING, PROCESSING, FAILED, TIMEOUT],
         AUDIO_PROCESSING: [EVALUATING, PROCESSING, FAILED, TIMEOUT],
         EVALUATING: [COMPLETED, PROCESSING, FAILED, TIMEOUT],
         COMPLETED: [],
@@ -118,18 +111,7 @@ class SessionManager:
             )
 
             session_db.add(interview_session)
-
-            from monitoring.prometheus_metrics import (
-                SESSIONS_ACTIVE,
-                SESSIONS_CREATED,
-            )
-
             session_db.commit()
-
-            SESSIONS_CREATED.inc()
-
-            SESSIONS_ACTIVE.inc()
-            logger.info("Prometheus session metrics updated")
 
             # Sync to Redis cache
             session_data = {
@@ -141,15 +123,14 @@ class SessionManager:
                 "created_at": _utcnow().isoformat(),
                 "updated_at": _utcnow().isoformat(),
                 "risk_score": None,
-                "max_task_retries": 3,
             }
             self.state_sync.set_session_state(session_id, session_data)
 
             logger.info(f"Session {session_id} created successfully")
             return session_id
 
-        except Exception as e:
-            logger.error(f"Error creating session: {e!s}")
+        except Exception:
+            logger.error("Error creating session")
             session_db.rollback()
             raise
         finally:
@@ -198,19 +179,6 @@ class SessionManager:
             interview.status = new_status
             interview.updated_at = _utcnow()
             session_db.commit()
-            from monitoring.prometheus_metrics import (
-                SESSIONS_ACTIVE,
-                SESSIONS_COMPLETED,
-                SESSIONS_FAILED,
-            )
-
-            if new_status == self.COMPLETED:
-                SESSIONS_COMPLETED.inc()
-                SESSIONS_ACTIVE.dec()
-
-            elif new_status == self.FAILED:
-                SESSIONS_FAILED.inc()
-                SESSIONS_ACTIVE.dec()
 
             # Update Redis cache
             session_data = self.state_sync.get_session_state(session_id)
@@ -228,8 +196,8 @@ class SessionManager:
 
             return True
 
-        except Exception as e:
-            logger.error(f"Error updating session status: {e!s}")
+        except Exception:
+            logger.error("Error updating session status")
             session_db.rollback()
             return False
         finally:
@@ -288,8 +256,8 @@ class SessionManager:
             finally:
                 session_db.close()
 
-        except Exception as e:
-            logger.error(f"Error retrieving session: {e!s}")
+        except Exception:
+            logger.error("Error retrieving session")
             return None
 
     def mark_session_failed(self, session_id: str, error_message: str) -> bool:
@@ -303,14 +271,6 @@ class SessionManager:
         Returns:
             bool: True if successful
         """
-        from monitoring.prometheus_metrics import (
-            SESSIONS_ACTIVE,
-            SESSIONS_FAILED,
-        )
-
-        SESSIONS_FAILED.inc()
-        print("SESSIONS_FAILED =", SESSIONS_FAILED._value.get())
-        SESSIONS_ACTIVE.dec()
         logger.warning(f"Marking session {session_id} as failed: {error_message}")
 
         return self.update_session_status(session_id, self.FAILED, {"error_message": error_message})
@@ -341,24 +301,7 @@ class SessionManager:
             interview.risk_score = risk_score
             interview.end_time = _utcnow()
             interview.updated_at = _utcnow()
-
-            from monitoring.prometheus_metrics import (
-                RISK_SCORE,
-                SESSION_PROCESSING_DURATION,
-                SESSIONS_ACTIVE,
-                SESSIONS_COMPLETED,
-            )
-
             session_db.commit()
-            SESSIONS_COMPLETED.inc()
-            print("SESSIONS_COMPLETED =", SESSIONS_COMPLETED._value.get())
-            SESSIONS_ACTIVE.dec()
-
-            RISK_SCORE.observe(risk_score)
-
-            if interview.start_time:
-                duration = (interview.end_time - interview.start_time).total_seconds()
-                SESSION_PROCESSING_DURATION.observe(duration)
 
             # Update Redis
             session_data = self.state_sync.get_session_state(session_id)
@@ -372,8 +315,8 @@ class SessionManager:
             logger.info(f"Session {session_id} marked as completed")
             return True
 
-        except Exception as e:
-            logger.error(f"Error marking session completed: {e!s}")
+        except Exception:
+            logger.error("Error marking session completed")
             session_db.rollback()
             return False
         finally:
