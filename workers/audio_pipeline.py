@@ -66,11 +66,28 @@ def _real_transcribe(session_id: str) -> dict[str, Any] | None:
         from workers.ai_client import transcribe_audio_file
 
         audio_path = f"{AUDIO_TEMP_DIR}/interview_{session_id}.wav"
+
+        # Check if the audio file exists
         if not os.path.exists(audio_path):
-            logger.warning("Audio file not found: %s", audio_path)
+            logger.warning(
+                "Audio file not found for session %s: %s",
+                session_id,
+                audio_path,
+            )
             return None
+
+        # Check if the audio file is empty
+        if os.path.getsize(audio_path) == 0:
+            logger.warning(
+                "Audio file is empty (0 bytes) for session %s: %s",
+                session_id,
+                audio_path,
+            )
+            return None
+
         result = transcribe_audio_file(audio_path)
         segments = result.get("segments", [])
+
         if segments:
             avg_logprob = np.mean([s.get("avg_logprob", -1.0) for s in segments])
 
@@ -80,6 +97,7 @@ def _real_transcribe(session_id: str) -> dict[str, Any] | None:
             )
         else:
             confidence = 0.0
+            avg_logprob = 0.0
 
         logger.info(
             "avg_logprob=%s, confidence=%s",
@@ -113,7 +131,7 @@ def _real_transcribe(session_id: str) -> dict[str, Any] | None:
             exc,
             exc_info=True,
         )
-    return None
+        return None
 
 
 def _real_detect_background_voices(session_id: str) -> dict[str, Any] | None:
@@ -296,6 +314,7 @@ def detect_background_voices(session_id: str) -> dict[str, Any]:
         "background_voices_detected": multi,
         "voice_count": 2 if multi else 1,
         "confidence": round(_seeded_unit(session_id, "bg_conf"), 3),
+        "speaker_segments": [],
         "timestamps": [],
     }
 
@@ -316,7 +335,19 @@ def detect_suspicious_conversation(session_id: str) -> dict[str, Any]:
         "suspicious_pattern_detected": suspicious,
         "pattern_type": pattern if suspicious else None,
         "confidence": round(_seeded_unit(session_id, "susp_conf"), 3),
-        "details": {},
+        "details": {
+            "indicators": [
+                "monotone_delivery",
+                "scripted_phrasing",
+            ],
+            "flagged_segments": [
+                round(_seeded_unit(session_id, "seg1") * 200),
+                round(_seeded_unit(session_id, "seg2") * 200),
+            ],
+            "analysis_version": "stub-v1",
+        }
+        if suspicious
+        else {},
     }
 
 
