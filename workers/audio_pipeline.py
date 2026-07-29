@@ -78,12 +78,7 @@ def _real_transcribe(session_id: str, audio_url: str | None = None) -> dict[str,
             try:
                 urllib.request.urlretrieve(url, audio_path)
             except Exception as e:
-                logger.warning(
-                    "Error downloading audio for session %s from %s: %s",
-                    session_id,
-                    url,
-                    e
-                )
+                logger.warning("Error downloading audio for session %s from %s: %s", session_id, url, e)
                 return None
 
             # Check if the audio file is empty
@@ -162,12 +157,7 @@ def _real_detect_background_voices(session_id: str, audio_url: str | None = None
             try:
                 urllib.request.urlretrieve(url, audio_path)
             except Exception as e:
-                logger.warning(
-                    "Error downloading audio for session %s from %s: %s",
-                    session_id,
-                    url,
-                    e
-                )
+                logger.warning("Error downloading audio for session %s from %s: %s", session_id, url, e)
                 return None
 
             segments = detect_speaker_segments(audio_path)

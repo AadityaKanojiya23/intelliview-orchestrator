@@ -168,6 +168,7 @@ class HealthMonitor:
     async def _check_all_dependencies(self) -> dict[str, dict[str, Any]]:
         """Check every critical dependency and return its status."""
         import asyncio
+
         results: dict[str, dict[str, Any]] = {}
 
         # Redis
