@@ -1,10 +1,7 @@
 import datetime
+
 from deduplication import generate_idempotency_key
-from storage import (
-    notification_exists,
-    save_notification,
-    get_timestamp
-)
+from storage import get_timestamp, notification_exists, save_notification
 
 print("===== Notification Deduplication System =====")
 

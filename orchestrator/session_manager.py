@@ -130,7 +130,6 @@ class SessionManager:
             return session_id
 
         except Exception:
-            logger.error("Error creating session")
             session_db.rollback()
             raise
         finally:
@@ -197,7 +196,6 @@ class SessionManager:
             return True
 
         except Exception:
-            logger.error("Error updating session status")
             session_db.rollback()
             return False
         finally:
@@ -257,7 +255,7 @@ class SessionManager:
                 session_db.close()
 
         except Exception:
-            logger.error("Error retrieving session")
+            session_db.rollback()
             return None
 
     def mark_session_failed(self, session_id: str, error_message: str) -> bool:
@@ -316,7 +314,6 @@ class SessionManager:
             return True
 
         except Exception:
-            logger.error("Error marking session completed")
             session_db.rollback()
             return False
         finally:
