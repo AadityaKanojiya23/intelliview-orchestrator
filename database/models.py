@@ -224,7 +224,6 @@ class InterviewTemplate(Base):
         )
 
 
-
 class Notification(Base):
     """In-app notification"""
 

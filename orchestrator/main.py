@@ -392,15 +392,15 @@ class CreateNotificationRequest(BaseModel):
             raise ValueError("Message cannot be empty.")
         return value
 
+
 class NotificationResponse(BaseModel):
     id: int
     user_id: str
     message: str
     read: bool
     created_at: datetime
-    model_config = {
-        "from_attributes": True
-    }
+    model_config = {"from_attributes": True}
+
 
 class WorkerRegistrationRequest(BaseModel):
     """Request model for worker registration"""
@@ -1058,6 +1058,7 @@ async def get_task_status(
 
 # ========== Notification Center Endpoints ==========
 
+
 @app.post("/notifications", response_model=NotificationResponse)
 async def create_notification(request: CreateNotificationRequest):
     """
@@ -1070,35 +1071,41 @@ async def create_notification(request: CreateNotificationRequest):
     )
 
     return NotificationResponse(
-    id=notification.id,
-    user_id=notification.user_id,
-    message=notification.message,
-    read=notification.read,
-    created_at=notification.created_at,
-)
-
-@app.get("/notifications", response_model=list[NotificationResponse])
-async def get_notifications(user_id: str,skip: int = 0,limit: int = 20,):
-    """
-    Get all notifications for a user.
-    """
-
-    notifications = notification_manager.get_notifications(
-    user_id=user_id,
-    skip=skip,
-    limit=limit,
-    )
-
-    return [
-    NotificationResponse(
         id=notification.id,
         user_id=notification.user_id,
         message=notification.message,
         read=notification.read,
         created_at=notification.created_at,
     )
-    for notification in notifications
-]
+
+
+@app.get("/notifications", response_model=list[NotificationResponse])
+async def get_notifications(
+    user_id: str,
+    skip: int = 0,
+    limit: int = 20,
+):
+    """
+    Get all notifications for a user.
+    """
+
+    notifications = notification_manager.get_notifications(
+        user_id=user_id,
+        skip=skip,
+        limit=limit,
+    )
+
+    return [
+        NotificationResponse(
+            id=notification.id,
+            user_id=notification.user_id,
+            message=notification.message,
+            read=notification.read,
+            created_at=notification.created_at,
+        )
+        for notification in notifications
+    ]
+
 
 @app.patch("/notifications/{notification_id}/read", response_model=NotificationResponse)
 async def mark_notification_as_read(notification_id: int, user_id: str):
@@ -1118,12 +1125,14 @@ async def mark_notification_as_read(notification_id: int, user_id: str):
         )
 
     return NotificationResponse(
-    id=notification.id,
-    user_id=notification.user_id,
-    message=notification.message,
-    read=notification.read,
-    created_at=notification.created_at,
-)
+        id=notification.id,
+        user_id=notification.user_id,
+        message=notification.message,
+        read=notification.read,
+        created_at=notification.created_at,
+    )
+
+
 # ========== Session Tracking Endpoints ==========
 
 

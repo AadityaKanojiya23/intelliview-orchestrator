@@ -4,11 +4,19 @@ from database.db import SessionLocal
 from database.models import Notification
 
 logger = logging.getLogger(__name__)
+
+
 class NotificationManager:
     """Handles notification operations."""
+
     def __init__(self):
         self.db = SessionLocal()
-    def create_notification(self,user_id: str,message: str,) -> Notification:
+
+    def create_notification(
+        self,
+        user_id: str,
+        message: str,
+    ) -> Notification:
         """Create a new notification."""
 
         notification = Notification(
@@ -27,7 +35,12 @@ class NotificationManager:
 
         return notification
 
-    def get_notifications(self,user_id: str,skip: int = 0,limit: int = 20,) -> list[Notification]:
+    def get_notifications(
+        self,
+        user_id: str,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> list[Notification]:
 
         return (
             self.db.query(Notification)
@@ -38,7 +51,11 @@ class NotificationManager:
             .all()
         )
 
-    def mark_as_read(self,notification_id: int,user_id: str,) -> Notification | None:
+    def mark_as_read(
+        self,
+        notification_id: int,
+        user_id: str,
+    ) -> Notification | None:
         """Mark a user's notification as read."""
 
         notification = (
