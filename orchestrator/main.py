@@ -13,6 +13,7 @@ Integrates:
 """
 
 import io
+import json
 import logging
 import re
 import time
@@ -34,6 +35,7 @@ from config import (
     CORS_ALLOW_ORIGINS,
     ENABLE_PROMETHEUS,
     MAX_REQUEST_BODY_BYTES,
+    get_settings,
 )
 from database.db import engine, get_db
 from database.models import Base, Candidate, InterviewSession
@@ -64,7 +66,10 @@ from orchestrator.load_balancer import BalancingStrategy, LoadBalancer
 from orchestrator.logging_config import configure_logging, log_event
 from orchestrator.question_bank import QuestionBank
 from orchestrator.rate_limiter import RateLimiterMiddleware
-from orchestrator.redis_client import circuit_breaker
+from orchestrator.redis_client import (
+    circuit_breaker,
+    get_redis_client,
+)
 from orchestrator.request_validation import RequestValidationMiddleware
 from orchestrator.retry_manager import RetryManager, RetryStrategy
 from orchestrator.scheduler import Scheduler, TaskPriority
@@ -84,25 +89,47 @@ APP_START_TIME = datetime.now(timezone.utc)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Execute on application startup/shutdown.
+    """Execute on application startup/shutdown."""
 
-    Startup: ensure schema exists, run an initial health probe, and warn
-    loudly if the default API token is still in use.
-
-    Shutdown: best-effort graceful drain — flush the request-id log line,
-    close the shared Redis client, and notify clients.
-    """
     Base.metadata.create_all(bind=engine)
+
     if API_TOKEN == "dev-token-change-me":
         logger.warning(
             "API_TOKEN is the built-in dev default — set a strong token "
             "in production via the API_TOKEN env var."
         )
+
     logger.info("AI Interview Orchestrator server starting...")
+
+    settings = get_settings()
+    redis_client = get_redis_client()
+
+    try:
+        redis_client.hset(
+            "config:startup",
+            mapping={
+                "worker_concurrency": str(settings.worker_concurrency),
+                "max_retries": str(settings.max_retries),
+                "cors_allow_origins": json.dumps(settings.cors_allow_origins),
+                "realtime_enabled": str(settings.realtime_enabled),
+                "moment_tracking_enabled": str(settings.moment_tracking_enabled),
+            },
+        )
+
+        logger.info("Configuration cache warmed successfully.")
+
+    except Exception as exc:
+        logger.warning(
+            "Configuration cache warm-up failed: %s",
+            exc,
+        )
+
     try:
         yield
+
     finally:
         logger.info("AI Interview Orchestrator server shutting down...")
+
         for resource in (ws_manager, state_sync, metrics_collector):
             close = getattr(resource, "close", None)
             if callable(close):
@@ -1843,6 +1870,9 @@ async def retry_failed_session(session_id: str):
                 status_code=400,
                 detail=f"Session {session_id} has exceeded maximum retry attempts",
             )
+
+        # Get retry info
+        retry_manager.get_retry_info(session_id)
 
         # Schedule retry with exponential backoff
         # Schedule retry
