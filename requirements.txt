@@ -34,3 +34,7 @@ opentelemetry-sdk
 opentelemetry-instrumentation-fastapi
 opentelemetry-instrumentation-celery
 opentelemetry-exporter-otlp
+
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
