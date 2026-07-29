@@ -1,15 +1,11 @@
 import datetime
+
 from deduplication import generate_idempotency_key
-from storage import (
-    notification_exists,
-    save_notification,
-    get_timestamp
-)
+from storage import get_timestamp, notification_exists, save_notification
 
 print("===== Notification Deduplication System =====")
 
 while True:
-
     # Event Name Validation
     event = input("\nEnter Event Name: ").strip()
     if not event:
@@ -33,30 +29,20 @@ while True:
 
     # Check for Duplicate Notification
     if notification_exists(key):
-
         print("\nNotification Skipped")
 
-        print({
-            "idempotency_key": key,
-            "status": "skipped_duplicate",
-            "original_sent_at": get_timestamp(key)
-        })
+        print({"idempotency_key": key, "status": "skipped_duplicate", "original_sent_at": get_timestamp(key)})
 
     else:
-
         save_notification(key, timestamp)
 
         print("\nNotification Sent Successfully")
 
-        print({
-            "idempotency_key": key,
-            "status": "sent",
-            "sent_at": timestamp
-        })
+        print({"idempotency_key": key, "status": "sent", "sent_at": timestamp})
 
     # Continue or Exit
     choice = input("\nSend another notification? (y/n): ").strip().lower()
 
-    if choice != 'y':
+    if choice != "y":
         print("\nExiting Notification Deduplication System.")
         break

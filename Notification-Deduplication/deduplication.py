@@ -1,5 +1,6 @@
 import hashlib
 
+
 def generate_idempotency_key(event, user):
     """
     Generates a SHA-256 hash based ONLY on event and user.
