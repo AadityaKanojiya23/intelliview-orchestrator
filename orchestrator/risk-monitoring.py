@@ -1,6 +1,7 @@
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any, Dict
 from sqlalchemy.orm import Session
+
 from .models import RiskPredictionMonitoring
 
 class RiskMonitoringService:
@@ -37,18 +38,20 @@ class RiskMonitoringService:
         base_query = db.query(RiskPredictionMonitoring).filter(
             RiskPredictionMonitoring.predicted_risk_level == "HIGH"
         )
-        
+
         total_high = base_query.count()
-        
+
         # Branch filters from base_query without mutating it, or filter separately
         confirmed = base_query.filter(
             RiskPredictionMonitoring.recruiter_outcome == "CONFIRM"
         ).count()
-        
+
         false_positives = base_query.filter(
             RiskPredictionMonitoring.is_false_positive.is_(True)
         ).count()
-        
+
+        reviewed = confirmed + false_positives
+        fp_rate = ((false_positives / reviewed) * 100) if reviewed > 0 else 0.0
         reviewed = confirmed + false_positives
         fp_rate = ((false_positives / reviewed) * 100) if reviewed > 0 else 0.0
 
