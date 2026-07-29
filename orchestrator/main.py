@@ -13,6 +13,7 @@ Integrates:
 """
 
 import io
+import json
 import logging
 import re
 import time
@@ -23,6 +24,11 @@ from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -34,6 +40,7 @@ from config import (
     CORS_ALLOW_ORIGINS,
     ENABLE_PROMETHEUS,
     MAX_REQUEST_BODY_BYTES,
+    get_settings,
 )
 from database.db import engine, get_db
 from database.models import Base, Candidate, InterviewSession
@@ -64,7 +71,10 @@ from orchestrator.load_balancer import BalancingStrategy, LoadBalancer
 from orchestrator.logging_config import configure_logging, log_event
 from orchestrator.question_bank import QuestionBank
 from orchestrator.rate_limiter import RateLimiterMiddleware
-from orchestrator.redis_client import circuit_breaker
+from orchestrator.redis_client import (
+    circuit_breaker,
+    get_redis_client,
+)
 from orchestrator.request_validation import RequestValidationMiddleware
 from orchestrator.retry_manager import RetryManager, RetryStrategy
 from orchestrator.scheduler import Scheduler, TaskPriority
@@ -84,28 +94,47 @@ APP_START_TIME = datetime.now(timezone.utc)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Execute on application startup/shutdown.
+    """Execute on application startup/shutdown."""
 
-    Startup: ensure schema exists, run an initial health probe, and warn
-    loudly if the default API token is still in use.
+    Base.metadata.create_all(bind=engine)
 
-    Shutdown: best-effort graceful drain — flush the request-id log line,
-    close the shared Redis client, and notify clients.
-    """
-    # Schema is managed by Alembic migrations (run `alembic upgrade head` before
-    # starting the server). Do NOT call Base.metadata.create_all() here — it
-    # blocks the event loop with synchronous DDL and delays the port binding,
-    # which causes health-check timeouts in Docker.
     if API_TOKEN == "dev-token-change-me":
         raise RuntimeError(
             "CRITICAL SECURITY ERROR: Default API_TOKEN detected! "
             "You MUST set a secure API_TOKEN environment variable."
         )
+
     logger.info("AI Interview Orchestrator server starting...")
+
+    settings = get_settings()
+    redis_client = get_redis_client()
+
+    try:
+        redis_client.hset(
+            "config:startup",
+            mapping={
+                "worker_concurrency": str(settings.worker_concurrency),
+                "max_retries": str(settings.max_retries),
+                "cors_allow_origins": json.dumps(settings.cors_allow_origins),
+                "realtime_enabled": str(settings.realtime_enabled),
+                "moment_tracking_enabled": str(settings.moment_tracking_enabled),
+            },
+        )
+
+        logger.info("Configuration cache warmed successfully.")
+
+    except Exception as exc:
+        logger.warning(
+            "Configuration cache warm-up failed: %s",
+            exc,
+        )
+
     try:
         yield
+
     finally:
         logger.info("AI Interview Orchestrator server shutting down...")
+
         for resource in (ws_manager, state_sync, metrics_collector):
             close = getattr(resource, "close", None)
             if callable(close):
@@ -131,6 +160,16 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+logging.getLogger("opentelemetry.exporter.otlp.proto.grpc.exporter").setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
+
+trace.set_tracer_provider(TracerProvider())
+tracer_provider = trace.get_tracer_provider()
+otlp_exporter = OTLPSpanExporter(endpoint="http://jaeger:4317", insecure=True)
+tracer_provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+
+FastAPIInstrumentor.instrument_app(app)
 
 
 @app.middleware("http")
@@ -172,6 +211,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         incoming = request.headers.get("x-request-id", "").strip()
         request_id = incoming if _VALID_ID_RE.match(incoming) else uuid4().hex
         request.state.request_id = request_id
+        trace.get_current_span().set_attribute("request_id", request_id)
         start = _time.perf_counter()
         try:
             response = await call_next(request)
@@ -1846,6 +1886,9 @@ async def retry_failed_session(session_id: str):
                 status_code=400,
                 detail=f"Session {session_id} has exceeded maximum retry attempts",
             )
+
+        # Get retry info
+        retry_manager.get_retry_info(session_id)
 
         # Schedule retry with exponential backoff
         # Schedule retry
