@@ -1,6 +1,4 @@
 """
-Load Balancer
-Implements intelligent task distribution strategies across worker nodes
 
 Strategies:
 1. Round Robin - Distribute tasks evenly in sequence
@@ -162,11 +160,11 @@ class LoadBalancer:
             # Select a worker that's not overloaded
             underutilized = [w for w in available if w["active_tasks"] < w["capacity"] * 0.7]
             if underutilized:
-                return underutilized[0]
-            return available[0]
+                return min(underutilized, key=lambda w: w["active_tasks"])
+            return min(available, key=lambda w: w["active_tasks"])
 
         # For low priority, select any available
-        return available[-1]  # Select the one with most load (fill it up)
+        return max(available, key=lambda w: w["active_tasks"])  # Select the one with most load (fill it up)
 
     def is_system_overloaded(self, threshold: float = 0.9) -> bool:
         """
