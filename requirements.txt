@@ -42,3 +42,6 @@ opentelemetry-exporter-otlp
 python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
+
+# === Audio & VAD processing ===
+numpy>=1.24.0
