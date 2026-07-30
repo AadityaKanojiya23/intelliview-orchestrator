@@ -34,31 +34,25 @@ function NullFallback() {
   return null;
 }
 
+// Wrapper to resolve the dynamic import of ScreenLock and its hook
 function ScreenLockWrapper() {
-  const [isLocked, setIsLocked] = useState(false);
+  const [Components, setComponents] = useState(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem("intelliview_screen_lock");
-    if (stored === "locked") setIsLocked(true);
-
-    const interval = setInterval(() => {
-      if (localStorage.getItem("intelliview_screen_lock") === "locked") {
-        setIsLocked(true);
-      }
-    }, 2000);
-    return () => clearInterval(interval);
+    import("@/components/ScreenLock").then((m) => {
+      setComponents({ UI: m.default, useScreenLock: m.useScreenLock });
+    });
   }, []);
 
-  const handleUnlock = useCallback((pin) => {
-    if (pin === "1234") {
-      setIsLocked(false);
-      localStorage.removeItem("intelliview_screen_lock");
-      return true;
-    }
-    return false;
-  }, []);
+  if (!Components) return null;
 
-  return <ScreenLock isLocked={isLocked} onUnlock={handleUnlock} />;
+  return <ScreenLockInner UI={Components.UI} useScreenLock={Components.useScreenLock} />;
+}
+
+// Inner component where we can safely call the hook
+function ScreenLockInner({ UI, useScreenLock }) {
+  const { isLocked, unlock } = useScreenLock();
+  return <UI isLocked={isLocked} onUnlock={unlock} />;
 }
 
 export function ClientProviders({ children }) {
@@ -83,8 +77,18 @@ export function ClientProviders({ children }) {
         setPaletteOpen((o) => !o);
       }
     };
+    const onPalette = () => setPaletteOpen(true);
+    const onHelp = () => setHelpOpen(true);
+    
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    window.addEventListener("open-command-palette", onPalette);
+    window.addEventListener("open-shortcuts-help", onHelp);
+    
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("open-command-palette", onPalette);
+      window.removeEventListener("open-shortcuts-help", onHelp);
+    };
   }, []);
 
   useEffect(() => {
