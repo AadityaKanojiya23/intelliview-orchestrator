@@ -39,58 +39,20 @@ class LoadBalancer:
         self.worker_registry = WorkerRegistry()
         self.strategy = strategy
         self.round_robin_index = 0
+        self._lock = threading.Lock()
         self.round_robin_lock = threading.Lock()
         logger.info(f"Load Balancer initialized with strategy: {strategy.value}")
 
     def select_worker(self) -> dict[str, Any] | None:
-        """
-        Select a worker for task execution based on current strategy.
-        Includes a safety net if the selected strategy raises an exception.
-
-        Returns:
-            dict: Selected worker details or None if no workers available
-        """
-        try:
+        with self._lock:
             if self.strategy == BalancingStrategy.ROUND_ROBIN:
                 return self._select_round_robin()
             if self.strategy == BalancingStrategy.LEAST_LOADED:
                 return self._select_least_loaded()
             if self.strategy == BalancingStrategy.QUEUE_BASED:
                 return self._select_queue_based()
-            # Default to least loaded
+
             return self._select_least_loaded()
-        except Exception as exc:
-            logger.error(
-                f"Primary load balancing strategy '{self.strategy.value}' failed with error: {exc}. "
-                f"Triggering fallback worker selection mechanism.",
-                exc_info=True,
-            )
-            return self._fallback_select()
-
-    def _fallback_select(self) -> dict[str, Any] | None:
-        """
-        Safety net fallback: Attempts to pick any reachable/available worker
-        when the primary strategy fails.
-
-        Returns:
-            dict: First available worker or None if registry completely fails
-        """
-        try:
-            available = self.worker_registry.get_available_workers()
-            if available:
-                selected = available[0]
-                logger.warning(
-                    f"Fallback strategy successfully selected worker: {selected.get('worker_id', 'unknown')}"
-                )
-                return selected
-            logger.warning("Fallback strategy found no available workers")
-            return None
-        except Exception as fallback_exc:
-            logger.critical(
-                f"Fallback worker selection failed as well: {fallback_exc}",
-                exc_info=True,
-            )
-            return None
 
     def _select_round_robin(self) -> dict[str, Any] | None:
         """
@@ -161,14 +123,9 @@ class LoadBalancer:
         return worker
 
     def switch_strategy(self, strategy: BalancingStrategy) -> None:
-        """
-        Switch to a different load balancing strategy
-
-        Args:
-            strategy: New strategy to use
-        """
-        self.strategy = strategy
-        logger.info(f"Switched to {strategy.value} strategy")
+        with self._lock:
+            self.strategy = strategy
+            logger.info(f"Switched to {strategy.value} strategy")
 
     def get_best_worker_for_priority(self, priority: str) -> dict[str, Any] | None:
         """
