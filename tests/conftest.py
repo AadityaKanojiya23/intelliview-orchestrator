@@ -45,6 +45,7 @@ os.environ.setdefault("POSTGRES_USER", "postgres")
 os.environ.setdefault("POSTGRES_PASSWORD", "postgres")
 os.environ.setdefault("API_TOKEN", "test-token")
 
+
 @pytest.fixture(scope="session")
 def postgres_container():
     """Start a PostgreSQL Testcontainer for integration tests."""
@@ -61,6 +62,7 @@ def postgres_container():
 @pytest.fixture(scope="session")
 def api_base_url() -> str:
     return os.getenv("API_BASE_URL", "http://localhost:8000")
+
 
 @pytest.fixture(scope="session")
 def celery_config():
