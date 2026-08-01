@@ -23,15 +23,21 @@ from orchestrator.session_tracker import SessionTracker
 
 
 @pytest.fixture
-def db_session():
-    engine = create_engine("sqlite:///:memory:", future=True)
+def db_session(postgres_container):
+    engine = create_engine(
+        postgres_container.get_connection_url(),
+        future=True,
+    )
     Base.metadata.create_all(engine)
+
     TestingSessionLocal = sessionmaker(bind=engine)
     session = TestingSessionLocal()
+
     try:
         yield session
     finally:
         session.close()
+        Base.metadata.drop_all(engine)
         engine.dispose()
 
 

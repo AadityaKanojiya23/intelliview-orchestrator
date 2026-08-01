@@ -10,6 +10,7 @@ import pathlib
 import sys
 
 import pytest
+from testcontainers.postgres import PostgresContainer
 
 # Make project root importable so `from config import ...` works.
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -24,6 +25,17 @@ os.environ.setdefault("POSTGRES_USER", "postgres")
 os.environ.setdefault("POSTGRES_PASSWORD", "postgres")
 os.environ.setdefault("API_TOKEN", "test-token")
 
+@pytest.fixture(scope="session")
+def postgres_container():
+    """Start a PostgreSQL Testcontainer for integration tests."""
+    with PostgresContainer("postgres:16") as postgres:
+        os.environ["POSTGRES_HOST"] = postgres.get_container_host_ip()
+        os.environ["POSTGRES_PORT"] = str(postgres.get_exposed_port(5432))
+        os.environ["POSTGRES_DB"] = postgres.dbname
+        os.environ["POSTGRES_USER"] = postgres.username
+        os.environ["POSTGRES_PASSWORD"] = postgres.password
+        os.environ["DATABASE_URL"] = postgres.get_connection_url()
+        yield postgres
 
 @pytest.fixture(scope="session")
 def api_base_url() -> str:
