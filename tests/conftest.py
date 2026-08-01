@@ -60,8 +60,7 @@ def postgres_container():
 
 @pytest.fixture(scope="session")
 def api_base_url() -> str:
-    return os.getenv("API_BASE_URL", "http://localhost:8000")   
-
+    return os.getenv("API_BASE_URL", "http://localhost:8000")
 
 @pytest.fixture(scope="session")
 def celery_config():
