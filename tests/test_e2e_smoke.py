@@ -50,7 +50,6 @@ def test_start_interview_and_get_status(api_base_url):
         f"{api_base_url}/start-interview",
         headers=API_HEADERS,
         json={"candidate_id": f"cand-{uuid.uuid4().hex[:8]}", "priority": "high"},
-        headers={"X-API-Token":"api123"},
         timeout=10.0,
     )
     assert r.status_code == 200, r.text
@@ -96,9 +95,6 @@ def test_worker_register_requires_token(api_base_url):
     r = httpx.post(
         f"{api_base_url}/register-worker",
         json={"worker_id": "test-w", "capacity": 2},
-
-        headers={"X-API-Token": "api123"},
-
         headers=API_HEADERS,
         timeout=5.0,
     )
@@ -112,7 +108,6 @@ def test_full_pipeline_completes(api_base_url):
         f"{api_base_url}/start-interview",
         headers=API_HEADERS,
         json={"candidate_id": f"e2e-{uuid.uuid4().hex[:8]}", "priority": "medium"},
-        headers={"X-API-Token": "api123"},
         timeout=10.0,
     )
     assert r.status_code == 200
