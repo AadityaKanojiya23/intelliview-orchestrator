@@ -1,9 +1,9 @@
 """Celery Application Setup.
-
 Initialises Celery with the Redis broker, sensible reliability defaults,
 and a `session_failed` signal that lets us mark the DB session as
 FAILED only after Celery has exhausted its retries.
 """
+
 from celery import Celery, signals
 from opentelemetry.instrumentation.celery import CeleryInstrumentor
 

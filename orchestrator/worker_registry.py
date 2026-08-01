@@ -491,17 +491,13 @@ class WorkerRegistry:
                 for wid, w in self.local_workers.items()
             ]
             capacity_utilization = round(
-                (total_active_tasks / total_capacity * 100)
-                if total_capacity > 0
-                else 0,
+                (total_active_tasks / total_capacity * 100) if total_capacity > 0 else 0,
                 2,
             )
             SYSTEM_UTILIZATION.set(
                 round(
-                    total_active_tasks / total_capacity
-                        if total_capacity
-                        else 0,
-                        2,
+                    total_active_tasks / total_capacity if total_capacity else 0,
+                    2,
                 )
             )
             return {
