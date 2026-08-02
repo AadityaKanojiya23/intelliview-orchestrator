@@ -1,6 +1,9 @@
 "use client";
+
+
 import { useMemo, useState, useCallback } from "react";
 import useSWR from "swr";
+import MetricsDashboard from "@/components/analytics/MetricsDashboard";
 import {
   Bar,
   BarChart,
@@ -406,6 +409,10 @@ export default function AnalyticsPage() {
             onClose={() => setDrillDown(null)}
           />
         )}
+</div>
+
+      <div className="border-t border-border pt-6">
+        <MetricsDashboard />
       </div>
     </ErrorBoundary>
   );
