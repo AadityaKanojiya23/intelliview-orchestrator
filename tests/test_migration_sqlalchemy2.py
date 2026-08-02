@@ -17,7 +17,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from database.db import Base
-from database.models import Candidate,InterviewSession
+from database.models import Candidate, InterviewSession
 from orchestrator.session_manager import SessionManager
 from orchestrator.session_tracker import SessionTracker
 
@@ -62,13 +62,13 @@ def _make_session(
 
 def test_session_tracker_active_sessions(db_session):
     db_session.add_all(
-    [
-        Candidate(candidate_id="cand-s1", name="Test 1", email="test1@example.com"),
-        Candidate(candidate_id="cand-s2", name="Test 2", email="test2@example.com"),
-        Candidate(candidate_id="cand-s3", name="Test 3", email="test3@example.com"),
-        Candidate(candidate_id="cand-s4", name="Test 4", email="test4@example.com"),
-    ]
-)
+        [
+            Candidate(candidate_id="cand-s1", name="Test 1", email="test1@example.com"),
+            Candidate(candidate_id="cand-s2", name="Test 2", email="test2@example.com"),
+            Candidate(candidate_id="cand-s3", name="Test 3", email="test3@example.com"),
+            Candidate(candidate_id="cand-s4", name="Test 4", email="test4@example.com"),
+        ]
+    )
     db_session.commit()
 
     db_session.add_all(
@@ -92,12 +92,12 @@ def test_session_tracker_active_sessions(db_session):
 
 def test_session_tracker_high_risk(db_session):
     db_session.add_all(
-    [
-        Candidate(candidate_id="cand-s1", name="Test 1", email="test1@example.com"),
-        Candidate(candidate_id="cand-s2", name="Test 2", email="test2@example.com"),
-        Candidate(candidate_id="cand-s3", name="Test 3", email="test3@example.com"),
-    ]
-)
+        [
+            Candidate(candidate_id="cand-s1", name="Test 1", email="test1@example.com"),
+            Candidate(candidate_id="cand-s2", name="Test 2", email="test2@example.com"),
+            Candidate(candidate_id="cand-s3", name="Test 3", email="test3@example.com"),
+        ]
+    )
     db_session.commit()
     db_session.add_all(
         [
@@ -118,13 +118,13 @@ def test_session_tracker_high_risk(db_session):
 
 def test_session_tracker_statistics(db_session):
     db_session.add_all(
-    [
-        Candidate(candidate_id="cand-s1", name="Test 1", email="test1@example.com"),
-        Candidate(candidate_id="cand-s2", name="Test 2", email="test2@example.com"),
-        Candidate(candidate_id="cand-s3", name="Test 3", email="test3@example.com"),
-        Candidate(candidate_id="cand-s4", name="Test 4", email="test4@example.com"),
-    ]
-)
+        [
+            Candidate(candidate_id="cand-s1", name="Test 1", email="test1@example.com"),
+            Candidate(candidate_id="cand-s2", name="Test 2", email="test2@example.com"),
+            Candidate(candidate_id="cand-s3", name="Test 3", email="test3@example.com"),
+            Candidate(candidate_id="cand-s4", name="Test 4", email="test4@example.com"),
+        ]
+    )
     db_session.commit()
     db_session.add_all(
         [
@@ -155,12 +155,12 @@ def test_session_manager_state_machine(db_session):
     smod.SessionLocal = lambda: db_session
 
     db_session.add(
-    Candidate(
-        candidate_id="c1",
-        name="Test Candidate",
-        email="c1@example.com",
+        Candidate(
+            candidate_id="c1",
+            name="Test Candidate",
+            email="c1@example.com",
+        )
     )
-)
     db_session.commit()
     db_session.add(
         InterviewSession(
@@ -187,12 +187,12 @@ def test_session_manager_rejects_invalid_transition(db_session):
     smod.SessionLocal = lambda: db_session
 
     db_session.add(
-    Candidate(
-        candidate_id="c2",
-        name="Test Candidate",
-        email="c2@example.com",
+        Candidate(
+            candidate_id="c2",
+            name="Test Candidate",
+            email="c2@example.com",
+        )
     )
-)
     db_session.commit()
 
     db_session.add(
