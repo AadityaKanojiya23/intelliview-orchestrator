@@ -148,7 +148,7 @@ export default function RiskTimeline({
                       moment.type
                     )}`}
                     style={{
-                      left: `${Math.min(left, 100)}%`,
+                      left: `${Math.min(Math.max(left, 1), 99)}%`,
                     }}
                   />
                 );
