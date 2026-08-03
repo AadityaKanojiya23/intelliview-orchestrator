@@ -11,8 +11,7 @@ This module implements the **asynchronous processing pipeline** for interview se
 | `celery_app.py` | Celery application instance, reliability config, Beat schedule, and the `task_failure` signal handler |
 | `tasks.py` | The actual task definitions and the pipeline orchestration logic |
 | `video_pipeline.py` | Video analysis stage (invoked by `_run_video`) |
-| `audio_pipeline.py` | Audio analysis stage (invoked by `_run_audio`), integrated with VAD pre-filtering |
-| `vad.py` | Voice Activity Detection (VAD) engine & configuration settings (see `docs/VAD_WORKFLOW.md`) |
+| `audio_pipeline.py` | Audio analysis stage (invoked by `_run_audio`) |
 | `evaluation_pipeline.py` | Answer evaluation stage |
 | `risk_engine.py` | Final risk scoring, run after evaluation |
 
