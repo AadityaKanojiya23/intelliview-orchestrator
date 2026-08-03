@@ -86,6 +86,8 @@ def test_full_capacity_workers_excluded():
     lb = LoadBalancer()
     lb.worker_registry = FakeRegistry(workers)
     assert lb.select_worker()["worker_id"] in {"w3"}
+
+
 def test_weighted_least_loaded_prefers_higher_weight_worker():
     workers = [
         {
@@ -110,6 +112,8 @@ def test_weighted_least_loaded_prefers_higher_weight_worker():
     selected = lb.select_worker()
 
     assert selected["worker_id"] == "w2"
+
+
 def test_weighted_least_loaded_prefers_higher_weight():
     workers = [
         {
@@ -128,9 +132,7 @@ def test_weighted_least_loaded_prefers_higher_weight():
         },
     ]
 
-    lb = LoadBalancer(
-        strategy=BalancingStrategy.WEIGHTED_LEAST_LOADED
-    )
+    lb = LoadBalancer(strategy=BalancingStrategy.WEIGHTED_LEAST_LOADED)
 
     lb.worker_registry = FakeRegistry(workers)
 
