@@ -43,7 +43,6 @@ REQUEST_COUNT = Counter(
     ["method", "path", "status"],
     registry=registry,
 )
-REDIS_HEALTH = Gauge("redis_health", "Redis connection health status")
 
 REQUEST_DURATION = Histogram(
     "intelliview_http_request_duration_seconds",
@@ -184,6 +183,41 @@ CELERY_ACTIVE_TASKS = Gauge(
     "intelliview_celery_active_tasks",
     "Currently running Celery tasks",
     ["task_name"],
+    registry=registry,
+)
+TASKS_STARTED = Counter(
+    "intelliview_tasks_started_total",
+    "Total Celery tasks started",
+    registry=registry,
+)
+
+TASKS_COMPLETED = Counter(
+    "intelliview_tasks_completed_total",
+    "Total Celery tasks completed",
+    registry=registry,
+)
+
+TASKS_RETRIED = Counter(
+    "intelliview_tasks_retried_total",
+    "Total Celery task retries",
+    registry=registry,
+)
+
+TASKS_PERMANENTLY_FAILED = Counter(
+    "intelliview_tasks_permanently_failed_total",
+    "Total permanently failed Celery tasks",
+    registry=registry,
+)
+
+CURRENT_WORKERS = Gauge(
+    "intelliview_current_workers",
+    "Current number of workers",
+    registry=registry,
+)
+
+SYSTEM_UTILIZATION = Gauge(
+    "intelliview_system_utilization",
+    "Current worker utilization percentage",
     registry=registry,
 )
 # ---------------------------------------------------------------------------
