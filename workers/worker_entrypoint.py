@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 SUPPORTED_POOL = "solo"
 
 agent = None
+heartbeat_thread = None
 
 
 def _run_celery() -> None:
@@ -57,7 +58,7 @@ def _run_celery() -> None:
 
 
 def main() -> int:
-    global agent
+    global agent, heartbeat_thread
 
     logging.basicConfig(
         level=logging.INFO,
@@ -92,7 +93,8 @@ def main() -> int:
         agent.decrement_active()
 
     # Start the heartbeat loop managed by WorkerAgent
-    threading.Thread(target=agent.heartbeat_loop, daemon=True).start()
+    heartbeat_thread = threading.Thread(target=agent.heartbeat_loop, daemon=True)
+    heartbeat_thread.start()
 
     # Celery begins its own graceful ("warm") shutdown here: it stops
     # accepting new tasks and waits for the current task to finish.
@@ -111,6 +113,18 @@ def main() -> int:
     @worker_shutdown.connect
     def _on_worker_shutdown(**kwargs):
         logger.info("Shutting down worker")
+
+        # Tell the heartbeat loop to stop, then actually wait for it to
+        # finish instead of just hoping it did.
+        agent._stop = True
+        if heartbeat_thread is not None:
+            heartbeat_thread.join(timeout=10)
+            if heartbeat_thread.is_alive():
+                logger.warning(
+                    "Heartbeat thread did not stop within timeout; "
+                    "continuing shutdown anyway"
+                )
+
         agent.deregister()
 
     logger.info("Worker entrypoint ready; starting Celery")
