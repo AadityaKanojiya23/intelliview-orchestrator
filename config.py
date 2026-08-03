@@ -5,11 +5,26 @@ Settings are loaded from environment variables (or a `.env` file in dev)
 via `pydantic-settings`. All values have sensible local defaults but
 should be overridden in production.
 """
-
+import json
+import os
 from functools import lru_cache
-
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+@lru_cache(maxsize=1)
+def get_aws_secrets(secret_name: str, region_name: str = "us-east-1") -> dict:
+    """Fetches and caches JSON secrets from AWS Secrets Manager."""
+    import boto3
+    from botocore.exceptions import ClientError
+
+    session = boto3.session.Session()
+    client = session.client(service_name="secretsmanager", region_name=region_name)
+    try:
+        response = client.get_secret_value(SecretId=secret_name)
+        if "SecretString" in response:
+            return json.loads(response["SecretString"])
+    except ClientError as e:
+        print(f"Error fetching secrets: {e}")
+    return {}
 
 
 class _CsvList(list):
@@ -25,6 +40,10 @@ class Settings(BaseSettings):
         extra="ignore",
         case_sensitive=False,
     )
+
+    environment: str = "development"
+    aws_secret_name: str = "intelliview-secrets"
+    aws_region: str = "us-east-1"
 
     # --- Service discovery ---
     redis_url: str = "redis://localhost:6379/0"
@@ -108,6 +127,16 @@ class Settings(BaseSettings):
             raise ValueError(f"Invalid database SSL mode: {value}")
 
         return value
+
+
+        
+    def __init__(self, **values):
+        super().__init__(**values)
+        if self.environment.lower() == "production":
+            secrets = get_aws_secrets(self.aws_secret_name, self.aws_region)
+            for key, val in secrets.items():
+                if hasattr(self, key.lower()):
+                    setattr(self, key.lower(), val)
 
     # --- Feature flags ---
     enable_celery_broker: bool = True
