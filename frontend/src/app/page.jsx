@@ -1,4 +1,6 @@
 "use client";
+
+
 import { useEffect, useState, useMemo } from "react";
 import useSWR from "swr";
 import { Activity, AlertTriangle, CheckCircle2, Users, Zap, Shield, TrendingUp, Clock } from "lucide-react";
@@ -13,6 +15,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 const MAX_SAMPLES = 20;
 
 export default function OverviewPage() {
+ 
   const health = useSWR("/system-health", { refreshInterval: 3000 });
   const workers = useSWR("/workers", { refreshInterval: 5000 });
   const stats = useSWR("/session-statistics", { refreshInterval: 5000 });
