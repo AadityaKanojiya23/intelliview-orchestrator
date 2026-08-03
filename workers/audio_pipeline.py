@@ -283,9 +283,7 @@ def run_audio_analysis(session_id: str) -> AudioAnalysisResult:
     return results
 
 
-def transcribe_speech(
-    session_id: str,
-    audio_url: str | None = None,
+def transcribe_speech(session_id: str,audio_url: str | None = None,
     vad_config: Any | None = None,
 ) -> dict[str, Any]:
     """Convert speech to text — real Whisper with seeded stub fallback."""
@@ -315,7 +313,8 @@ def transcribe_speech(
     if vad_config is not None:
         stub_res["vad_executed"] = True
         stub_res["speech_detected"] = bool(text)
-
+        stub_res["vad_segments"] = []  
+        
     return stub_res
 
 
