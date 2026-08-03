@@ -314,7 +314,7 @@ def transcribe_speech(session_id: str,audio_url: str | None = None,
         stub_res["vad_executed"] = True
         stub_res["speech_detected"] = bool(text)
         stub_res["vad_segments"] = []  
-        
+        stub_res["vad_config"] = vad_config  
     return stub_res
 
 
