@@ -59,7 +59,7 @@ export default function OverviewPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "0ms" }}>
+        <div className="glass-card p-4 animate-slide-in-up [animation-delay:0ms]">
           <Stat
             label="System"
             value={health.data ? <StatusBadge status={health.data.overall_status} /> : <Skeleton className="h-7 w-20" />}
@@ -67,7 +67,7 @@ export default function OverviewPage() {
             icon={<Activity size={16} />}
           />
         </div>
-        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "50ms" }}>
+        <div className="glass-card p-4 animate-slide-in-up [animation-delay:50ms]">
           <Stat
             label="Workers"
             value={
@@ -81,7 +81,7 @@ export default function OverviewPage() {
             icon={<Users size={16} />}
           />
         </div>
-        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "100ms" }}>
+        <div className="glass-card p-4 animate-slide-in-up [animation-delay:100ms]">
           <Stat
             label="Completed"
             value={stats.data ? stats.data.completed_sessions : <Skeleton className="h-7 w-12" />}
@@ -89,7 +89,7 @@ export default function OverviewPage() {
             icon={<CheckCircle2 size={16} />}
           />
         </div>
-        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "150ms" }}>
+        <div className="glass-card p-4 animate-slide-in-up [animation-delay:150ms]">
           <Stat
             label="Avg risk"
             value={
