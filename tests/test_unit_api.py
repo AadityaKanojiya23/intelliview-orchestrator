@@ -58,29 +58,38 @@ def test_sync_to_database_with_token():
     assert response.status_code == 200
 
 
-@patch("orchestrator.main.http_cache")
-@patch("orchestrator.main.scheduler")
-@patch("orchestrator.main.session_manager")
+@patch("orchestrator.http_cache.invalidate")
+@patch("orchestrator.main.scheduler.get_estimated_wait_time")
+@patch("orchestrator.main.scheduler.schedule_task")
+@patch("orchestrator.main.scheduler.can_accept_task")
+@patch("orchestrator.main.session_manager.get_session")
+@patch("orchestrator.main.session_manager.update_session_status")
+@patch("orchestrator.main.session_manager.create_session")
 def test_start_interview_valid(
-    mock_session_manager,
-    mock_scheduler,
-    mock_http_cache,
+    mock_create_session,
+    mock_update_session_status,
+    mock_get_session,
+    mock_can_accept_task,
+    mock_schedule_task,
+    mock_get_estimated_wait_time,
+    mock_invalidate,
 ):
-    mock_session_manager.QUEUED = "QUEUED"
+    # `session_manager` and `scheduler` are shared instances injected into the
+    # session router at startup, so their methods (not the module-level names
+    # in orchestrator.main) must be patched for the mock to take effect.
+    mock_create_session.return_value = "session-123"
 
-    mock_session_manager.create_session.return_value = "session-123"
+    mock_update_session_status.return_value = None
 
-    mock_session_manager.update_session_status.return_value = None
+    mock_get_session.return_value = {"created_at": "2026-07-16T10:00:00Z"}
 
-    mock_session_manager.get_session.return_value = {"created_at": "2026-07-16T10:00:00Z"}
+    mock_can_accept_task.return_value = True
 
-    mock_scheduler.can_accept_task.return_value = True
+    mock_schedule_task.return_value = None
 
-    mock_scheduler.schedule_task.return_value = None
+    mock_get_estimated_wait_time.return_value = 5
 
-    mock_scheduler.get_estimated_wait_time.return_value = 5
-
-    mock_http_cache.invalidate.return_value = None
+    mock_invalidate.return_value = None
 
     response = client.post(
         "/start-interview",
