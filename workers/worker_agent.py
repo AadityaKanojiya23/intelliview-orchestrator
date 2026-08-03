@@ -30,11 +30,13 @@ class WorkerAgent:
         worker_id: str,
         capacity: int = WORKER_CONCURRENCY,
         heartbeat_interval: int = 15,
+        tags: list[str] | None = None,
     ):
         self.api_url = api_url.rstrip("/")
         self.worker_id = worker_id
         self.capacity = capacity
         self.heartbeat_interval = heartbeat_interval
+        self.tags = tags or []
 
         # Process-local counter used for worker heartbeats.
         # This is accurate only when running with the 'solo' pool.
@@ -85,11 +87,27 @@ class WorkerAgent:
         return False
 
     def register(self) -> bool:
-        ok = self._post("/register-worker", {"worker_id": self.worker_id, "capacity": self.capacity})
+        ok = self._post(
+            "/register-worker",
+            {
+                "worker_id": self.worker_id,
+                "capacity": self.capacity,
+                "tags": self.tags,
+            },
+        )
+
         if ok:
-            logger.info("Worker %s registered with %s", self.worker_id, self.api_url)
+            logger.info(
+                "Worker %s registered with %s",
+                self.worker_id,
+                self.api_url,
+            )
         else:
-            logger.error("Failed to register worker %s", self.worker_id)
+            logger.error(
+                "Failed to register worker %s",
+                self.worker_id,
+            )
+
         return ok
 
     def deregister(self) -> None:
@@ -110,7 +128,9 @@ class WorkerAgent:
             # orchestrator's existing "active_tasks < capacity" check
             # to stop routing new work here, without needing any
             # orchestrator-side change.
-            reported_active_tasks = self.capacity if self.draining else self.active_tasks
+            reported_active_tasks = (
+                self.capacity if self.draining else self.active_tasks
+            )
 
             self._post(
                 "/worker/heartbeat",
@@ -183,7 +203,9 @@ class WorkerAgent:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
 
     api_url = os.getenv("API_URL", "http://fastapi:8000")
     worker_id = os.getenv("WORKER_ID", f"worker-{os.getpid()}")
