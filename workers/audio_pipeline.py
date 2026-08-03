@@ -283,9 +283,7 @@ def run_audio_analysis(session_id: str) -> AudioAnalysisResult:
     return results
 
 
-def transcribe_speech(session_id: str,audio_url: str | None = None,
-    vad_config: Any | None = None,
-) -> dict[str, Any]:
+def transcribe_speech(session_id: str,audio_url: str | None = None,vad_config: Any | None = None,) -> TranscriptionResult:
     """Convert speech to text — real Whisper with seeded stub fallback."""
     logger.info(f"Transcribing audio for session {session_id}")
 
@@ -313,10 +311,10 @@ def transcribe_speech(session_id: str,audio_url: str | None = None,
     if vad_config is not None:
         stub_res["vad_executed"] = True
         stub_res["speech_detected"] = bool(text)
-        stub_res["vad_segments"] = []  
-        stub_res["vad_config"] = vad_config  
-    return stub_res
+        stub_res["vad_segments"] = []
+        stub_res["vad_config"] = _format_vad_config(vad_config)
 
+    return stub_res
 
 def detect_background_voices(session_id: str) -> dict[str, Any]:
     """Detect background voices — real diarisation with seeded stub fallback."""
