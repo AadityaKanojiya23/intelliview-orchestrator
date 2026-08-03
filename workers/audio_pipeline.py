@@ -283,8 +283,8 @@ def run_audio_analysis(session_id: str) -> AudioAnalysisResult:
     return results
 
 
-def transcribe_speech(session_id: str,audio_url: str | None = None,vad_config: Any | None = None,) -> TranscriptionResult:
-    """Convert speech to text — real Whisper with seeded stub fallback."""
+def transcribe_speech(session_id: str,audio_url: str | None = None,vad_config: Any | None = None,
+) -> dict[str, Any]:    """Convert speech to text — real Whisper with seeded stub fallback."""
     logger.info(f"Transcribing audio for session {session_id}")
 
     real = _real_transcribe(session_id, audio_url=audio_url, vad_config=vad_config)
@@ -312,7 +312,16 @@ def transcribe_speech(session_id: str,audio_url: str | None = None,vad_config: A
         stub_res["vad_executed"] = True
         stub_res["speech_detected"] = bool(text)
         stub_res["vad_segments"] = []
-        stub_res["vad_config"] = _format_vad_config(vad_config)
+        
+        # Safely extract dict representation inline without needing extra functions
+        if isinstance(vad_config, dict):
+            stub_res["vad_config"] = vad_config
+        elif hasattr(vad_config, "to_dict"):
+            stub_res["vad_config"] = vad_config.to_dict()
+        elif hasattr(vad_config, "__dict__"):
+            stub_res["vad_config"] = vad_config.__dict__
+        else:
+            stub_res["vad_config"] = vad_config
 
     return stub_res
 
