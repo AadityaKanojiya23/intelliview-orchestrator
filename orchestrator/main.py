@@ -4,7 +4,7 @@ Main entry point for the AI Interview Orchestrator API
 
 Integrates:
 - Session Manager for lifecycle management
-- Session Tracker for monitoring
+- Session Tracker for monaitoring
 - State Synchronizer for Redis/DB consistency
 - Scheduler for intelligent task scheduling
 - Load Balancer for worker distribution
