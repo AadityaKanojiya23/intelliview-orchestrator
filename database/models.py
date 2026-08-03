@@ -72,6 +72,9 @@ class InterviewSession(Base):
     audio_analysis = Column(JSON, nullable=True)
     evaluation_analysis = Column(JSON, nullable=True)
 
+    # Token & cost usage tracking stored as JSON
+    llm_usage = Column(JSON, nullable=True, default=dict)
+
     # Interview Q&A tracking
     questions_asked = Column(JSON, nullable=True, default=list)
     answers_provided = Column(JSON, nullable=True, default=list)
