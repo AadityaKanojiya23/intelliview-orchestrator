@@ -28,15 +28,28 @@ class SessionTracker:
 
     def __init__(self):
         """Initialize session tracker"""
+
     def get_active_sessions(
         self,
-        status=None,
-        since=None,
-        sort_by="start_time",
-        order="desc",
+        status: str | None = None,
+        since: str | None = None,
+        sort_by: str | None = "start_time",
+        order: str | None = "desc",
     ) -> list[dict[str, Any]]:
         """
         Get all currently active sessions (CREATED, QUEUED, PROCESSING)
+
+        Args:
+            status: Optional single status to filter down to (e.g. "QUEUED").
+            since: Optional ISO 8601 datetime string; only sessions whose
+                start_time is after this value are returned.
+            sort_by: Column name to sort by (falls back to start_time if
+                the attribute doesn't exist on InterviewSession).
+            order: "asc" or "desc" (default "desc").
+
+        Raises:
+            ValueError: if `since` is provided but is not a valid ISO
+                8601 datetime string.
 
         Returns:
             list: List of active session details
@@ -51,7 +64,7 @@ class SessionTracker:
                 "AUDIO_PROCESSING",
                 "EVALUATING",
             ]
-            
+
             # 1. Start with the baseline query for active statuses
             stmt = select(InterviewSession).where(InterviewSession.status.in_(active_statuses))
 
@@ -59,13 +72,17 @@ class SessionTracker:
             if status:
                 stmt = stmt.where(InterviewSession.status == status.upper())
 
-            # 3. Filter by date cutoff if provided
+            # 3. Filter by date cutoff if provided — invalid input is a
+            # caller error, so we raise instead of silently skipping the
+            # filter (main.py turns this into a 400).
             if since:
                 try:
                     since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
-                    stmt = stmt.where(InterviewSession.start_time > since_dt)
                 except ValueError:
                     logger.error(f"Invalid ISO datetime string format passed: {since}")
+                    raise ValueError("Invalid ISO datetime format")
+
+                stmt = stmt.where(InterviewSession.start_time > since_dt)
 
             # 4. Handle dynamic column sorting safely
             sort_column = getattr(InterviewSession, sort_by, InterviewSession.start_time)
@@ -94,13 +111,15 @@ class SessionTracker:
             logger.debug(f"Retrieved {len(result)} active sessions")
             return result
 
+        except ValueError:
+            # Propagate invalid `since` so the API layer can return a 400.
+            raise
         except Exception as e:
             logger.error(f"Error getting active sessions: {e!s}")
             return []
         finally:
             session_db.close()
 
-    
     def get_completed_sessions(self, limit: int = 100) -> list[dict[str, Any]]:
         """
         Get recently completed sessions

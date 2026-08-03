@@ -4,7 +4,7 @@ Main entry point for the AI Interview Orchestrator API
 
 Integrates:
 - Session Manager for lifecycle management
-- Session Tracker for monaitoring
+- Session Tracker for monitoring
 - State Synchronizer for Redis/DB consistency
 - Scheduler for intelligent task scheduling
 - Load Balancer for worker distribution
@@ -598,24 +598,37 @@ async def get_task_status(task_id: str):
 @app.get("/active-sessions")
 @http_cache.cached("active-sessions", ttl=2)
 async def get_active_sessions(
-    status=None,
-    since=None,
-    sort_by="start_time",
-    order="desc",
+    status: str | None = None,
+    since: str | None = None,
+    sort_by: str | None = "start_time",
+    order: str | None = "desc",
 ):
-   
+    """
+    Get currently active sessions (CREATED, QUEUED, PROCESSING, ...).
+
+    Query params:
+        status: Optional single status to filter down to (e.g. "QUEUED").
+        since: Optional ISO 8601 datetime string; only sessions started
+            after this value are returned. Invalid values return a 400.
+        sort_by: Column to sort by (default "start_time").
+        order: "asc" or "desc" (default "desc").
+    """
     try:
         active = session_tracker.get_active_sessions(
-    status=status,
-    since=since,
-    sort_by=sort_by,
-    order=order,
-)
+            status=status,
+            since=since,
+            sort_by=sort_by,
+            order=order,
+        )
         return {"count": len(active), "sessions": active}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e),
+        )
     except Exception as e:
         logger.error(f"Error fetching active sessions: {e!s}")
         raise HTTPException(status_code=500, detail="Error fetching active sessions")
-
 
 
 @app.get("/completed-sessions")
