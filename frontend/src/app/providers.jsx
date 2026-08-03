@@ -34,25 +34,31 @@ function NullFallback() {
   return null;
 }
 
-// Wrapper to resolve the dynamic import of ScreenLock and its hook
 function ScreenLockWrapper() {
-  const [Components, setComponents] = useState(null);
+  const [isLocked, setIsLocked] = useState(false);
 
   useEffect(() => {
-    import("@/components/ScreenLock").then((m) => {
-      setComponents({ UI: m.default, useScreenLock: m.useScreenLock });
-    });
+    const stored = localStorage.getItem("intelliview_screen_lock");
+    if (stored === "locked") setIsLocked(true);
+
+    const interval = setInterval(() => {
+      if (localStorage.getItem("intelliview_screen_lock") === "locked") {
+        setIsLocked(true);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
   }, []);
 
-  if (!Components) return null;
+  const handleUnlock = useCallback((pin) => {
+    if (pin === "1234") {
+      setIsLocked(false);
+      localStorage.removeItem("intelliview_screen_lock");
+      return true;
+    }
+    return false;
+  }, []);
 
-  return <ScreenLockInner UI={Components.UI} useScreenLock={Components.useScreenLock} />;
-}
-
-// Inner component where we can safely call the hook
-function ScreenLockInner({ UI, useScreenLock }) {
-  const { isLocked, unlock } = useScreenLock();
-  return <UI isLocked={isLocked} onUnlock={unlock} />;
+  return <ScreenLock isLocked={isLocked} onUnlock={handleUnlock} />;
 }
 
 export function ClientProviders({ children }) {
