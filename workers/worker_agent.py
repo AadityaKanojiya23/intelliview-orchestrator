@@ -41,7 +41,9 @@ class WorkerAgent:
         self.active_tasks = 0
 
         self.tasks_completed = 0  # track total completed tasks
-        self.max_tasks_before_restart = int(os.getenv("MAX_TASKS_BEFORE_RESTART", "100"))  # restart limit
+        self.max_tasks_before_restart = int(
+            os.getenv("MAX_TASKS_BEFORE_RESTART", "100")
+        )  # restart limit
         self._restart_requested = False  # restart flag
 
         self._stop = False
@@ -130,12 +132,16 @@ class WorkerAgent:
 
             self._post(
                 "/worker/heartbeat",
-                {"worker_id": self.worker_id, "active_tasks": self.active_tasks},
+                {
+                    "worker_id": self.worker_id,
+                    "active_tasks": reported_active_tasks,
+                },
             )
-            time.sleep(self.heartbeat_interval)
 
     def _handle_shutdown(self, signum, frame) -> None:
-        logger.info("Received signal %s, shutting down worker %s", signum, self.worker_id)
+        logger.info(
+            "Received signal %s, shutting down worker %s", signum, self.worker_id
+        )
         self._stop = True
         self.deregister()
 
