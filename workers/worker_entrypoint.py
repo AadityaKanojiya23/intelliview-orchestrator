@@ -120,10 +120,7 @@ def main() -> int:
         if heartbeat_thread is not None:
             heartbeat_thread.join(timeout=10)
             if heartbeat_thread.is_alive():
-                logger.warning(
-                    "Heartbeat thread did not stop within timeout; "
-                    "continuing shutdown anyway"
-                )
+                logger.warning("Heartbeat thread did not stop within timeout; continuing shutdown anyway")
 
         agent.deregister()
 
