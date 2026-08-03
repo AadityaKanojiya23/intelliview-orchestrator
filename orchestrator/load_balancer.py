@@ -42,6 +42,7 @@ class LoadBalancer:
         """
         self.worker_registry = WorkerRegistry()
         self.strategy = strategy
+        self.session_affinity_enabled = True
         self.round_robin_index = 0
         self.redis_client = get_redis_client()
         self._lock = threading.Lock()
@@ -68,12 +69,34 @@ class LoadBalancer:
             # Default to least loaded
             return self._select_least_loaded()
 
+    def select_worker_with_affinity(
+        self,
+        preferred_worker_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        """
+        Select a worker using session affinity.
+
+        If the preferred worker is healthy and has available capacity,
+        use it. Otherwise, fall back to the configured load balancing
+        strategy.
+        """
+        if self.session_affinity_enabled and preferred_worker_id:
+            worker = self.worker_registry.get_worker(preferred_worker_id)
+
+            if worker and worker["status"] == "healthy" and worker["active_tasks"] < worker["capacity"]:
+                logger.debug(
+                    "Session affinity selected worker %s",
+                    preferred_worker_id,
+                )
+                return worker
+
+        return self.select_worker()
+
     def _select_round_robin(self) -> dict[str, Any] | None:
         """
-        Round Robin Strategy: Distribute tasks in sequence
+        Round Robin Strategy: Distribute tasks evenly in sequence
 
-        Distributes tasks evenly across all available workers in a circular fashion.
-        Good for evenly distributed workloads.
+        Cycles through available workers in order, regardless of current load.
 
         Returns:
             dict: Next worker in rotation or None if no workers available
