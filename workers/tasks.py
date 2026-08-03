@@ -38,14 +38,16 @@ state_sync = StateSynchronizer()
 # Individual stage tasks
 # ---------------------------------------------------------------------------
 
+from cv_service.client import CVClient
+
 
 @celery_app.task(bind=True, max_retries=3, name="workers.tasks._run_video")
 def _run_video(self, session_id: str) -> dict:
     """Video analysis stage."""
-    from workers.video_pipeline import run_video_analysis
 
-    return run_video_analysis(session_id)
+    client = CVClient()
 
+    return client.analyze_video(session_id)
 
 @celery_app.task(bind=True, max_retries=3, name="workers.tasks._run_audio")
 def _run_audio(self, session_id: str) -> dict:

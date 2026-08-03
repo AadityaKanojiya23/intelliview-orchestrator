@@ -101,12 +101,15 @@ services:
       API_TOKEN: "${API_TOKEN:-dev-token-change-me}"
       WORKER_CONCURRENCY: "${WORKER_CONCURRENCY:-4}"
       WORKER_ID: "${WORKER_ID:-worker-1}"
+      CV_SERVICE_URL: "http://cv-service:8001"
     depends_on:
       redis:
         condition: service_healthy
       postgres:
         condition: service_healthy
       fastapi:
+        condition: service_started
+      cv-service:
         condition: service_started
     volumes:
       - .:/app
@@ -125,6 +128,27 @@ services:
         limits:
           memory: 2G
           cpus: "4.0"
+
+  cv-service:
+    build:
+      context: ./cv_service
+      dockerfile: Dockerfile
+
+    container_name: ai-interview-cv-service
+
+    ports:
+      - "8001:8001"
+
+    networks:
+      - ai-interview-network
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   flower:
     build:

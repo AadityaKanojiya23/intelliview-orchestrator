@@ -1,4 +1,10 @@
 """
+Deprecated.
+
+Video processing has moved to the standalone CV microservice.
+This module is retained temporarily for backwards compatibility/tests.
+
+
 Video Analysis Pipeline
 Handles computer vision tasks for interview monitoring
 
