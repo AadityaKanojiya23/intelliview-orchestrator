@@ -23,26 +23,38 @@ from workers._stubs import _seeded_unit
 logger = logging.getLogger(__name__)
 AUDIO_TEMP_DIR = os.getenv("AUDIO_TEMP_DIR", "/tmp")
 
+
 # ---------------------------------------------------------------------------
 # Real detection helpers (Whisper / pyannote / OpenAI) with fallback to stubs
 # ---------------------------------------------------------------------------
-class TranscriptionResult(TypedDict):
+class TranscriptionResult(TypedDict, total=False):
     text: str
     confidence: float
     language: str
     duration_seconds: float
     timestamp: float | None
+    vad_executed: bool
+    speech_detected: bool
+    speech_duration_seconds: float
+    vad_segments: list[dict[str, Any]]
+    vad_config: dict[str, Any]
+
+
 class BackgroundVoiceResult(TypedDict):
     background_voices_detected: bool
     voice_count: int
     confidence: float
     speaker_segments: list[dict[str, Any]]
     timestamps: list[dict[str, Any]]
+
+
 class SuspiciousPatternResult(TypedDict):
     suspicious_pattern_detected: bool
     pattern_type: str | None
     confidence: float
     details: dict[str, Any]
+
+
 class AudioAnalysisResult(TypedDict):
     session_id: str
     transcription: TranscriptionResult
@@ -50,26 +62,55 @@ class AudioAnalysisResult(TypedDict):
     suspicious_conversation: SuspiciousPatternResult
     risk_score: float
 
-def _real_transcribe(session_id: str) -> dict[str, Any] | None:
-    """Transcribe audio using local Whisper model."""
+
+def _real_transcribe(session_id: str, vad_config: Any | None = None) -> dict[str, Any] | None:
+    """Transcribe audio using local Whisper model with VAD pre-filtering."""
     try:
+        import numpy as np
+
         from workers.ai_client import transcribe_audio_file
+        from workers.vad import VoiceActivityDetector
 
         audio_path = f"{AUDIO_TEMP_DIR}/interview_{session_id}.wav"
         if not os.path.exists(audio_path):
             logger.warning("Audio file not found: %s", audio_path)
             return None
-        result = transcribe_audio_file(audio_path)
+
+        # VAD Stage execution (run ONCE)
+        detector = VoiceActivityDetector(vad_config)
+        vad_segments = detector.process_audio(audio_path)
+        speech_detected = len(vad_segments) > 0
+
+        # Pass pre-computed vad_segments so VAD is not executed twice
+        result = transcribe_audio_file(audio_path, vad_config=vad_config, speech_segments=vad_segments)
         if result is None:
             return None
+
+        segments = result.get("segments", [])
+        if segments:
+            avg_logprob = np.mean([s.get("avg_logprob", -1.0) for s in segments])
+            confidence = round(max(0.0, min(1.0, 1.0 + avg_logprob)), 3)
+        else:
+            confidence = 0.0
+
+        speech_dur = sum(s.duration for s in vad_segments)
+        total_dur = result.get("total_speech_duration", speech_dur)
+
         return {
-            "text": result["text"],
-            "confidence": 0.9,
+            "text": result.get("text", ""),
+            "confidence": confidence,
             "language": result.get("language", "en"),
-            "duration_seconds": sum(s.get("end", 0) - s.get("start", 0) for s in result.get("segments", []))
-            or 120.0,
+            "duration_seconds": (
+                sum(s.get("end", 0) - s.get("start", 0) for s in segments) or round(total_dur, 1)
+            ),
             "timestamp": time.time(),
+            "vad_executed": True,
+            "speech_detected": speech_detected,
+            "speech_duration_seconds": round(speech_dur, 3),
+            "vad_segments": [s.to_dict() for s in vad_segments],
+            "vad_config": vars(detector.config),
         }
+
     except Exception as exc:
         logger.debug("Real transcription unavailable: %s", exc)
         return None
@@ -94,7 +135,14 @@ def _real_detect_background_voices(session_id: str) -> dict[str, Any] | None:
             "voice_count": voice_count,
             "confidence": 0.85,
             "speaker_segments": segments,
-            "timestamps": [],
+            "timestamps": [
+                {
+                    "speaker": s["speaker_id"],
+                    "start": s["start"],
+                    "end": s["end"],
+                }
+                for s in segments
+            ],
         }
     except Exception as exc:
         logger.debug("Real background voice detection unavailable: %s", exc)
@@ -156,11 +204,11 @@ def _real_detect_suspicious(session_id: str) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 
 
-def run_audio_analysis(session_id: str) -> dict[str, Any]:
-    """Execute audio analysis pipeline for an interview session."""
+def run_audio_analysis(session_id: str, vad_config: Any | None = None) -> dict[str, Any]:
+    """Execute audio analysis pipeline for an interview session with optional VAD configuration."""
     logger.info(f"Starting audio analysis for session {session_id}")
 
-    transcription = transcribe_speech(session_id)
+    transcription = transcribe_speech(session_id, vad_config=vad_config)
     bg_voices = detect_background_voices(session_id)
     suspicious = detect_suspicious_conversation(session_id)
 
@@ -177,14 +225,19 @@ def run_audio_analysis(session_id: str) -> dict[str, Any]:
     return results
 
 
-def transcribe_speech(session_id: str) -> dict[str, Any]:
-    """Convert speech to text — real Whisper with seeded stub fallback."""
+def transcribe_speech(session_id: str, vad_config: Any | None = None) -> dict[str, Any]:
+    """Convert speech to text — real Whisper + VAD with seeded stub fallback."""
     logger.info(f"Transcribing audio for session {session_id}")
 
-    real = _real_transcribe(session_id)
+    real = _real_transcribe(session_id, vad_config=vad_config)
     if real is not None:
         return real
 
+    from workers.vad import VADConfig
+
+    config = vad_config if isinstance(vad_config, VADConfig) else VADConfig.from_env()
+
+    # VAD pre-filtering in stub mode
     silence = _seeded_unit(session_id, "silence") > 0.92
     text = (
         ""
@@ -194,12 +247,36 @@ def transcribe_speech(session_id: str) -> dict[str, Any]:
             "Recently I led a migration from a monolith to Celery-backed workers."
         )
     )
+    total_duration = round(120 + _seeded_unit(session_id, "duration") * 600, 1)
+
+    # Simulated timestamp-aligned VAD segments for stub mode
+    vad_segments = []
+    if not silence:
+        speech_start = round(1.5 + _seeded_unit(session_id, "start") * 2.0, 3)
+        speech_end = round(speech_start + min(total_duration - 2.0, 15.0), 3)
+        vad_segments = [
+            {
+                "start": speech_start,
+                "end": speech_end,
+                "duration": round(speech_end - speech_start, 3),
+                "confidence": round(0.85 + _seeded_unit(session_id, "vad_conf") * 0.1, 3),
+                "segment_index": 0,
+            }
+        ]
+
+    speech_duration = sum(s["duration"] for s in vad_segments)
+
     return {
         "text": text,
         "confidence": round(0.6 + _seeded_unit(session_id, "asr_conf") * 0.35, 3),
         "language": "en",
-        "duration_seconds": round(120 + _seeded_unit(session_id, "duration") * 600, 1),
+        "duration_seconds": total_duration,
         "timestamp": None,
+        "vad_executed": True,
+        "speech_detected": not silence,
+        "speech_duration_seconds": speech_duration,
+        "vad_segments": vad_segments,
+        "vad_config": vars(config),
     }
 
 

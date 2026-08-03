@@ -6,10 +6,12 @@ FAILED only after Celery has exhausted its retries.
 """
 
 from celery import Celery, signals
+from opentelemetry.instrumentation.celery import CeleryInstrumentor
 
 from config import REDIS_URL
 
 celery_app = Celery("interview_tasks", broker=REDIS_URL, backend=REDIS_URL)
+CeleryInstrumentor().instrument()
 
 
 celery_app.conf.update(
@@ -103,14 +105,24 @@ def _on_task_failure(sender, task_id, exception, args, kwargs, traceback, einfo,
             f"Celery task exhausted retries: {exception!s}",
         )
 
-        from workers.tasks import send_mock_email_alert
-
-        send_mock_email_alert.delay(session_id)
+        # TODO: enable notification task when implemented
+        # send_mock_email_alert.delay(session_id)
     except Exception as exc:
         # Don't let a signal handler crash the worker.
         import logging
 
         logging.getLogger(__name__).warning("task_failure handler failed: %s", exc)
+
+
+@celery_app.task(name="workers.tasks.send_mock_email_alert")
+def send_mock_email_alert(session_id: str) -> None:
+    """Mock email alert task — logs the notification.
+
+    In production this would call SendGrid / SES / etc.
+    """
+    import logging
+
+    logging.getLogger(__name__).info("Mock email alert sent for session %s", session_id)
 
 
 if __name__ == "__main__":
