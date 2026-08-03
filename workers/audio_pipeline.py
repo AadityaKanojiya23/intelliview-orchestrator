@@ -283,8 +283,8 @@ def run_audio_analysis(session_id: str) -> AudioAnalysisResult:
     return results
 
 
-def transcribe_speech(session_id: str,audio_url: str | None = None,vad_config: Any | None = None,
-) -> dict[str, Any]:    """Convert speech to text — real Whisper with seeded stub fallback."""
+def transcribe_speech(session_id: str,audio_url: str | None = None,vad_config: Any | None = None,) -> TranscriptionResult:    
+    """Convert speech to text — real Whisper with seeded stub fallback."""
     logger.info(f"Transcribing audio for session {session_id}")
 
     real = _real_transcribe(session_id, audio_url=audio_url, vad_config=vad_config)
