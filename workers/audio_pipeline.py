@@ -17,13 +17,47 @@ HIGH/CRITICAL thresholds fire correctly without GPU dependencies.
 
 import logging                 
 import os
+import shutil
+import tempfile
 import time
+from pathlib import Path
 from typing import Any, TypedDict
 
 from workers._stubs import _seeded_unit
 
 logger = logging.getLogger(__name__)
 AUDIO_TEMP_DIR = os.getenv("AUDIO_TEMP_DIR")
+
+CHUNK_DURATION_MS = 5000
+
+
+def split_audio_into_chunks(
+    audio_path: str,
+    chunk_duration_ms: int = CHUNK_DURATION_MS,
+) -> tuple[list[str], str]:
+    """
+    Split an audio file into fixed-size WAV chunks.
+    Returns:
+        chunk_paths, temp_directory
+    """
+    from pydub import AudioSegment
+
+    audio = AudioSegment.from_file(audio_path)
+
+    chunk_temp_dir = tempfile.mkdtemp(prefix="audio_chunks_")
+
+    chunk_paths = []
+
+    for i, start in enumerate(range(0, len(audio), chunk_duration_ms)):
+        chunk = audio[start : start + chunk_duration_ms]
+
+        chunk_path = Path(chunk_temp_dir) / f"chunk_{i}.wav"
+
+        chunk.export(chunk_path, format="wav")
+
+        chunk_paths.append(str(chunk_path))
+
+    return chunk_paths, chunk_temp_dir
 
 
 # ---------------------------------------------------------------------------
