@@ -2,19 +2,37 @@
 
 import pytest
 
-from scripts.dataset_validation.schemas import QUESTION_BANK_SCHEMA, EVALUATION_DATASET_SCHEMA
+from scripts.dataset_validation.schemas import EVALUATION_DATASET_SCHEMA, QUESTION_BANK_SCHEMA
 from scripts.dataset_validation.validator import DatasetValidator
 
 
 @pytest.fixture
 def valid_questions():
     return [
-        {"question_id": "q_001", "text": "Describe your experience with distributed systems.",
-         "category": "technical", "difficulty": "medium", "usage_count": 12, "avg_score": 78.5},
-        {"question_id": "q_002", "text": "Tell me about a time you disagreed with a teammate.",
-         "category": "behavioral", "difficulty": "easy", "usage_count": 5, "avg_score": 82.0},
-        {"question_id": "q_003", "text": "How would you design a rate limiter for a public API?",
-         "category": "technical", "difficulty": "hard", "usage_count": 3, "avg_score": 65.2},
+        {
+            "question_id": "q_001",
+            "text": "Describe your experience with distributed systems.",
+            "category": "technical",
+            "difficulty": "medium",
+            "usage_count": 12,
+            "avg_score": 78.5,
+        },
+        {
+            "question_id": "q_002",
+            "text": "Tell me about a time you disagreed with a teammate.",
+            "category": "behavioral",
+            "difficulty": "easy",
+            "usage_count": 5,
+            "avg_score": 82.0,
+        },
+        {
+            "question_id": "q_003",
+            "text": "How would you design a rate limiter for a public API?",
+            "category": "technical",
+            "difficulty": "hard",
+            "usage_count": 3,
+            "avg_score": 65.2,
+        },
     ]
 
 
@@ -49,15 +67,18 @@ class TestQuestionBankValidator:
         assert any(r.rule_name == "numeric_ranges_valid" for r in report.errors)
 
     def test_duplicate_ids_fail(self, valid_questions):
-        broken = valid_questions + [dict(valid_questions[0])]
+        broken = [*valid_questions, dict(valid_questions[0])]
         report = DatasetValidator(QUESTION_BANK_SCHEMA).validate(broken)
         assert not report.is_valid
         assert any(r.rule_name == "unique_ids" for r in report.errors)
 
     def test_near_duplicate_text_warns_but_does_not_fail(self, valid_questions):
-        near_dupe = dict(valid_questions[0], question_id="q_099",
-                          text="Describe your experience with distributed systems!!")
-        report = DatasetValidator(QUESTION_BANK_SCHEMA).validate(valid_questions + [near_dupe])
+        near_dupe = dict(
+            valid_questions[0],
+            question_id="q_099",
+            text="Describe your experience with distributed systems!!",
+        )
+        report = DatasetValidator(QUESTION_BANK_SCHEMA).validate([*valid_questions, near_dupe])
         dup_result = next(r for r in report.results if r.rule_name == "no_near_duplicates")
         assert dup_result.severity == "warning"
         assert not dup_result.passed
@@ -75,18 +96,25 @@ class TestQuestionBankValidator:
 class TestEvaluationDatasetValidator:
     def test_valid_eval_sample_passes(self):
         records = [
-            {"sample_id": "e_001", "question": "What is a race condition?",
-             "answer": "It happens when threads access shared state unsynchronized.",
-             "expected_label": "grounded", "expected_score": 90},
+            {
+                "sample_id": "e_001",
+                "question": "What is a race condition?",
+                "answer": "It happens when threads access shared state unsynchronized.",
+                "expected_label": "grounded",
+                "expected_score": 90,
+            },
         ]
         report = DatasetValidator(EVALUATION_DATASET_SCHEMA).validate(records)
         assert report.is_valid
 
     def test_invalid_label_fails(self):
         records = [
-            {"sample_id": "e_001", "question": "What is a race condition?",
-             "answer": "It happens when threads access shared state unsynchronized.",
-             "expected_label": "maybe_true"},
+            {
+                "sample_id": "e_001",
+                "question": "What is a race condition?",
+                "answer": "It happens when threads access shared state unsynchronized.",
+                "expected_label": "maybe_true",
+            },
         ]
         report = DatasetValidator(EVALUATION_DATASET_SCHEMA).validate(records)
         assert not report.is_valid

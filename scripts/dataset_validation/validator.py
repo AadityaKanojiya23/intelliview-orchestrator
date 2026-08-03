@@ -32,10 +32,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 # ---------------------------------------------------------------------------
 # Rule outcome primitives
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class RuleResult:
@@ -105,6 +105,7 @@ class ValidationReport:
 # Validator
 # ---------------------------------------------------------------------------
 
+
 class DatasetValidator:
     """
     Schema-driven validator. A schema dict declares:
@@ -146,8 +147,12 @@ class DatasetValidator:
 
     def _check_non_empty(self, records: list[dict[str, Any]]) -> RuleResult:
         passed = len(records) > 0
-        return RuleResult("non_empty_dataset", "error", passed,
-                           "Dataset has at least one record." if passed else "Dataset is empty.")
+        return RuleResult(
+            "non_empty_dataset",
+            "error",
+            passed,
+            "Dataset has at least one record." if passed else "Dataset is empty.",
+        )
 
     def _check_required_fields(self, records: list[dict[str, Any]]) -> RuleResult:
         required = list(self.schema.get("required_fields", {}).keys())
@@ -158,8 +163,12 @@ class DatasetValidator:
                 offenders.append({"index": i, "id": rec.get(self.schema.get("id_field")), "missing": missing})
         passed = len(offenders) == 0
         return RuleResult(
-            "required_fields_present", "error", passed,
-            "All required fields present." if passed else f"{len(offenders)} record(s) missing required fields.",
+            "required_fields_present",
+            "error",
+            passed,
+            "All required fields present."
+            if passed
+            else f"{len(offenders)} record(s) missing required fields.",
             offenders,
         )
 
@@ -169,11 +178,20 @@ class DatasetValidator:
         for i, rec in enumerate(records):
             for f_name, f_type in type_map.items():
                 if f_name in rec and rec[f_name] is not None and not isinstance(rec[f_name], f_type):
-                    offenders.append({"index": i, "id": rec.get(self.schema.get("id_field")),
-                                       "field": f_name, "expected": f_type.__name__, "got": type(rec[f_name]).__name__})
+                    offenders.append(
+                        {
+                            "index": i,
+                            "id": rec.get(self.schema.get("id_field")),
+                            "field": f_name,
+                            "expected": f_type.__name__,
+                            "got": type(rec[f_name]).__name__,
+                        }
+                    )
         passed = len(offenders) == 0
         return RuleResult(
-            "field_types_correct", "error", passed,
+            "field_types_correct",
+            "error",
+            passed,
             "All fields match expected types." if passed else f"{len(offenders)} type mismatch(es) found.",
             offenders,
         )
@@ -185,12 +203,23 @@ class DatasetValidator:
             for f_name, allowed in enum_fields.items():
                 val = rec.get(f_name)
                 if val is not None and val not in allowed:
-                    offenders.append({"index": i, "id": rec.get(self.schema.get("id_field")),
-                                       "field": f_name, "value": val, "allowed": sorted(allowed)})
+                    offenders.append(
+                        {
+                            "index": i,
+                            "id": rec.get(self.schema.get("id_field")),
+                            "field": f_name,
+                            "value": val,
+                            "allowed": sorted(allowed),
+                        }
+                    )
         passed = len(offenders) == 0
         return RuleResult(
-            "enum_values_valid", "error", passed,
-            "All categorical fields use allowed values." if passed else f"{len(offenders)} invalid categorical value(s).",
+            "enum_values_valid",
+            "error",
+            passed,
+            "All categorical fields use allowed values."
+            if passed
+            else f"{len(offenders)} invalid categorical value(s).",
             offenders,
         )
 
@@ -201,12 +230,23 @@ class DatasetValidator:
             for f_name, (lo, hi) in ranges.items():
                 val = rec.get(f_name)
                 if val is not None and isinstance(val, (int, float)) and not (lo <= val <= hi):
-                    offenders.append({"index": i, "id": rec.get(self.schema.get("id_field")),
-                                       "field": f_name, "value": val, "range": [lo, hi]})
+                    offenders.append(
+                        {
+                            "index": i,
+                            "id": rec.get(self.schema.get("id_field")),
+                            "field": f_name,
+                            "value": val,
+                            "range": [lo, hi],
+                        }
+                    )
         passed = len(offenders) == 0
         return RuleResult(
-            "numeric_ranges_valid", "error", passed,
-            "All numeric fields within expected range." if passed else f"{len(offenders)} out-of-range value(s).",
+            "numeric_ranges_valid",
+            "error",
+            passed,
+            "All numeric fields within expected range."
+            if passed
+            else f"{len(offenders)} out-of-range value(s).",
             offenders,
         )
 
@@ -217,12 +257,23 @@ class DatasetValidator:
             for f_name, (min_len, max_len) in text_rules.items():
                 val = rec.get(f_name)
                 if isinstance(val, str) and not (min_len <= len(val.strip()) <= max_len):
-                    offenders.append({"index": i, "id": rec.get(self.schema.get("id_field")),
-                                       "field": f_name, "length": len(val.strip()), "expected": [min_len, max_len]})
+                    offenders.append(
+                        {
+                            "index": i,
+                            "id": rec.get(self.schema.get("id_field")),
+                            "field": f_name,
+                            "length": len(val.strip()),
+                            "expected": [min_len, max_len],
+                        }
+                    )
         passed = len(offenders) == 0
         return RuleResult(
-            "text_length_valid", "warning", passed,
-            "All text fields within expected length bounds." if passed else f"{len(offenders)} field(s) outside length bounds.",
+            "text_length_valid",
+            "warning",
+            passed,
+            "All text fields within expected length bounds."
+            if passed
+            else f"{len(offenders)} field(s) outside length bounds.",
             offenders,
         )
 
@@ -233,7 +284,9 @@ class DatasetValidator:
         dupes = [k for k, v in counts.items() if v > 1]
         passed = len(dupes) == 0
         return RuleResult(
-            "unique_ids", "error", passed,
+            "unique_ids",
+            "error",
+            passed,
             "All record IDs are unique." if passed else f"{len(dupes)} duplicate ID(s) found.",
             dupes,
         )
@@ -250,14 +303,19 @@ class DatasetValidator:
             norm = re.sub(r"[^\w\s]", "", raw.lower())
             norm = re.sub(r"\s+", " ", norm).strip()
             if norm in seen:
-                offenders.append({"index": i, "id": rec.get(self.schema.get("id_field")),
-                                   "duplicate_of_index": seen[norm]})
+                offenders.append(
+                    {"index": i, "id": rec.get(self.schema.get("id_field")), "duplicate_of_index": seen[norm]}
+                )
             else:
                 seen[norm] = i
         passed = len(offenders) == 0
         return RuleResult(
-            "no_near_duplicates", "warning", passed,
-            "No near-duplicate records detected." if passed else f"{len(offenders)} near-duplicate record(s) found.",
+            "no_near_duplicates",
+            "warning",
+            passed,
+            "No near-duplicate records detected."
+            if passed
+            else f"{len(offenders)} near-duplicate record(s) found.",
             offenders,
         )
 
@@ -271,7 +329,9 @@ class DatasetValidator:
         ratio = most / least if least else float("inf")
         passed = ratio <= max_ratio
         return RuleResult(
-            "class_balance", "warning", passed,
+            "class_balance",
+            "warning",
+            passed,
             f"Class distribution for '{balance_field}': {dict(counts)} (ratio {ratio:.1f}x, max allowed {max_ratio}x).",
             [] if passed else [dict(counts)],
         )
@@ -280,6 +340,7 @@ class DatasetValidator:
 # ---------------------------------------------------------------------------
 # I/O helpers
 # ---------------------------------------------------------------------------
+
 
 def load_records(path: str) -> list[dict[str, Any]]:
     p = Path(path)
@@ -295,6 +356,7 @@ def load_records(path: str) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     from scripts.dataset_validation.schemas import SCHEMAS
