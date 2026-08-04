@@ -16,6 +16,7 @@ source of truth for every numeric constant in the scoring pipeline.
 import logging
 import os
 from typing import Any
+from workers.risk_override import RiskOverrideEngine
 
 logger = logging.getLogger(__name__)
 
@@ -184,24 +185,23 @@ class RiskScoringEngine:
         video_risk = RiskScoringEngine.calculate_video_risk(video_result)
         audio_risk = RiskScoringEngine.calculate_audio_risk(audio_result)
         evaluation_risk = RiskScoringEngine.calculate_evaluation_risk(evaluation_result)
-        final_risk = RiskScoringEngine.calculate_final_risk(
-            video_risk,
-            audio_risk,
-            evaluation_risk,
-        )
-        risk_classification = RiskDecisionTree.classify(
+        final_risk = RiskScoringEngine.calculate_final_risk(video_risk, audio_risk, evaluation_risk)
+        risk_classification = RiskScoringEngine.classify_risk(final_risk)
+
+        override = RiskOverrideEngine.evaluate(
             video_result,
             audio_result,
             evaluation_result,
         )
-        final_risk = RiskScoringEngine._apply_critical_rule_overrides(final_risk, risk_classification)
-        weighted_classification = RiskScoringEngine.classify_risk(final_risk)
-        logger.info(
-            "Weighted=%s (%.2f), DecisionTree=%s",
-            weighted_classification,
-            final_risk,
-            risk_classification,
-        )
+
+        if override is not None:
+            logger.info(
+                "Risk classification overridden from %s to %s",
+                risk_classification,
+                override,
+            )
+            risk_classification = override        
+
         risk_factors = RiskScoringEngine._identify_risk_factors(video_result, audio_result, evaluation_result)
 
         report = {

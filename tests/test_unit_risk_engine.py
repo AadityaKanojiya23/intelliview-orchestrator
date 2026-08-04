@@ -95,37 +95,95 @@ def test_generate_risk_report_shape():
     assert "explanation" in report
     assert "recommendation" in report
 
-
-def test_generate_explanation_low():
-    explanation = RiskScoringEngine._generate_explanation(
-        "LOW",
-        [],
+def test_multiple_persons_override_to_critical():
+    report = RiskScoringEngine.generate_risk_report(
+        "s1",
+        {
+            "face_detected": {"faces_found": True},
+            "multiple_persons": {"multiple_persons_detected": True},
+        },
+        {"transcription": {"text": "hello"}},
+        {
+            "answer_quality_score": {"overall_quality_score": 90},
+            "technical_accuracy": {"accuracy_score": 90},
+            "communication_clarity": {"clarity_score": 90},
+        },
     )
-    assert "Low risk" in explanation
 
+    assert report["risk_classification"] == "CRITICAL"
 
-def test_generate_explanation_medium():
-    explanation = RiskScoringEngine._generate_explanation(
-        "MEDIUM",
-        ["Background voices detected"],
+def test_face_absent_override_to_high():
+    report = RiskScoringEngine.generate_risk_report(
+        "s1",
+        {
+            "face_detected": {"faces_found": False},
+            "multiple_persons": {"multiple_persons_detected": False},
+        },
+        {"transcription": {"text": "hello"}},
+        {
+            "answer_quality_score": {"overall_quality_score": 90},
+            "technical_accuracy": {"accuracy_score": 90},
+            "communication_clarity": {"clarity_score": 90},
+        },
     )
-    assert "Medium risk" in explanation
-    assert "Background voices detected" in explanation
 
+    assert report["risk_classification"] == "HIGH"
 
-def test_generate_explanation_high():
-    explanation = RiskScoringEngine._generate_explanation(
-        "HIGH",
-        ["Phone detected"],
+def test_no_override_keeps_weighted_classification():
+    report = RiskScoringEngine.generate_risk_report(
+        "s1",
+        {
+            "face_detected": {"faces_found": True},
+            "multiple_persons": {"multiple_persons_detected": False},
+            "phone_detected": {"phone_detected": False},
+            "head_movement_suspicious": {
+                "suspicious_movement_detected": False
+            },
+        },
+        {"transcription": {"text": "hello"}},
+        {
+            "answer_quality_score": {"overall_quality_score": 90},
+            "technical_accuracy": {"accuracy_score": 90},
+            "communication_clarity": {"clarity_score": 90},
+        },
+)
+
+    assert report["risk_classification"] == "LOW"
+
+def test_no_override_keeps_weighted_classification():
+    report = RiskScoringEngine.generate_risk_report(
+        "s1",
+        {
+            "face_detected": {"faces_found": True},
+            "multiple_persons": {"multiple_persons_detected": False},
+            "phone_detected": {"phone_detected": False},
+            "head_movement_suspicious": {
+                "suspicious_movement_detected": False
+            },
+        },
+        {"transcription": {"text": "hello"}},
+        {
+            "answer_quality_score": {"overall_quality_score": 90},
+            "technical_accuracy": {"accuracy_score": 90},
+            "communication_clarity": {"clarity_score": 90},
+        },
     )
-    assert "High risk" in explanation
-    assert "Phone detected" in explanation
 
+    assert report["risk_classification"] == "LOW"
 
-def test_generate_explanation_critical():
-    explanation = RiskScoringEngine._generate_explanation(
-        "CRITICAL",
-        ["Multiple persons detected"],
+def test_multiple_persons_has_priority_over_face_absent():
+    report = RiskScoringEngine.generate_risk_report(
+        "s1",
+        {
+            "face_detected": {"faces_found": False},
+            "multiple_persons": {"multiple_persons_detected": True},
+        },
+        {"transcription": {"text": "hello"}},
+        {
+            "answer_quality_score": {"overall_quality_score": 90},
+            "technical_accuracy": {"accuracy_score": 90},
+            "communication_clarity": {"clarity_score": 90},
+        },
     )
-    assert "Critical risk" in explanation
-    assert "Multiple persons detected" in explanation
+
+    assert report["risk_classification"] == "CRITICAL"
