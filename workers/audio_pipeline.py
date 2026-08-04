@@ -300,7 +300,7 @@ def run_audio_analysis(session_id: str,vad_config: Any | None = None,) -> AudioA
     """Execute audio analysis pipeline for an interview session."""
     logger.info(f"Starting audio analysis for session {session_id}")
 
-    transcription = transcribe_speech(session_id, vad_config=vad_config)
+    transcription = transcribe_speech(session_id)
     bg_voices = detect_background_voices(session_id)
     suspicious = detect_suspicious_conversation(session_id)
 

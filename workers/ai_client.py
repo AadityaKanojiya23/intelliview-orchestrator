@@ -296,12 +296,9 @@ def transcribe_audio_file(
         )
 
         return {
-            "text": combined_text,
-            "language": detected_language,
-            "segments": aligned_whisper_segments,
-            "silence_only": False,
-            "vad_segments": vad_summary,
-            "total_speech_duration": round(speech_duration, 3),
+            "text": result.get("text", ""),
+            "language": result.get("language", "en"),
+            "segments": result.get("segments", []),
         }
     except Exception as exc:
         logger.warning("Whisper transcription failed: %s", exc)
