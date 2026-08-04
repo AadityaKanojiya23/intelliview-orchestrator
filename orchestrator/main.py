@@ -44,22 +44,6 @@ from config import (
     MAX_REQUEST_BODY_BYTES,
     get_settings,
 )
-from database.db import engine, get_db
-from database.models import Base, Candidate, InterviewSession
-from metrics.prometheus_metrics import (
-    POSTGRES_HEALTH,
-    REDIS_HEALTH,
-    REQUEST_COUNT,
-    REQUEST_DURATION,
-    SESSIONS_ACTIVE,
-    SESSIONS_CREATED,
-    WORKER_ACTIVE_TASKS,
-    WORKER_CAPACITY,
-    WORKER_HEARTBEAT_AGE_SECONDS,
-    WORKERS_HEALTHY,
-    WORKERS_REGISTERED,
-    WORKERS_UNHEALTHY,
-)
 from monitoring.dashboard_api import create_dashboard_routes
 from monitoring.metrics_collector import MetricsCollector
 from monitoring.websocket_manager import ws_manager
@@ -108,7 +92,6 @@ async def lifespan(app: FastAPI):
 
     settings = get_settings()
     settings.validate_configuration()
-
     Base.metadata.create_all(bind=engine)
 
         # Initialize webhook subscriber store
