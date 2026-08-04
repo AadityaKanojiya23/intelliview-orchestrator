@@ -27,9 +27,27 @@ class FakeRegistry:
 
 def _make_workers():
     return [
-        {"worker_id": "w1", "capacity": 4, "active_tasks": 3, "status": "healthy"},
-        {"worker_id": "w2", "capacity": 4, "active_tasks": 1, "status": "healthy"},
-        {"worker_id": "w3", "capacity": 4, "active_tasks": 2, "status": "healthy"},
+        {
+            "worker_id": "w1",
+            "capacity": 4,
+            "active_tasks": 3,
+            "status": "healthy",
+            "weight": 1,
+        },
+        {
+            "worker_id": "w2",
+            "capacity": 4,
+            "active_tasks": 1,
+            "status": "healthy",
+            "weight": 1,
+        },
+        {
+            "worker_id": "w3",
+            "capacity": 4,
+            "active_tasks": 2,
+            "status": "healthy",
+            "weight": 1,
+        },
     ]
 
 
@@ -68,3 +86,98 @@ def test_full_capacity_workers_excluded():
     lb = LoadBalancer()
     lb.worker_registry = FakeRegistry(workers)
     assert lb.select_worker()["worker_id"] in {"w3"}
+def test_weighted_least_loaded_prefers_higher_weight_worker():
+    workers = [
+        {
+            "worker_id": "w1",
+            "capacity": 10,
+            "active_tasks": 4,
+            "status": "healthy",
+            "weight": 1,
+        },
+        {
+            "worker_id": "w2",
+            "capacity": 10,
+            "active_tasks": 6,
+            "status": "healthy",
+            "weight": 3,
+        },
+    ]
+
+
+def test_weighted_least_loaded_prefers_higher_weight_worker():
+    workers = [
+        {
+            "worker_id": "w1",
+            "capacity": 10,
+            "active_tasks": 4,
+            "status": "healthy",
+            "weight": 1,
+        },
+        {
+            "worker_id": "w2",
+            "capacity": 10,
+            "active_tasks": 6,
+            "status": "healthy",
+            "weight": 3,
+        },
+    ]
+
+    lb = LoadBalancer(strategy=BalancingStrategy.WEIGHTED_LEAST_LOADED)
+    lb.worker_registry = FakeRegistry(workers)
+
+    selected = lb.select_worker()
+
+    assert selected["worker_id"] == "w2"
+<<<<<<< HEAD
+def test_weighted_least_loaded_prefers_higher_weight():
+    workers = [
+        {
+            "worker_id": "w1",
+            "capacity": 4,
+            "active_tasks": 2,
+            "status": "healthy",
+            "weight": 1,
+        },
+        {
+            "worker_id": "w2",
+            "capacity": 4,
+            "active_tasks": 2,
+            "status": "healthy",
+            "weight": 2,
+        },
+    ]
+
+    lb = LoadBalancer(
+        strategy=BalancingStrategy.WEIGHTED_LEAST_LOADED
+    )
+
+=======
+
+
+def test_weighted_least_loaded_prefers_higher_weight():
+    workers = [
+        {
+            "worker_id": "w1",
+            "capacity": 4,
+            "active_tasks": 2,
+            "status": "healthy",
+            "weight": 1,
+        },
+        {
+            "worker_id": "w2",
+            "capacity": 4,
+            "active_tasks": 2,
+            "status": "healthy",
+            "weight": 2,
+        },
+    ]
+
+    lb = LoadBalancer(strategy=BalancingStrategy.WEIGHTED_LEAST_LOADED)
+
+>>>>>>> issue-527-weighted-least-loaded-v3
+    lb.worker_registry = FakeRegistry(workers)
+
+    selected = lb.select_worker()
+
+    assert selected["worker_id"] == "w2"

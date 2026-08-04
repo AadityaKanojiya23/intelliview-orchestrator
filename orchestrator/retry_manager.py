@@ -97,7 +97,11 @@ class RetryManager:
             logger.error(f"Error checking if can retry: {e!s}")
             return False
 
-    def schedule_retry(self, session_id: str, delay_seconds: int | None = None) -> bool:
+    def schedule_retry(
+        self,
+        session_id: str,
+        delay_seconds: int | None = None,
+    ) -> bool:
         """
         Schedule a retry for a failed task
 
@@ -112,9 +116,11 @@ class RetryManager:
             True if retry was scheduled, False otherwise
         """
         try:
-            # Check if can retry
             if not self.can_retry(session_id):
-                logger.warning(f"Cannot retry session {session_id}: max retries exceeded")
+                logger.warning(
+                    "Maximum retries exceeded for session %s. Sending to DLQ.",
+                    session_id,
+                )
                 return False
 
             # Get current retry count and increment
@@ -134,12 +140,18 @@ class RetryManager:
                 "retry_count": retry_count,
                 "scheduled_at": datetime.now(timezone.utc).isoformat(),
                 "retry_after": (datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)).isoformat(),
-                "delay_seconds": delay_seconds,
                 "strategy": self.strategy.value,
             }
 
             if self.redis_client:
-                # Store retry metadata
+                scheduled_key = f"{self.retry_scheduled_key}{session_id}"
+
+                self.redis_client.set(
+                    scheduled_key,
+                    json.dumps(retry_data),
+                    ex=delay_seconds,
+                )
+
                 retry_key = f"{self.retry_key_prefix}{session_id}"
                 self.redis_client.set(
                     retry_key,
@@ -160,7 +172,7 @@ class RetryManager:
             return True
 
         except Exception as e:
-            logger.error(f"Error scheduling retry for {session_id}: {e!s}")
+            logger.exception(e)
             return False
 
     def _calculate_delay(self, retry_count: int) -> int:
@@ -227,10 +239,19 @@ class RetryManager:
                 return 1
 
             count_key = f"{self.retry_count_key}{session_id}"
-            count = self.redis_client.incr(count_key)
 
-            # Set TTL to 7 days
-            self.redis_client.expire(count_key, 604800)
+            # Use MULTI/EXEC pipeline to atomically INCR and EXPIRE
+            client = getattr(self.redis_client, "raw", self.redis_client)
+            if hasattr(client, "pipeline"):
+                pipe = client.pipeline()
+                pipe.incr(count_key)
+                pipe.expire(count_key, 604800)
+                results = pipe.execute()
+                count = results[0]
+            else:
+                count = self.redis_client.incr(count_key)
+                # Set TTL to 7 days
+                self.redis_client.expire(count_key, 604800)
 
             logger.debug(f"Incremented retry count for {session_id} to {count}")
 
