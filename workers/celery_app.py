@@ -5,7 +5,7 @@ FAILED only after Celery has exhausted its retries.
 """
 
 from celery import Celery, signals
-from opentelemetry.instrumentation.celery import CeleryInstrumentor
+from kombu import Queue
 
 from config import REDIS_URL
 from metrics.prometheus_metrics import TASKS_PERMANENTLY_FAILED
@@ -31,6 +31,14 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     broker_connection_retry_on_startup=True,
     # Periodic beat schedule — scan for due retries every 60 seconds
+    task_queues=(
+    Queue("fast"),
+    Queue("slow"),
+    ),
+
+    task_routes={
+    "workers.tasks.scan_and_dispatch_retries": {"queue": "fast"},
+    },
     beat_schedule={
         "scan-due-retries": {
             "task": "workers.tasks.scan_and_dispatch_retries",
