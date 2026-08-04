@@ -282,52 +282,23 @@ class LoadBalancer:
         """
         available = self._get_cached_workers()
 
-        if not available:
-            logger.warning("No workers available for priority-based selection")
-            return None
+if not available:
+    return None
+
+available.sort(
+    key=lambda w: (
+        w["active_tasks"] /
+        self.worker_registry.get_worker_weight(w)
+    )
+)
+
 
         # Normalize priority to lowercase so "High"/"high"/"HIGH" all work
         priority = priority.lower()
 
         # ── Step 1: Filter candidate pool by priority ─────────────────────────
         if priority == "high":
-            # High priority: all workers are candidates — no filtering
-            candidates = available
-
-        elif priority == "medium":
-            # Medium priority: skip workers above 70% capacity
-            candidates = [w for w in available if w["active_tasks"] < w["capacity"] * 0.7]
-            # Fallback: if all workers are busy, consider everyone
-            if not candidates:
-                logger.debug("Medium priority fallback: all workers above 70% — using full pool")
-                candidates = available
-
-        else:
-            # Low priority: only workers below 50% capacity (spare capacity)
-            candidates = [w for w in available if w["active_tasks"] < w["capacity"] * 0.5]
-            # Fallback: if no spare-capacity worker found, use least loaded one
-            if not candidates:
-                logger.debug("Low priority fallback: no spare-capacity workers — using least loaded")
-                candidates = [min(available, key=lambda w: w["active_tasks"])]
-
-        # ── Step 2: Apply configured strategy on the filtered pool ────────────
-        # Temporarily swap the registry's worker pool so select_worker() picks
-        # only from our filtered candidates, then restore it afterward.
-        original_get = self.worker_registry.get_available_workers
-
-        self.worker_registry.get_available_workers = lambda: candidates
-        try:
-            selected = self.select_worker()
-        finally:
-            # Always restore original method — even if select_worker() raises
-            self.worker_registry.get_available_workers = original_get
-
-        logger.debug(
-            f"Priority '{priority}' + strategy '{self.strategy.value}' "
-            f"→ selected worker: {selected['worker_id'] if selected else None}"
-        )
-        return selected
-        return min(available, key=lambda w: w["active_tasks"])
+        return available[0]
 
         # For medium priority, select from least loaded
         if priority == "medium":

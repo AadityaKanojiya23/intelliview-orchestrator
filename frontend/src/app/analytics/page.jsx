@@ -1,9 +1,8 @@
 "use client";
 
-
 import { useMemo, useState, useCallback } from "react";
 import useSWR from "swr";
-import MetricsDashboard from "@/components/analytics/MetricsDashboard";
+
 import {
   Bar,
   BarChart,
@@ -19,534 +18,1402 @@ import {
   Line,
   LineChart,
 } from "recharts";
-import { Download, Calendar, TrendingUp, Filter } from "lucide-react";
+
+import {
+  Download,
+  Calendar,
+  Filter,
+} from "lucide-react";
+
+
 import Card from "@/components/Card";
 import Stat from "@/components/Stat";
 import { Badge } from "@/components/Badge";
 import { Skeleton, ErrorState } from "@/components/States";
-import { endpoints } from "@/lib/api";
+
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
+
+
 const RISK_BUCKETS = [
-  { name: "Low (<0.3)", color: "#10b981" },
-  { name: "Medium (0.3-0.6)", color: "#f59e0b" },
-  { name: "High (0.6-0.8)", color: "#f97316" },
-  { name: "Critical (≥0.8)", color: "#ef4444" },
+  { name: "Low (<0.3)", color:"#10b981" },
+  { name: "Medium (0.3-0.6)", color:"#f59e0b" },
+  { name: "High (0.6-0.8)", color:"#f97316" },
+  { name: "Critical (≥0.8)", color:"#ef4444" },
 ];
 
-const DATE_PRESETS = [
-  { label: "All time", value: "all" },
-  { label: "Last 24h", value: "24h" },
-  { label: "Last 7d", value: "7d" },
-  { label: "Last 30d", value: "30d" },
+
+const DATE_PRESETS=[
+ {
+  label:"All time",
+  value:"all"
+ },
+ {
+  label:"Last 24h",
+  value:"24h"
+ },
+ {
+  label:"Last 7d",
+  value:"7d"
+ },
+ {
+  label:"Last 30d",
+  value:"30d"
+ }
 ];
 
-const TOOLTIP_STYLE = {
-  contentStyle: { background: "#12121a", border: "1px solid #27272a", borderRadius: 8 },
+
+const TOOLTIP_STYLE={
+ contentStyle:{
+  background:"#12121a",
+  border:"1px solid #27272a",
+  borderRadius:8
+ }
 };
 
-function filterByDate(sessions, range) {
-  if (range === "all") return sessions;
-  const now = Date.now();
-  const ms = { "24h": 86400000, "7d": 604800000, "30d": 2592000000 }[range];
-  return sessions.filter((s) => {
-    const t = new Date(s.updated_at || s.created_at || 0).getTime();
-    return now - t <= ms;
-  });
+
+
+
+function filterByDate(sessions,range){
+
+ if(range==="all")
+ return sessions;
+
+
+ const now=Date.now();
+
+ const msMap = {
+  "24h": 86400000,
+  "7d": 604800000,
+  "30d": 2592000000,
+};
+
+const ms = msMap[range];
+
+if (typeof ms !== "number") {
+  return sessions;
 }
 
-function RiskDistribution({ sessions, loading, onDrillDown }) {
-  const buckets = useMemo(() => {
-    const counts = RISK_BUCKETS.map((b) => ({ ...b, value: 0 }));
-    for (const s of sessions) {
-      const r = s?.risk_score;
-      if (typeof r !== "number") continue;
-      if (r < 0.3) counts[0].value += 1;
-      else if (r < 0.6) counts[1].value += 1;
-      else if (r < 0.8) counts[2].value += 1;
-      else counts[3].value += 1;
-    }
-    return counts;
-  }, [sessions]);
+return sessions.filter((s) => {
 
-  return (
-    <Card
-      title="Risk distribution"
-      description="Sessions bucketed by final risk score."
-      action={
-        <button
-          onClick={() => onDrillDown("risk")}
-          className="flex items-center gap-1 rounded-md border border-border bg-bg-card px-2 py-1 text-xs text-muted hover:text-zinc-200"
-        >
-          <Filter size={12} /> Drill down
-        </button>
-      }
-    >
-      {loading ? (
-        <Skeleton className="h-64 w-full" />
-      ) : buckets.every((b) => b.value === 0) ? (
-        <div className="py-8 text-center text-sm text-muted">No sessions with risk scores yet.</div>
-      ) : (
-        <ResponsiveContainer width="100%" height={280}>
-          <PieChart>
-            <Pie
-              data={buckets}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              outerRadius={90}
-              innerRadius={50}
-              paddingAngle={2}
-            >
-              {buckets.map((b, i) => (
-                <Cell key={i} fill={b.color} />
-              ))}
-            </Pie>
-            <Tooltip {...TOOLTIP_STYLE} />
-            <Legend wrapperStyle={{ fontSize: 12, color: "#a1a1aa" }} />
-          </PieChart>
-        </ResponsiveContainer>
-      )}
-    </Card>
-  );
+ const t=new Date(
+ s.updated_at ||
+ s.created_at ||
+ 0
+ ).getTime();
+
+
+ return now-t<=ms;
+
+ });
+
+
 }
 
-function TrendChart({ sessions }) {
-  const trendData = useMemo(() => {
-    const byDate = {};
-    for (const s of sessions) {
-      const date = (s.updated_at || s.created_at || "").slice(0, 10);
-      if (!date) continue;
-      if (!byDate[date]) byDate[date] = { date, completed: 0, failed: 0, avgRisk: 0, riskCount: 0 };
-      if (s.status === "COMPLETED") byDate[date].completed += 1;
-      else if (s.status === "FAILED" || s.status === "TIMEOUT") byDate[date].failed += 1;
-      if (s.risk_score != null) {
-        byDate[date].avgRisk += s.risk_score;
-        byDate[date].riskCount += 1;
-      }
-    }
-    return Object.values(byDate)
-      .map((d) => ({
-        ...d,
-        avgRisk: d.riskCount > 0 ? d.avgRisk / d.riskCount : null,
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [sessions]);
 
-  return (
-    <Card title="Trend analysis" description="Daily session completion and failure trends.">
-      {trendData.length === 0 ? (
-        <div className="py-8 text-center text-sm text-muted">No data for trend analysis.</div>
-      ) : (
-        <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={trendData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-            <XAxis dataKey="date" stroke="#71717a" fontSize={11} />
-            <YAxis stroke="#71717a" fontSize={11} />
-            <Tooltip {...TOOLTIP_STYLE} />
-            <Legend wrapperStyle={{ fontSize: 12, color: "#a1a1aa" }} />
-            <Line
-              type="monotone"
-              dataKey="completed"
-              stroke="#10b981"
-              strokeWidth={2}
-              dot={{ r: 3 }}
-              name="Completed"
-            />
-            <Line
-              type="monotone"
-              dataKey="failed"
-              stroke="#ef4444"
-              strokeWidth={2}
-              dot={{ r: 3 }}
-              name="Failed"
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      )}
-    </Card>
-  );
+
+
+
+
+function RiskDistribution({
+ sessions,
+ loading,
+ onDrillDown
+}){
+
+
+ const buckets=useMemo(()=>{
+
+
+ const counts=RISK_BUCKETS.map(
+ b=>({...b,value:0})
+ );
+
+
+ sessions.forEach((s)=>{
+
+
+ const r=s?.risk_score;
+
+
+ if (typeof r !== "number" || Number.isNaN(r)) {
+  return;
 }
 
-function InterviewMetricsChart({ sessions }) {
-  const trendData = useMemo(() => {
-    const byDate = {};
-    for (const s of sessions) {
-      const date = (s.updated_at || s.created_at || "").slice(0, 10);
-      if (!date) continue;
-      if (!byDate[date]) byDate[date] = { date, avgRisk: 0, count: 0 };
-      if (s.risk_score != null) {
-        byDate[date].avgRisk += s.risk_score;
-        byDate[date].count += 1;
-      }
-    }
-    return Object.values(byDate)
-      .map((d) => ({
-        date: d.date,
-        avgRisk: d.count > 0 ? d.avgRisk / d.count : null,
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [sessions]);
+ if(r<0.3)
+ counts[0].value++;
 
-  return (
-    <Card title="Interview metrics" description="Average risk score across interviews per day.">
-      {trendData.length === 0 ? (
-        <div className="py-8 text-center text-sm text-muted">No interview metrics yet.</div>
-      ) : (
-        <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={trendData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-            <XAxis dataKey="date" stroke="#71717a" fontSize={11} />
-            <YAxis stroke="#71717a" fontSize={11} domain={[0, 1]} />
-            <Tooltip {...TOOLTIP_STYLE} />
-            <Legend wrapperStyle={{ fontSize: 12, color: "#a1a1aa" }} />
-            <Line type="monotone" dataKey="avgRisk" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} name="Avg risk score" />
-          </LineChart>
-        </ResponsiveContainer>
-      )}
-    </Card>
-  );
+ else if(r<0.6)
+ counts[1].value++;
+
+ else if(r<0.8)
+ counts[2].value++;
+
+ else
+ counts[3].value++;
+
+
+ });
+
+
+ return counts;
+
+
+ },[sessions]);
+
+
+
+ return(
+
+ <Card
+ title="Risk distribution"
+ description="Sessions bucketed by final risk score."
+ action={
+ <button
+ onClick={()=>onDrillDown("risk")}
+ className="flex items-center gap-1 rounded-md border border-border bg-bg-card px-2 py-1 text-xs"
+ >
+ <Filter size={12}/>
+ Drill down
+ </button>
+ }
+ >
+
+
+ {
+ loading ?
+
+ <Skeleton className="h-64 w-full"/>
+
+
+ :
+
+ buckets.every(
+ b=>b.value===0
+ )
+
+ ?
+
+ <div className="py-8 text-center text-sm text-muted">
+ No sessions with risk scores yet.
+ </div>
+
+
+ :
+
+ <ResponsiveContainer
+ width="100%"
+ height={280}
+ >
+
+ <PieChart>
+
+ <Pie
+ data={buckets}
+ dataKey="value"
+ nameKey="name"
+ cx="50%"
+ cy="50%"
+ outerRadius={90}
+ innerRadius={50}
+ >
+
+ {
+ buckets.map((b,i)=>(
+
+ <Cell
+ key={i}
+ fill={b.color}
+ />
+
+ ))
+ }
+
+
+ </Pie>
+
+
+ <Tooltip {...TOOLTIP_STYLE}/>
+
+ <Legend/>
+
+
+ </PieChart>
+
+
+ </ResponsiveContainer>
+
+
+ }
+
+
+
+ </Card>
+
+
+ );
+
 }
 
-function CandidateStatsChart({ sessions }) {
-  const data = useMemo(() => {
-    const map = new Map();
-    for (const s of sessions) {
-      const id = s.candidate_id || "unknown";
-      if (!map.has(id)) map.set(id, { candidate_id: id, sessions: 0 });
-      map.get(id).sessions += 1;
-    }
-    return Array.from(map.values())
-      .sort((a, b) => b.sessions - a.sessions)
-      .slice(0, 10);
-  }, [sessions]);
 
-  return (
-    <Card title="Candidate statistics" description="Top candidates by number of interview sessions.">
-      {data.length === 0 ? (
-        <div className="py-8 text-center text-sm text-muted">No candidate data yet.</div>
-      ) : (
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-            <XAxis dataKey="candidate_id" stroke="#71717a" fontSize={10} interval={0} angle={-20} textAnchor="end" height={50} />
-            <YAxis stroke="#71717a" fontSize={11} />
-            <Tooltip {...TOOLTIP_STYLE} />
-            <Bar dataKey="sessions" fill="#10b981" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      )}
-    </Card>
-  );
+
+
+
+
+function TrendChart({sessions}){
+
+
+ const trendData=useMemo(()=>{
+
+
+ const data={};
+
+
+ sessions.forEach((s)=>{
+
+
+ const date=(
+ s.updated_at ||
+ s.created_at ||
+ ""
+ ).slice(0,10);
+
+
+
+ if(!date)
+ return;
+
+
+
+ if(!data[date]){
+
+ data[date]={
+ date,
+ completed:0,
+ failed:0
+ };
+
+ }
+
+
+
+ if(s.status==="COMPLETED")
+ data[date].completed++;
+
+
+ if(
+ s.status==="FAILED" ||
+ s.status==="TIMEOUT"
+ )
+ data[date].failed++;
+
+
+ });
+
+
+
+ return Object.values(data);
+
+
+ },[sessions]);
+
+
+
+ return(
+
+ <Card
+ title="Trend analysis"
+ description="Daily session completion and failure trends."
+ >
+
+
+ {
+ trendData.length===0 ?
+
+ <div className="py-8 text-center text-sm text-muted">
+ No data for trend analysis.
+ </div>
+
+
+ :
+
+ <ResponsiveContainer
+ width="100%"
+ height={280}
+ >
+
+ <LineChart data={trendData}>
+
+ <CartesianGrid strokeDasharray="3 3"/>
+
+ <XAxis dataKey="date"/>
+
+ <YAxis/>
+
+ <Tooltip {...TOOLTIP_STYLE}/>
+
+
+ <Line
+ dataKey="completed"
+ stroke="#10b981"
+ name="Completed"
+ />
+
+ <Line
+ dataKey="failed"
+ stroke="#ef4444"
+ name="Failed"
+ />
+
+
+ </LineChart>
+
+
+ </ResponsiveContainer>
+
+
+ }
+
+
+
+ </Card>
+
+
+ );
+
+
 }
 
-function DrillDownModal({ type, sessions, onClose }) {
-  const data = useMemo(() => {
-    if (type === "risk") {
-      return sessions
-        .filter((s) => s.risk_score != null)
-        .sort((a, b) => b.risk_score - a.risk_score)
-        .map((s) => ({
-          session_id: s.session_id,
-          candidate_id: s.candidate_id,
-          risk_score: s.risk_score,
-          status: s.status,
-        }));
-    }
-    return [];
-  }, [type, sessions]);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-xl border border-border bg-bg-panel shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h3 className="text-sm font-semibold text-zinc-100">
-            {type === "risk" ? "Risk Score Breakdown" : "Drill Down"}
-          </h3>
-          <button
-            onClick={onClose}
-            className="rounded-md border border-border bg-bg-card px-2 py-1 text-xs text-muted hover:text-zinc-200"
-          >
-            Close
-          </button>
-        </div>
-        <div className="max-h-[60vh] overflow-y-auto p-5">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-muted">
-              <tr>
-                <th className="py-2 pr-4">Session</th>
-                <th className="py-2 pr-4">Candidate</th>
-                <th className="py-2 pr-4">Risk Score</th>
-                <th className="py-2 pr-4">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((s) => (
-                <tr key={s.session_id} className="border-t border-border">
-                  <td className="py-2 pr-4 font-mono text-xs text-zinc-300">{s.session_id}</td>
-                  <td className="py-2 pr-4 text-zinc-300">{s.candidate_id}</td>
-                  <td className="py-2 pr-4">
-                    <Badge
-                      variant={
-                        s.risk_score >= 0.8
-                          ? "danger"
-                          : s.risk_score >= 0.6
-                            ? "warn"
-                            : "success"
-                      }
-                    >
-                      {s.risk_score.toFixed(3)}
-                    </Badge>
-                  </td>
-                  <td className="py-2 pr-4 text-zinc-300">{s.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+
+
+
+
+
+export default function AnalyticsPage(){
+
+
+
+// =============================
+// Recruiter Dashboard State
+// =============================
+
+
+const [candidates,setCandidates]=useState([]);
+
+
+
+const [candidateForm,setCandidateForm]=useState({
+
+ name:"",
+ role:"",
+ status:"Scheduled",
+ score:"",
+ risk:""
+
+});
+
+
+
+
+
+const addCandidate=()=>{
+
+const removeCandidate = (id) => {
+
+  setCandidates((prev) =>
+    prev.filter((candidate) => candidate.id !== id)
   );
+
+  toast.success(
+    "Candidate removed"
+  );
+
+};
+ if(
+ !candidateForm.name ||
+ !candidateForm.role
+ ){
+
+ toast.error(
+ "Candidate name and role required"
+ );
+
+ return;
+
+ }
+
+
+
+ setCandidates([
+
+ ...candidates,
+
+ {
+  id:Date.now(),
+  ...candidateForm
+ }
+
+ ]);
+
+
+
+ setCandidateForm({
+
+ name:"",
+ role:"",
+ status:"Scheduled",
+ score:"",
+ risk:""
+
+ });
+
+
+ toast.success(
+ "Candidate added"
+ );
+
+
+};
+
+
+
+
+
+const stats=useSWR(
+"/session-statistics",
+{
+ refreshInterval:10000
 }
+);
 
-export default function AnalyticsPage() {
-  const stats = useSWR("/session-statistics", { refreshInterval: 10000 });
-  const faults = useSWR("/fault-statistics", { refreshInterval: 10000 });
-  const dlq = useSWR("/dead-letter-queue?limit=50", { refreshInterval: 10000 });
-  const completed = useSWR("/completed-sessions?limit=100", { refreshInterval: 10000 });
-  const failed = useSWR("/failed-sessions?limit=100", { refreshInterval: 10000 });
 
-  const [dateRange, setDateRange] = useState("all");
-  const [drillDown, setDrillDown] = useState(null);
+const faults=useSWR(
+"/fault-statistics",
+{
+ refreshInterval:10000
+}
+);
 
-  const allSessions = useMemo(
-    () => [...(completed.data?.sessions ?? []), ...(failed.data?.sessions ?? [])],
-    [completed.data, failed.data]
-  );
 
-  const filteredSessions = useMemo(() => filterByDate(allSessions, dateRange), [allSessions, dateRange]);
+const dlq=useSWR(
+"/dead-letter-queue?limit=50",
+{
+ refreshInterval:10000
+}
+);
 
-  const breakdown = useMemo(() => {
-    if (!stats.data) return [];
-    return Object.entries(stats.data.status_breakdown).map(([status, count]) => ({
+
+const completed=useSWR(
+"/completed-sessions?limit=100",
+{
+ refreshInterval:10000
+}
+);
+
+
+const failed=useSWR(
+"/failed-sessions?limit=100",
+{
+ refreshInterval:10000
+}
+);
+
+
+
+const [dateRange,setDateRange]=useState("all");
+
+
+const [drillDown,setDrillDown]=useState(null);
+
+
+
+
+const allSessions=useMemo(()=>[
+
+...(completed.data?.sessions ?? []),
+
+...(failed.data?.sessions ?? [])
+
+],
+[
+completed.data,
+failed.data
+]);
+
+
+
+
+const filteredSessions=useMemo(()=>{
+
+return filterByDate(
+allSessions,
+dateRange
+);
+
+},[
+allSessions,
+dateRange
+]);
+
+
+  const breakdown = useMemo(()=>{
+
+    if(!stats.data)
+      return [];
+
+    return Object.entries(
+      stats.data.status_breakdown || {}
+    ).map(([status,count])=>({
       status,
-      count,
+      count
     }));
-  }, [stats.data]);
 
-  const failureData = useMemo(() => {
-    if (!faults.data) return [];
-    return Object.entries(faults.data.fault_statistics.failures_by_type).map(
-      ([type, count]) => ({ type, count })
-    );
-  }, [faults.data]);
+  },[stats.data]);
 
-  const handleExport = useCallback(() => {
-    const csv = [
-      "session_id,candidate_id,status,risk_score,worker,updated_at",
-      ...filteredSessions.map(
-        (s) =>
-          `${s.session_id},${s.candidate_id || ""},${s.status},${s.risk_score ?? ""},${s.assigned_node || ""},${s.updated_at || ""}`
-      ),
+
+
+  const failureData = useMemo(()=>{
+
+    if(!faults.data)
+      return [];
+
+    return Object.entries(
+      faults.data.fault_statistics?.failures_by_type || {}
+    ).map(([type,count])=>({
+      type,
+      count
+    }));
+
+  },[faults.data]);
+
+
+
+
+  const handleExport = useCallback(()=>{
+
+
+    const csv=[
+
+      "candidate,role,status,score,risk",
+
+      ...candidates.map(c=>
+
+        `${c.name},${c.role},${c.status},${c.score},${c.risk}`
+
+      )
+
     ].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `analytics-export-${dateRange}.csv`;
+
+
+
+    const blob=new Blob(
+      [csv],
+      {
+        type:"text/csv"
+      }
+    );
+
+
+    const url=URL.createObjectURL(blob);
+
+
+    const a=document.createElement("a");
+
+    a.href=url;
+
+    a.download="candidate-export.csv";
+
     a.click();
+
+
     URL.revokeObjectURL(url);
-    toast.success("Export complete", "CSV file downloaded");
-  }, [filteredSessions, dateRange]);
 
-  return (
-    <ErrorBoundary>
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex items-end justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-zinc-50">Analytics</h1>
-            <p className="text-sm text-muted">Risk distribution, failure modes, trends, and export.</p>
-          </div>
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-3 py-1.5 text-xs text-muted hover:text-zinc-200"
-          >
-            <Download size={14} /> Export CSV
-          </button>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Calendar size={14} className="text-muted" />
-          {DATE_PRESETS.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setDateRange(p.value)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-xs font-medium",
-                dateRange === p.value
-                  ? "bg-accent/15 text-accent-light"
-                  : "text-muted hover:bg-bg-card hover:text-zinc-200"
-              )}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+    toast.success(
+      "Export complete"
+    );
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat
-            label="Total sessions"
-            value={stats.data?.total_sessions ?? <Skeleton className="h-7 w-12" />}
-          />
-          <Stat
-            label="Avg risk"
-            value={
-              stats.data ? (
-                stats.data.risk_score_stats.average_risk_score.toFixed(3)
-              ) : (
-                <Skeleton className="h-7 w-16" />
-              )
-            }
-          />
-          <Stat
-            label="High risk"
-            value={
-              stats.data?.risk_score_stats.high_risk_sessions ?? (
-                <Skeleton className="h-7 w-12" />
-              )
-            }
-          />
-          <Stat
-            label="DLQ size"
-            value={dlq.data?.count ?? <Skeleton className="h-7 w-12" />}
-          />
-        </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Card title="Sessions by status" description="Distribution across the lifecycle states.">
-            {stats.error ? (
-              <ErrorState error={stats.error} onRetry={() => stats.mutate()} />
-            ) : !stats.data ? (
-              <Skeleton className="h-64 w-full" />
-            ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={breakdown}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                  <XAxis dataKey="status" stroke="#71717a" fontSize={11} />
-                  <YAxis stroke="#71717a" fontSize={11} />
-                  <Tooltip {...TOOLTIP_STYLE} />
-                  <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </Card>
+  },[candidates]);
 
-          <Card title="Failure breakdown" description="Counts grouped by failure type.">
-            {faults.error ? (
-              <ErrorState error={faults.error} onRetry={() => faults.mutate()} />
-            ) : !faults.data ? (
-              <Skeleton className="h-64 w-full" />
-            ) : failureData.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted">No failures recorded.</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={failureData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                  <XAxis dataKey="type" stroke="#71717a" fontSize={11} />
-                  <YAxis stroke="#71717a" fontSize={11} />
-                  <Tooltip {...TOOLTIP_STYLE} />
-                  <Bar dataKey="count" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </Card>
-        </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <RiskDistribution
-            sessions={filteredSessions}
-            loading={completed.isLoading && failed.isLoading}
-            onDrillDown={(type) => setDrillDown(type)}
-          />
-          <TrendChart sessions={filteredSessions} />
-        </div>
 
-        {drillDown && (
-          <DrillDownModal
-            type={drillDown}
-            sessions={filteredSessions}
-            onClose={() => setDrillDown(null)}
-          />
-        )}
+
+return (
+
+<div className="space-y-6 animate-fade-in">
+
+
+
+{/* ===========================
+    RECRUITER DASHBOARD
+=========================== */}
+
+
+
+<div className="space-y-5">
+
+
+<div>
+
+<h1 className="text-2xl font-semibold text-zinc-50">
+Recruiter Dashboard
+</h1>
+
+
+<p className="text-sm text-muted">
+AI powered candidate hiring insights and interview evaluation.
+</p>
+
+
 </div>
 
-      <div className="border-t border-border pt-6">
-        <MetricsDashboard />
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title="Sessions by status" description="Distribution across the lifecycle states.">
-          {stats.error ? (
-            <ErrorState error={stats.error} onRetry={() => stats.mutate()} />
-          ) : !stats.data ? (
-            <Skeleton className="h-64 w-full" />
-          ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={breakdown}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                <XAxis dataKey="status" stroke="#71717a" fontSize={11} />
-                <YAxis stroke="#71717a" fontSize={11} />
-                <Tooltip {...TOOLTIP_STYLE} />
-                <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </Card>
 
-        <Card title="Failure breakdown" description="Counts grouped by failure type.">
-          {faults.error ? (
-            <ErrorState error={faults.error} onRetry={() => faults.mutate()} />
-          ) : !faults.data ? (
-            <Skeleton className="h-64 w-full" />
-          ) : failureData.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted">No failures recorded.</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={failureData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                <XAxis dataKey="type" stroke="#71717a" fontSize={11} />
-                <YAxis stroke="#71717a" fontSize={11} />
-                <Tooltip {...TOOLTIP_STYLE} />
-                <Bar dataKey="count" fill="#ef4444" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </Card>
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <RiskDistribution
-          sessions={filteredSessions}
-          loading={completed.isLoading && failed.isLoading}
-          onDrillDown={(type) => setDrillDown(type)}
-        />
-        <TrendChart sessions={filteredSessions} />
-      </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <InterviewMetricsChart sessions={filteredSessions} />
-        <CandidateStatsChart sessions={filteredSessions} />
-      </div>
+<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
-      {drillDown && (
-        <DrillDownModal
-          type={drillDown}
-          sessions={filteredSessions}
-          onClose={() => setDrillDown(null)}
-        />
-      )}
-    </div>
-  );
+
+<Stat
+label="Total Candidates"
+value={candidates.length}
+/>
+
+
+<Stat
+label="Scheduled Interviews"
+value={
+candidates.filter(
+c=>c.status==="Scheduled"
+).length
+}
+/>
+
+
+<Stat
+label="Completed Interviews"
+value={
+candidates.filter(
+c=>c.status==="Completed"
+).length
+}
+/>
+
+
+<Stat
+label="Average Score"
+value={
+candidates.length
+
+?
+
+Math.round(
+
+candidates.reduce(
+
+(sum,c)=>
+
+sum+(Number(c.score)||0)
+
+,0)
+
+/
+candidates.length
+
+)+"%"
+
+:
+
+"0%"
+
+}
+/>
+
+
+
+</div>
+
+
+
+
+
+<Card
+title="Add Candidate"
+description="Enter candidate interview details"
+>
+
+
+<div className="grid gap-3">
+
+
+<input
+className="rounded border border-border bg-bg-card p-2"
+placeholder="Candidate name"
+value={candidateForm.name}
+
+onChange={(e)=>
+
+setCandidateForm({
+
+...candidateForm,
+
+name:e.target.value
+
+})
+
+}
+/>
+
+
+
+<input
+className="rounded border border-border bg-bg-card p-2"
+placeholder="Role"
+
+value={candidateForm.role}
+
+onChange={(e)=>
+
+setCandidateForm({
+
+...candidateForm,
+
+role:e.target.value
+
+})
+
+}
+
+/>
+
+
+
+<select
+
+className="rounded border border-border bg-bg-card p-2"
+
+value={candidateForm.status}
+
+onChange={(e)=>
+
+setCandidateForm({
+
+...candidateForm,
+
+status:e.target.value
+
+})
+
+}
+
+>
+
+
+<option>
+Scheduled
+</option>
+
+<option>
+Under Review
+</option>
+
+<option>
+Completed
+</option>
+
+
+</select>
+
+
+
+
+
+<input
+
+type="number"
+
+className="rounded border border-border bg-bg-card p-2"
+
+placeholder="Score"
+
+value={candidateForm.score}
+
+onChange={(e)=>
+
+setCandidateForm({
+
+...candidateForm,
+
+score:e.target.value
+
+})
+
+}
+
+/>
+
+
+
+
+<select
+
+className="rounded border border-border bg-bg-card p-2"
+
+value={candidateForm.risk}
+
+onChange={(e)=>
+
+setCandidateForm({
+
+...candidateForm,
+
+risk:e.target.value
+
+})
+
+}
+
+>
+
+
+<option value="">
+Select Risk
+</option>
+
+<option>
+Low
+</option>
+
+<option>
+Medium
+</option>
+
+<option>
+High
+</option>
+
+
+</select>
+
+
+
+
+<button
+
+onClick={addCandidate}
+
+className="rounded bg-accent px-4 py-2 text-white"
+
+>
+
+Add Candidate
+
+</button>
+
+
+
+</div>
+
+
+</Card>
+
+
+
+
+
+
+
+<Card
+
+title="Candidate Evaluation"
+
+description="Recruiter view of candidate interview results."
+
+>
+
+
+<table className="w-full text-sm">
+
+
+<thead>
+
+<tr className="text-left text-muted">
+
+
+<th className="py-3">
+Candidate
+</th>
+
+
+<th>
+Role
+</th>
+
+
+<th>
+Status
+</th>
+
+
+<th>
+Score
+</th>
+
+
+<th>
+Risk
+</th>
+
+
+</tr>
+
+
+</thead>
+
+
+
+
+<tbody>
+
+
+
+{
+
+candidates.map((c)=>(
+
+
+<tr
+key={c.id}
+className="border-t border-border"
+>
+
+
+<td className="py-3">
+{c.name}
+</td>
+
+
+<td>
+{c.role}
+</td>
+
+
+<td>
+{c.status}
+</td>
+
+
+<td>
+
+{
+c.score
+?
+
+c.score+"%"
+
+:
+
+"-"
+
+}
+
+</td>
+
+
+<td>
+
+{
+c.risk || "-"
+
+}
+
+</td>
+
+
+</tr>
+
+
+))
+
+
+}
+
+
+
+
+{
+
+candidates.length===0 &&
+
+<tr>
+
+<td
+
+colSpan="5"
+
+className="py-6 text-center text-muted"
+
+>
+
+No candidates added yet.
+
+</td>
+
+
+</tr>
+
+
+}
+
+
+
+</tbody>
+
+
+</table>
+
+
+</Card>
+
+
+
+</div>
+
+
+
+
+
+
+
+{/* ===========================
+        OLD ANALYTICS
+=========================== */}
+
+
+
+<div className="flex items-end justify-between">
+
+
+<div>
+
+<h1 className="text-2xl font-semibold text-zinc-50">
+Analytics
+</h1>
+
+
+<p className="text-sm text-muted">
+Risk distribution, failure modes, trends, and export.
+</p>
+
+
+</div>
+
+
+
+<button
+
+onClick={handleExport}
+
+className="flex items-center gap-2 rounded border border-border bg-bg-card px-3 py-2 text-xs"
+
+>
+
+<Download size={14}/>
+
+Export CSV
+
+</button>
+
+
+</div>
+
+
+
+
+
+<div className="flex flex-wrap gap-2">
+
+
+<Calendar size={14}/>
+
+
+{
+DATE_PRESETS.map(p=>(
+
+
+<button
+
+key={p.value}
+
+onClick={()=>setDateRange(p.value)}
+
+className={cn(
+
+"rounded px-3 py-1 text-xs",
+
+dateRange===p.value
+
+?
+
+"bg-accent/20"
+
+:
+
+"text-muted"
+
+)}
+
+>
+
+{p.label}
+
+</button>
+
+
+))
+
+}
+
+
+</div>
+
+
+
+
+
+
+
+<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+
+<Stat
+
+label="Total sessions"
+
+value={
+stats.data?.total_sessions ?? 0
+}
+
+/>
+
+
+<Stat
+
+label="Avg risk"
+
+value={
+
+stats.data
+
+?
+
+stats.data.risk_score_stats
+?.average_risk_score
+?.toFixed(3)
+
+:
+
+0
+
+}
+
+/>
+
+
+
+<Stat
+
+label="High risk"
+
+value={
+
+stats.data?.risk_score_stats
+?.high_risk_sessions ?? 0
+
+}
+
+/>
+
+
+
+<Stat
+
+label="DLQ size"
+
+value={
+dlq.data?.count ?? 0
+}
+
+/>
+
+
+
+</div>
+
+
+
+
+
+
+<div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+
+
+<Card
+title="Sessions by status"
+description="Distribution across lifecycle states."
+>
+
+
+{
+
+stats.error ?
+
+<ErrorState
+error={stats.error}
+onRetry={()=>stats.mutate()}
+/>
+
+
+:
+
+
+<ResponsiveContainer
+width="100%"
+height={280}
+>
+
+
+<BarChart data={breakdown}>
+
+
+<CartesianGrid strokeDasharray="3 3"/>
+
+<XAxis dataKey="status"/>
+
+<YAxis/>
+
+<Tooltip {...TOOLTIP_STYLE}/>
+
+
+<Bar
+
+dataKey="count"
+
+fill="#6366f1"
+
+/>
+
+
+</BarChart>
+
+
+</ResponsiveContainer>
+
+
+}
+
+
+
+</Card>
+
+
+
+
+
+
+<Card
+
+title="Failure breakdown"
+
+description="Counts grouped by failure type."
+
+>
+
+
+<ResponsiveContainer
+
+width="100%"
+
+height={280}
+
+>
+
+
+<BarChart data={failureData}>
+
+
+<CartesianGrid strokeDasharray="3 3"/>
+
+<XAxis dataKey="type"/>
+
+<YAxis/>
+
+<Tooltip {...TOOLTIP_STYLE}/>
+
+
+<Bar
+
+dataKey="count"
+
+fill="#ef4444"
+
+/>
+
+
+</BarChart>
+
+
+</ResponsiveContainer>
+
+
+</Card>
+
+
+
+</div>
+
+
+
+
+
+
+<div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+
+
+<RiskDistribution
+
+sessions={filteredSessions}
+
+loading={
+completed.isLoading &&
+failed.isLoading
+}
+
+onDrillDown={
+(type)=>setDrillDown(type)
+}
+
+/>
+
+
+
+<TrendChart
+
+sessions={filteredSessions}
+
+/>
+
+
+</div>
+
+
+
+
+</div>
+
+);
+
 }
