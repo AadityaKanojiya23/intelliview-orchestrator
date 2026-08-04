@@ -30,7 +30,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
-from orchestrator.middleware.capacity_guard import CapacityGuardMiddleware
+from workers.evaluation_pipeline import _llm_generate_question
 
 from config import (
     API_TOKEN,
