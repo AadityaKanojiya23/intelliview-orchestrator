@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 from workers._stubs import _seeded_unit  # noqa: E402
+from workers.prompt_categorization import categorize_prompt
 
 # ---------------------------------------------------------------------------
 # Real LLM-based evaluation helpers with fallback to seeded stubs
@@ -36,9 +37,13 @@ from workers._stubs import _seeded_unit  # noqa: E402
 
 def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
     """Use GPT-4o/Gemini/Grok to evaluate answer quality and relevance."""
-
-    prompt = QUALITY_EVALUATION_PROMPT
-
+    prompt = (
+        "You are an expert technical interviewer. Evaluate this candidate answer. "
+        "Return a JSON object with keys: overall_quality_score (0-100), "
+        "relevance (0-1), completeness (0-1), clarity (0-1), feedback (string)."
+    )
+    prompt_category = categorize_prompt(prompt)
+    
     user_msg = f"Question: {question}\n\nAnswer: {answer}"
 
     try: 
@@ -65,6 +70,7 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                     "completeness": round(parsed.get("completeness", 0.5), 2),
                     "clarity": round(parsed.get("clarity", 0.5), 2),
                     "feedback": parsed.get("feedback", ""),
+                    "prompt_category": prompt_category,
                     "provider": "openai",
                     "usage": usage,
                 }
@@ -89,6 +95,7 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                     "completeness": round(parsed.get("completeness", 0.5), 2),
                     "clarity": round(parsed.get("clarity", 0.5), 2),
                     "feedback": parsed.get("feedback", ""),
+                    "prompt_category": prompt_category,
                     "provider": "gemini",
                     "usage": usage,
                 }
@@ -117,6 +124,7 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                     "completeness": round(parsed.get("completeness", 0.5), 2),
                     "clarity": round(parsed.get("clarity", 0.5), 2),
                     "feedback": parsed.get("feedback", ""),
+                    "prompt_category": prompt_category,
                     "provider": "grok",
                     "usage": usage,
                 }
