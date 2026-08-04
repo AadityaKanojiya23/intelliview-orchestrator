@@ -10,7 +10,9 @@ import { StatusBadge } from "@/components/Badge";
 import { Skeleton, ErrorState, EmptyState } from "@/components/States";
 import Sparkline from "@/components/Sparkline";
 import { formatPercent, formatRelative } from "@/lib/utils";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui";
+import React, { useState } from "react";
+import SortableHeader from "../components/SortableHeader";
 
 const MAX_SAMPLES = 20;
 
@@ -188,6 +190,38 @@ export default function OverviewPage() {
         ) : workers.data.workers.length === 0 ? (
           <EmptyState title="No workers registered" description="Workers self-register via the worker_agent on startup." />
         ) : (
+          <Table>
+            <Thead>
+              <Tr>
+                <Th>Worker</Th>
+                <Th>Status</Th>
+                <Th>Load</Th>
+                <Th>Last heartbeat</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {workers.data.workers.map((w) => (
+                <Tr key={w.worker_id}>
+                  <Td className="font-mono text-xs text-zinc-200">{w.worker_id}</Td>
+                  <Td><StatusBadge status={w.health_status} /></Td>
+                  <Td>{w.active_tasks}/{w.capacity}</Td>
+                  <Td className="text-muted">{formatRelative(w.last_heartbeat)}</Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        )}
+      </Card>
+        <tbody>
+          {workers.map((worker) => (
+            <tr key={worker.id}>
+              <td>{worker.name}</td>
+              <td>{worker.role}</td>
+              <td>{worker.salary}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-muted">

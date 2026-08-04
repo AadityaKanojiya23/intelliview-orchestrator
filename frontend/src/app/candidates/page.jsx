@@ -16,7 +16,7 @@ import Stat from "@/components/Stat";
 import StatsCards from "@/components/StatsCards";
 import { StatusBadge, Badge } from "@/components/Badge";
 import { Skeleton, ErrorState, EmptyState } from "@/components/States";
-import { SearchInput } from "@/components/SearchInput";
+import { SearchInput, Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui";
 import Pipeline from "@/components/Pipeline";
 import {
   formatDate,
@@ -313,7 +313,112 @@ export default function CandidatesPage() {
                 </Card>
               </div>
             )}
-          </div>
+          </Card>
+        </div>
+
+        <div className="lg:col-span-2">
+          {!selected ? (
+            <Card>
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <UserCircle size={48} className="mb-3 text-muted opacity-30" />
+                <p className="text-sm text-zinc-300">Select a candidate to view details</p>
+                <p className="mt-1 text-xs text-muted">
+                  Click on a candidate from the list to see their profile
+                </p>
+              </div>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              <Card title={selected.candidate_id} description="Candidate profile and performance">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="rounded-md border border-border bg-bg-card px-3 py-2.5">
+                    <div className="text-[10px] uppercase tracking-wide text-muted">Total</div>
+                    <div className="mt-1 text-lg font-semibold text-zinc-50">
+                      {selected.total_sessions}
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-border bg-bg-card px-3 py-2.5">
+                    <div className="text-[10px] uppercase tracking-wide text-muted">Completed</div>
+                    <div className="mt-1 text-lg font-semibold text-emerald-400">
+                      {selected.completed_sessions}
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-border bg-bg-card px-3 py-2.5">
+                    <div className="text-[10px] uppercase tracking-wide text-muted">Failed</div>
+                    <div className="mt-1 text-lg font-semibold text-rose-400">
+                      {selected.failed_sessions}
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-border bg-bg-card px-3 py-2.5">
+                    <div className="text-[10px] uppercase tracking-wide text-muted">Avg Risk</div>
+                    <div className="mt-1 text-lg font-semibold text-zinc-50">
+                      {selected.avg_risk_score != null ? selected.avg_risk_score.toFixed(3) : "—"}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {statusData.length > 0 && (
+                <Card title="Session Status Distribution">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={statusData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                      <XAxis dataKey="status" stroke="#71717a" fontSize={11} />
+                      <YAxis stroke="#71717a" fontSize={11} />
+                      <Tooltip
+                        contentStyle={{
+                          background: "#12121a",
+                          border: "1px solid #27272a",
+                          borderRadius: 8,
+                        }}
+                      />
+                      <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Card>
+              )}
+
+              <Card title="Interview History" description="All sessions for this candidate">
+                <Table>
+                  <Thead>
+                    <Tr>
+                      <Th>Session</Th>
+                      <Th>Pipeline</Th>
+                      <Th>Status</Th>
+                      <Th>Risk</Th>
+                      <Th>Worker</Th>
+                      <Th>Updated</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {selected.sessions
+                      .sort(
+                        (a, b) =>
+                          new Date(b.updated_at || 0) - new Date(a.updated_at || 0)
+                      )
+                      .map((s) => (
+                        <Tr key={s.session_id}>
+                          <Td className="font-mono text-xs text-zinc-300">{s.session_id}</Td>
+                          <Td><Pipeline current={s.status} /></Td>
+                          <Td><StatusBadge status={s.status} /></Td>
+                          <Td>
+                            {s.risk_score != null ? (
+                              <Badge variant={riskColor(s.risk_score)}>
+                                {s.risk_score.toFixed(2)}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted">—</span>
+                            )}
+                          </Td>
+                          <Td className="font-mono text-xs text-muted">{s.assigned_node ?? "—"}</Td>
+                          <Td className="text-muted">{formatDate(s.updated_at ?? s.end_time)}</Td>
+                        </Tr>
+                      ))}
+                  </Tbody>
+                </Table>
+              </Card>
+            </div>
+          )}
         </div>
       </div>
     </ErrorBoundary>
