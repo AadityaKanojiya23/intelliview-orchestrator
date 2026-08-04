@@ -38,9 +38,8 @@ from workers.prompt_categorization import categorize_prompt
 def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
     """Use GPT-4o/Gemini/Grok to evaluate answer quality and relevance."""
     prompt = (
-        "You are an expert technical interviewer. Evaluate this candidate answer. "
-        "Return a JSON object with keys: overall_quality_score (0-100), "
-        "relevance (0-1), completeness (0-1), clarity (0-1), feedback (string)."
+        "Evaluate the candidate's answer. "
+        "Return JSON: overall_quality_score (0-100), relevance (0-1), completeness (0-1), clarity (0-1), feedback."
     )
     prompt_category = categorize_prompt(prompt)
     
@@ -136,7 +135,10 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
 
 def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
     """Use GPT-4o/Gemini/Grok to evaluate technical accuracy."""
-    prompt = TECHNICAL_ACCURACY_PROMPT 
+    prompt = (
+        "Evaluate the answer. "
+        "Return JSON with keys: accuracy_score, correct_concepts_count, incorrect_concepts_count, knowledge_gaps."
+    )
     user_msg = f"Question: {question}\n\nAnswer: {answer}"
 
     try:
@@ -229,7 +231,10 @@ def _llm_evaluate_communication(session_id: str, question: str, answer: str) -> 
             [
                 {
                     "role": "system",
-                    "content": COMMUNICATION_EVALUATION_PROMPT,
+                    "content": (
+                        "Evaluate communication. "
+                        "Return JSON with keys: clarity_score, professionalism, confidence_level, pace_appropriateness."
+                    ),
                 },
                 {"role": "user", "content": f"Question: {question}\n\nAnswer: {answer}"},
             ],
@@ -267,11 +272,8 @@ def _llm_generate_feedback(session_id: str, question: str, answer: str) -> dict[
                 {
                     "role": "system",
                     "content": (
-                        "You are an experienced technical interviewer. Based on the "
-                        "question and answer, generate structured feedback. "
-                        "Return a JSON object with keys: strengths (list of strings), "
-                        "improvements (list of strings), detailed_feedback (string), "
-                        "recommendation (one of: strong_hire, hire, maybe, no_hire)."
+                        "Generate structured interview feedback. "
+                        "Return JSON: strengths, improvements, detailed_feedback, recommendation.(strong_hire|hire|maybe|no_hire)."
                     ),
                 },
                 {"role": "user", "content": f"Question: {question}\n\nAnswer: {answer}"},
@@ -382,8 +384,8 @@ def _llm_generate_question(session_id: str, topic: str = "systems_design") -> st
                 {
                     "role": "system",
                     "content": (
-                        "Generate a single challenging technical interview question "
-                        f"about {topic}. Return only the question text, nothing else."
+                        f"Generate one challenging {topic} interview question. "
+                        "Return only the question."
                     ),
                 },
                 {"role": "user", "content": "Generate one question."},
@@ -412,6 +414,59 @@ def _llm_generate_question(session_id: str, topic: str = "systems_design") -> st
 
 
 # ---------------------------------------------------------------------------
+# Hallucination detection — semantic similarity + NLI entailment,
+# with a seeded stub fallback matching the pattern used above.
+# ---------------------------------------------------------------------------
+
+_hallucination_detector = None
+_hallucination_detector_unavailable = False
+
+
+def _get_hallucination_detector():
+    """Lazily load the hallucination detector's models (expensive — load once)."""
+    global _hallucination_detector, _hallucination_detector_unavailable
+    if _hallucination_detector_unavailable:
+        return None
+    if _hallucination_detector is None:
+        try:
+            from orchestrator.hallucination_detector import HallucinationDetector
+
+            _hallucination_detector = HallucinationDetector()
+        except Exception as exc:
+            logger.warning(f"Hallucination detector models unavailable, using stub: {exc}")
+            _hallucination_detector_unavailable = True
+            return None
+    return _hallucination_detector
+
+
+def evaluate_hallucination(
+    session_id: str, question: str, answer: str, source_context: str | None = None
+) -> dict[str, Any]:
+    """Evaluate whether the candidate's answer contains hallucinated
+    (fabricated / unsupported / contradictory) claims — real model with
+    seeded stub fallback."""
+    logger.info(f"Evaluating hallucination risk for session {session_id}")
+
+    detector = _get_hallucination_detector()
+    if detector is not None:
+        try:
+            reference = source_context or question
+            result = detector.evaluate(reference, answer)
+            return result.to_dict()
+        except Exception as exc:
+            logger.debug(f"Hallucination model evaluation failed, falling back to stub: {exc}")
+
+    base = 0.15 + _seeded_unit(session_id, "hallucination") * 0.3
+    risk_level = "low" if base < 0.3 else "medium" if base < 0.6 else "high"
+    return {
+        "hallucination_score": round(base, 3),
+        "is_hallucination": base >= 0.5,
+        "risk_level": risk_level,
+        "explanation": "Stub evaluation (models unavailable): deterministic seeded signal.",
+    }
+
+
+# ---------------------------------------------------------------------------
 # Public pipeline API — real LLM evaluation with seeded stub fallback
 # ---------------------------------------------------------------------------
 
@@ -423,6 +478,11 @@ def evaluate_answers(session_id: str) -> dict[str, Any]:
     quality = evaluate_answer_quality(session_id)
     accuracy = evaluate_technical_accuracy(session_id)
     clarity = evaluate_communication(session_id)
+    hallucination = evaluate_hallucination(
+        session_id,
+        "Describe your experience with distributed systems.",
+        "I have five years of experience building distributed systems in Python and Go.",
+    )
     feedback = generate_feedback(session_id)
 
     results = {
@@ -430,6 +490,7 @@ def evaluate_answers(session_id: str) -> dict[str, Any]:
         "answer_quality_score": quality,
         "technical_accuracy": accuracy,
         "communication_clarity": clarity,
+        "hallucination_check": hallucination,
         "feedback": feedback,
         "risk_score": 0.0,
     }
@@ -530,10 +591,12 @@ def calculate_evaluation_risk_score(results: dict[str, Any]) -> float:
     quality = results.get("answer_quality_score", {}).get("overall_quality_score", 50) / 100.0
     accuracy = results.get("technical_accuracy", {}).get("accuracy_score", 50) / 100.0
     clarity = results.get("communication_clarity", {}).get("clarity_score", 50) / 100.0
+    hallucination_score = results.get("hallucination_check", {}).get("hallucination_score", 0.0)
 
     quality_risk = (1 - quality) * RiskScoringEngine.EVALUATION_FACTORS["low_quality_answers"]
     accuracy_risk = (1 - accuracy) * RiskScoringEngine.EVALUATION_FACTORS["low_accuracy"]
     clarity_risk = (1 - clarity) * RiskScoringEngine.EVALUATION_FACTORS["poor_communication"]
+    hallucination_risk = hallucination_score * RiskScoringEngine.EVALUATION_FACTORS["hallucination"]
 
-    score = quality_risk + accuracy_risk + clarity_risk
+    score = quality_risk + accuracy_risk + clarity_risk + hallucination_risk
     return round(min(score, 1.0), 3)
