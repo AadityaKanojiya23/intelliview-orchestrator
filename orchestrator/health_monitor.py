@@ -19,18 +19,6 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-# Import Prometheus system health monitoring metrics
-from metrics.prometheus_metrics import (
-    POSTGRES_HEALTH,
-    QUEUE_DEPTH,
-    REDIS_HEALTH,
-    REDIS_MEMORY_FRAGMENTATION,
-    REDIS_MEMORY_MAX,
-    REDIS_MEMORY_PEAK,
-    REDIS_MEMORY_USAGE_PERCENT,
-    REDIS_MEMORY_USED,
-    REDIS_SPACE_USED,
-)
 from orchestrator.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
@@ -129,8 +117,8 @@ class HealthMonitor:
     # Readiness probe (Kubernetes-style)
     # ------------------------------------------------------------------
 
-    async def readiness_check(self) -> dict[str, Any]:
-        """Return true readiness — all critical dependencies must be up.
+    def readiness_check(self) -> dict[str, Any]:
+        """Return true readiness â€” all critical dependencies must be up.
 
         Use this for k8s readinessProbe: the service only receives
         traffic when this returns ready=True.
@@ -151,7 +139,7 @@ class HealthMonitor:
     def liveness_check(self) -> dict[str, Any]:
         """Return whether the process itself is alive and responsive.
 
-        This only checks that the Python process can respond — it does
+        This only checks that the Python process can respond â€” it does
         NOT check downstream dependencies. Use for k8s livenessProbe.
         """
         return {
@@ -261,7 +249,8 @@ class HealthMonitor:
             if fragmentation_info["fragmentation_status"] == HealthStatus.CRITICAL:
                 dep.healthy = False
                 dep.error = (
-                    f"Redis memory fragmentation ratio too high: {fragmentation_info['fragmentation_ratio']}"
+                    f"Redis memory fragmentation ratio too high: "
+                    f"{fragmentation_info['fragmentation_ratio']}"
                 )
             dep.last_check = datetime.now(timezone.utc).isoformat()
         except Exception as exc:
@@ -519,33 +508,7 @@ class HealthMonitor:
             max_memory = info.get("maxmemory", 0)
             fragmentation = info.get("mem_fragmentation_ratio", 0)
             connected_clients = info.get("connected_clients", 0)
-
-            # ------------------------------------------------------------------
-            # Update Prometheus Redis memory and space metrics
-            # ------------------------------------------------------------------
-
-            # Current Redis memory usage
-            REDIS_MEMORY_USED.set(used_memory)
-
-            # Peak Redis memory usage
-            REDIS_MEMORY_PEAK.set(peak_memory)
-
-            # Maximum configured Redis memory
-            REDIS_MEMORY_MAX.set(max_memory)
-
-            # Redis dataset space usage
-            REDIS_SPACE_USED.set(used_memory)
-
-            # Redis memory fragmentation ratio
-            REDIS_MEMORY_FRAGMENTATION.set(fragmentation)
-
-            # Calculate memory usage percentage
-            if max_memory > 0:
-                REDIS_MEMORY_USAGE_PERCENT.set((used_memory / max_memory) * 100)
-            else:
-                REDIS_MEMORY_USAGE_PERCENT.set(0)
-
-            used_memory_human = info.get("used_memory_human", "unknown")
+            used_memory = info.get("used_memory_human", "unknown")
             fragmentation_info = self._evaluate_redis_fragmentation(info, context="basic_check")
 
             status = HealthStatus.HEALTHY
@@ -556,8 +519,7 @@ class HealthMonitor:
                 "status": status,
                 "connected": True,
                 "clients": connected_clients,
-                "memory": used_memory_human,
-                "memory_bytes": used_memory,
+                "memory": used_memory,
                 **fragmentation_info,
             }
 
