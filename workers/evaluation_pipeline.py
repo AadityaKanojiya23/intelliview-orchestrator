@@ -17,6 +17,12 @@ import json
 import logging
 import re
 from typing import Any
+from workers.prompts import (
+    QUALITY_EVALUATION_PROMPT,
+    TECHNICAL_ACCURACY_PROMPT,
+    COMMUNICATION_EVALUATION_PROMPT,
+)
+from workers.prompts import QUALITY_EVALUATION_PROMPT 
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +36,12 @@ from workers._stubs import _seeded_unit  # noqa: E402
 
 def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
     """Use GPT-4o/Gemini/Grok to evaluate answer quality and relevance."""
-    prompt = (
-        "You are an expert technical interviewer. Evaluate this candidate answer. "
-        "Return a JSON object with keys: overall_quality_score (0-100), "
-        "relevance (0-1), completeness (0-1), clarity (0-1), feedback (string)."
-    )
+
+    prompt = QUALITY_EVALUATION_PROMPT
+
     user_msg = f"Question: {question}\n\nAnswer: {answer}"
 
-    try:
+    try: 
         from workers.ai_client import HAS_OPENAI, chat_completion
 
         if HAS_OPENAI:
@@ -52,7 +56,7 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                     parsed = json.loads(response)
                 except json.JSONDecodeError:
                     logger.error("Invalid JSON from LLM (openai, quality): %s", response)
-                    return None
+                return None
                 return {
                     "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
                     "relevance": round(parsed.get("relevance", 0.5), 2),
@@ -73,8 +77,9 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                 try:
                     parsed = json.loads(response)
                 except json.JSONDecodeError:
-                    logger.error("Invalid JSON from LLM (gemini, quality): %s", response)
-                    return None
+                    logger.error("Invalid JSON from LLM (openai, quality): %s", response)
+                return None
+            
                 return {
                     "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
                     "relevance": round(parsed.get("relevance", 0.5), 2),
@@ -117,12 +122,7 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
 
 def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
     """Use GPT-4o/Gemini/Grok to evaluate technical accuracy."""
-    prompt = (
-        "You are a technical interviewer evaluating a candidate's answer. "
-        "Return a JSON object with keys: accuracy_score (0-100), "
-        "correct_concepts_count (int), incorrect_concepts_count (int), "
-        "knowledge_gaps (list of strings)."
-    )
+    prompt = TECHNICAL_ACCURACY_PROMPT 
     user_msg = f"Question: {question}\n\nAnswer: {answer}"
 
     try:
@@ -209,12 +209,7 @@ def _llm_evaluate_communication(session_id: str, question: str, answer: str) -> 
             [
                 {
                     "role": "system",
-                    "content": (
-                        "Evaluate the candidate's communication quality. "
-                        "Return a JSON object with keys: clarity_score (0-100), "
-                        "professionalism (0-100), confidence_level (0-1), "
-                        "pace_appropriateness (0-1)."
-                    ),
+                    "content": COMMUNICATION_EVALUATION_PROMPT,
                 },
                 {"role": "user", "content": f"Question: {question}\n\nAnswer: {answer}"},
             ],
