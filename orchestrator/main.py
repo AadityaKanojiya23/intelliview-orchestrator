@@ -44,6 +44,8 @@ from config import (
     MAX_REQUEST_BODY_BYTES,
     get_settings,
 )
+from database.db import engine, get_db
+from database.models import Base
 from monitoring.dashboard_api import create_dashboard_routes
 from monitoring.metrics_collector import MetricsCollector
 from monitoring.websocket_manager import ws_manager
@@ -71,7 +73,7 @@ from orchestrator.session_manager import SessionManager
 from orchestrator.session_tracker import SessionTracker
 from orchestrator.state_sync import StateSynchronizer
 from orchestrator.worker_registry import WorkerRegistry
-from workers.bias_auditor import BiasAuditor
+from sqlalchemy.orm import Session
 
 # Configure logging after imports so startup messages are structured.
 configure_logging()
@@ -1350,7 +1352,6 @@ async def clear_session_cache():
 @app.get("/interviews")
 async def list_interviews(
     limit: int = 100,
-    offset: int = 0,
     status: str | None = None,
     session_db: Session = Depends(get_db),
 ):
@@ -1360,29 +1361,16 @@ async def list_interviews(
     Returns:
         dict: List of interview sessions + total count.
     """
-  
-
-    try:
-        stmt = select(InterviewSession)
-        if status:
+    from sqlalchemy import select
+    from database.models import InterviewSession
+    stmt = select(InterviewSession)
+    
+    if status:
             stmt = stmt.where(InterviewSession.status == status.upper())
-
-        count_stmt = select(func.count()).select_from(InterviewSession)
-
-        if status:
-            count_stmt = count_stmt.where(
-                InterviewSession.status == status.upper()
-            )
-
-        total_count = session_db.execute(count_stmt).scalar()
-        stmt = (
-             stmt.order_by(InterviewSession.created_at.desc().nullslast())
-            .offset(offset)
-            .limit(limit)
-            )
-        rows = session_db.execute(stmt).scalars().all()
-        return {
-            "total_count": total_count,
+    stmt = stmt.order_by(InterviewSession.created_at.desc().nullslast()).limit(limit)
+    rows = session_db.execute(stmt).scalars().all()
+    return {
+            "total_count": len(rows),
             "sessions": [
                 {
                     "session_id": r.session_id,
@@ -1398,11 +1386,6 @@ async def list_interviews(
                 for r in rows
             ],
         }
-    except Exception as e:
-        logger.error(f"Error listing interviews: {e!s}")
-        raise HTTPException(status_code=500, detail="Error listing interviews")
-
-
 
 # ========== Question Endpoints ==========
 
