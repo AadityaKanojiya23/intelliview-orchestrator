@@ -161,7 +161,9 @@ class Settings(BaseSettings):
             errors.append("MAX_REQUEST_BODY_BYTES must be greater than 0.")
 
         if errors:
-            raise ValueError("Configuration validation failed:\n- " + "\n- ".join(errors))
+            raise ValueError(
+                "Configuration validation failed:\n- " + "\n- ".join(errors)
+            )
 
     # --- Derived ---
     @property

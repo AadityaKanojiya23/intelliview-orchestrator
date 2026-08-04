@@ -83,8 +83,12 @@ def create_health_routes(health_monitor, worker_registry, session_manager) -> AP
             """Prometheus metrics endpoint."""
             # Dynamic check of dependency statuses
             deps = await health_monitor._check_all_dependencies()
-            REDIS_HEALTH.set(1 if deps.get("redis", {}).get("status") == "healthy" else 0)
-            POSTGRES_HEALTH.set(1 if deps.get("postgres", {}).get("status") == "healthy" else 0)
+            REDIS_HEALTH.set(
+                1 if deps.get("redis", {}).get("status") == "healthy" else 0
+            )
+            POSTGRES_HEALTH.set(
+                1 if deps.get("postgres", {}).get("status") == "healthy" else 0
+            )
 
             # Worker status gauges
             all_workers = worker_registry.get_all_workers()
@@ -132,7 +136,9 @@ def create_health_routes(health_monitor, worker_registry, session_manager) -> AP
 
         except Exception as e:
             logger.error(f"Error checking system health: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error checking system health: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error checking system health: {e!s}"
+            )
 
     @router.get("/worker-health")
     async def get_worker_health():
@@ -149,6 +155,8 @@ def create_health_routes(health_monitor, worker_registry, session_manager) -> AP
 
         except Exception as e:
             logger.error(f"Error fetching worker health: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error fetching worker health: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error fetching worker health: {e!s}"
+            )
 
     return router

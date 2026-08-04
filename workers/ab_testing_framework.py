@@ -87,7 +87,9 @@ class ABTestingFramework:
             3,
         )
 
-        classification_changed = production["risk_classification"] != experimental["risk_classification"]
+        classification_changed = (
+            production["risk_classification"] != experimental["risk_classification"]
+        )
 
         return {
             "production_score": production["final_risk_score"],

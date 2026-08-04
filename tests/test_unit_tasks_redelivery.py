@@ -69,7 +69,9 @@ def test_redelivery_of_in_flight_session_is_skipped():
     with (
         patch.object(tasks, "SessionLocal", return_value=db_session),
         patch.object(tasks, "group") as fake_group,
-        patch.object(tasks.session_manager, "update_session_status") as fake_update_status,
+        patch.object(
+            tasks.session_manager, "update_session_status"
+        ) as fake_update_status,
     ):
         result = tasks.process_interview_session.run("session-123")
 

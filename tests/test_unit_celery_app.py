@@ -147,7 +147,11 @@ class TestOnTaskFailureScoping:
         mock_class, mock_instance = self._fresh_sm()
         with patch.dict(
             sys.modules,
-            {"orchestrator.session_manager": types.SimpleNamespace(SessionManager=mock_class)},
+            {
+                "orchestrator.session_manager": types.SimpleNamespace(
+                    SessionManager=mock_class
+                )
+            },
         ):
             sender = _make_sender(_BEAT_TASK)
             _invoke_handler(sender, args=(), kwargs={})
@@ -157,7 +161,11 @@ class TestOnTaskFailureScoping:
         mock_class, mock_instance = self._fresh_sm()
         with patch.dict(
             sys.modules,
-            {"orchestrator.session_manager": types.SimpleNamespace(SessionManager=mock_class)},
+            {
+                "orchestrator.session_manager": types.SimpleNamespace(
+                    SessionManager=mock_class
+                )
+            },
         ):
             sender = _make_sender("workers.tasks.some_future_task")
             _invoke_handler(sender, args=(), kwargs={})
@@ -167,7 +175,11 @@ class TestOnTaskFailureScoping:
         mock_class, mock_instance = self._fresh_sm()
         with patch.dict(
             sys.modules,
-            {"orchestrator.session_manager": types.SimpleNamespace(SessionManager=mock_class)},
+            {
+                "orchestrator.session_manager": types.SimpleNamespace(
+                    SessionManager=mock_class
+                )
+            },
         ):
             _invoke_handler(_make_sender(_MAIN_TASK), args=(SESSION_ID,))
         mock_instance.mark_session_failed.assert_called_once()
@@ -176,7 +188,11 @@ class TestOnTaskFailureScoping:
         mock_class, mock_instance = self._fresh_sm()
         with patch.dict(
             sys.modules,
-            {"orchestrator.session_manager": types.SimpleNamespace(SessionManager=mock_class)},
+            {
+                "orchestrator.session_manager": types.SimpleNamespace(
+                    SessionManager=mock_class
+                )
+            },
         ):
             _invoke_handler(_make_sender(_VIDEO_TASK), args=(SESSION_ID,))
         mock_instance.mark_session_failed.assert_called_once()
@@ -185,7 +201,11 @@ class TestOnTaskFailureScoping:
         mock_class, mock_instance = self._fresh_sm()
         with patch.dict(
             sys.modules,
-            {"orchestrator.session_manager": types.SimpleNamespace(SessionManager=mock_class)},
+            {
+                "orchestrator.session_manager": types.SimpleNamespace(
+                    SessionManager=mock_class
+                )
+            },
         ):
             _invoke_handler(_make_sender(_AUDIO_TASK), args=(SESSION_ID,))
         mock_instance.mark_session_failed.assert_called_once()
@@ -194,7 +214,11 @@ class TestOnTaskFailureScoping:
         mock_class, mock_instance = self._fresh_sm()
         with patch.dict(
             sys.modules,
-            {"orchestrator.session_manager": types.SimpleNamespace(SessionManager=mock_class)},
+            {
+                "orchestrator.session_manager": types.SimpleNamespace(
+                    SessionManager=mock_class
+                )
+            },
         ):
             # _after_parallel(session_id, video_result, audio_result)
             _invoke_handler(_make_sender(_AFTER_TASK), args=(SESSION_ID, {}, {}))
@@ -231,20 +255,24 @@ class TestOnTaskFailureSessionIdResolution:
         stub, mock_instance = self._sm_patch()
         with patch.dict(sys.modules, {"orchestrator.session_manager": stub}):
             # Crucially: args is EMPTY, session_id lives in kwargs only.
-            _invoke_handler(_make_sender(_MAIN_TASK), args=(), kwargs={"session_id": SESSION_ID})
+            _invoke_handler(
+                _make_sender(_MAIN_TASK), args=(), kwargs={"session_id": SESSION_ID}
+            )
 
         mock_instance.mark_session_failed.assert_called_once()
         actual_sid, actual_msg = mock_instance.mark_session_failed.call_args[0]
-        assert actual_sid == SESSION_ID, (
-            "session_id passed as a keyword argument was not picked up — the args[0] bug is still present"
-        )
+        assert (
+            actual_sid == SESSION_ID
+        ), "session_id passed as a keyword argument was not picked up — the args[0] bug is still present"
         assert "exhausted retries" in actual_msg
 
     def test_apply_async_with_kwargs_dict(self):
         """task.apply_async(kwargs={'session_id': ...}) — equivalent to keyword call."""
         stub, mock_instance = self._sm_patch()
         with patch.dict(sys.modules, {"orchestrator.session_manager": stub}):
-            _invoke_handler(_make_sender(_VIDEO_TASK), args=(), kwargs={"session_id": SESSION_ID})
+            _invoke_handler(
+                _make_sender(_VIDEO_TASK), args=(), kwargs={"session_id": SESSION_ID}
+            )
 
         mock_instance.mark_session_failed.assert_called_once()
         actual_sid = mock_instance.mark_session_failed.call_args[0][0]
@@ -254,7 +282,9 @@ class TestOnTaskFailureSessionIdResolution:
         """If session_id cannot be found in args or kwargs, skip silently."""
         stub, mock_instance = self._sm_patch()
         with patch.dict(sys.modules, {"orchestrator.session_manager": stub}):
-            _invoke_handler(_make_sender(_MAIN_TASK), args=(), kwargs={"other_param": "value"})
+            _invoke_handler(
+                _make_sender(_MAIN_TASK), args=(), kwargs={"other_param": "value"}
+            )
 
         mock_instance.mark_session_failed.assert_not_called()
 

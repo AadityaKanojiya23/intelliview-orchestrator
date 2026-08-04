@@ -82,7 +82,9 @@ def _extract_session_id(args: tuple, kwargs: dict) -> str | None:
 
 
 @signals.task_failure.connect
-def _on_task_failure(sender, task_id, exception, args, kwargs, traceback, einfo, **_extra):
+def _on_task_failure(
+    sender, task_id, exception, args, kwargs, traceback, einfo, **_extra
+):
     print(f"HANDLER EXECUTED: {task_id}")
     """When a session-aware task fails permanently (retries exhausted), mark
     the session as FAILED so the dashboard reflects reality.

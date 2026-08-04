@@ -159,7 +159,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-logging.getLogger("opentelemetry.exporter.otlp.proto.grpc.exporter").setLevel(logging.DEBUG)
+logging.getLogger("opentelemetry.exporter.otlp.proto.grpc.exporter").setLevel(
+    logging.DEBUG
+)
 logging.basicConfig(level=logging.DEBUG)
 
 trace.set_tracer_provider(TracerProvider())
@@ -315,7 +317,9 @@ app.include_router(
 )
 app.include_router(create_candidate_routes(candidate_manager=candidate_manager))
 app.include_router(create_question_routes(question_bank=question_bank))
-app.include_router(create_template_routes(interview_template_manager=interview_template_manager))
+app.include_router(
+    create_template_routes(interview_template_manager=interview_template_manager)
+)
 app.include_router(
     create_worker_routes(
         worker_registry=worker_registry,
@@ -324,7 +328,9 @@ app.include_router(
         session_tracker=session_tracker,
     )
 )
-app.include_router(create_admin_routes(state_sync=state_sync, load_balancer=load_balancer))
+app.include_router(
+    create_admin_routes(state_sync=state_sync, load_balancer=load_balancer)
+)
 
 from fastapi import Request
 
@@ -338,7 +344,9 @@ async def receive_web_vitals(request: Request):
         return {"status": "success", "message": "Web Vitals received"}
     except Exception as e:
         logger.error(f"Error receiving Web Vitals: {e!s}")
-        raise HTTPException(status_code=500, detail=f"Error receiving Web Vitals: {e!s}")
+        raise HTTPException(
+            status_code=500, detail=f"Error receiving Web Vitals: {e!s}"
+        )
 
 
 if __name__ == "__main__":
