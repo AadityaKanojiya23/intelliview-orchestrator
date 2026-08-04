@@ -82,16 +82,7 @@ class RetryManager:
         """
         try:
             retry_count = self.get_retry_count(session_id)
-
-            max_retries = self.max_retries
-
-            if self.redis_client:
-                session_json = self.redis_client.get(f"session:{session_id}")
-                if session_json:
-                    session_data = json.loads(session_json)
-                    max_retries = session_data.get("max_task_retries", self.max_retries)
-
-            can_retry = retry_count < max_retries
+            can_retry = retry_count < self.max_retries
 
             if can_retry:
                 logger.debug(f"Session {session_id} can retry ({retry_count}/{self.max_retries})")
@@ -112,13 +103,17 @@ class RetryManager:
         delay_seconds: int | None = None,
     ) -> bool:
         """
-        Schedule a retry.
+        Schedule a retry for a failed task
 
-        If retries remain, schedule the retry.
+        Calculates appropriate delay based on retry attempt count and strategy,
+        then schedules the task for retry after that delay.
 
-        If maximum retries have been exceeded,
-        return False so the FaultManager can
-        move the task to the Dead Letter Queue.
+        Args:
+            session_id: ID of session to retry
+            delay_seconds: Optional override for delay (uses calculated if None)
+
+        Returns:
+            True if retry was scheduled, False otherwise
         """
         try:
             if not self.can_retry(session_id):
@@ -128,15 +123,21 @@ class RetryManager:
                 )
                 return False
 
+            # Get current retry count and increment
             retry_count = self.increment_retry(session_id)
 
+            # Calculate delay if not provided
             if delay_seconds is None:
                 delay_seconds = self._calculate_delay(retry_count)
+            else:
+                delay_seconds = min(delay_seconds, self.max_delay)
 
+            logger.info(f"Scheduling retry for {session_id}: attempt {retry_count}, delay {delay_seconds}s")
+
+            # Create retry record
             retry_data = {
                 "session_id": session_id,
                 "retry_count": retry_count,
-                "delay_seconds": delay_seconds,
                 "scheduled_at": datetime.now(timezone.utc).isoformat(),
                 "retry_after": (datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)).isoformat(),
                 "strategy": self.strategy.value,
@@ -152,19 +153,21 @@ class RetryManager:
                 )
 
                 retry_key = f"{self.retry_key_prefix}{session_id}"
-
                 self.redis_client.set(
                     retry_key,
                     json.dumps(retry_data),
                     ex=delay_seconds + 600,
                 )
 
-            logger.info(
-                "Retry %d scheduled for %s after %d seconds",
-                retry_count,
-                session_id,
-                delay_seconds,
-            )
+                # Add to scheduled retry set (expire based on retry time)
+                scheduled_key = f"{self.retry_scheduled_key}{session_id}"
+                self.redis_client.set(
+                    scheduled_key,
+                    json.dumps(retry_data),
+                    ex=delay_seconds,
+                )
+
+                logger.debug(f"Retry scheduled for {session_id} in {delay_seconds}s")
 
             return True
 

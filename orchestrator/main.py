@@ -2058,7 +2058,6 @@ async def retry_failed_session(session_id: str):
         retry_manager.get_retry_info(session_id)
 
         # Schedule retry with exponential backoff
-        # Schedule retry
         retry_scheduled = retry_manager.schedule_retry(session_id)
 
         if not retry_scheduled:
@@ -2079,9 +2078,9 @@ async def retry_failed_session(session_id: str):
 
         return {
             "status": "success",
-            "message": f"Session {session_id} scheduled and requeued",
+            "message": f"Session {session_id} scheduled for retry",
             "session_id": session_id,
-            "retry_info": retry_manager.get_retry_info(session_id),
+            "retry_info": retry_info,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except HTTPException:
