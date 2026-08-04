@@ -129,8 +129,8 @@ class SessionManager:
             logger.info(f"Session {session_id} created successfully")
             return session_id
 
-        except Exception as e:
-            logger.error(f"Error creating session: {e!s}")
+        except Exception:
+            logger.error("Error creating session")
             session_db.rollback()
             raise
         finally:
@@ -179,6 +179,19 @@ class SessionManager:
             interview.status = new_status
             interview.updated_at = _utcnow()
             session_db.commit()
+            from metrics.prometheus_metrics import (
+                SESSIONS_ACTIVE,
+                SESSIONS_COMPLETED,
+                SESSIONS_FAILED,
+            )
+
+            if new_status == self.COMPLETED:
+                SESSIONS_COMPLETED.inc()
+                SESSIONS_ACTIVE.dec()
+
+            elif new_status == self.FAILED:
+                SESSIONS_FAILED.inc()
+                SESSIONS_ACTIVE.dec()
 
             # Update Redis cache
             session_data = self.state_sync.get_session_state(session_id)
@@ -196,8 +209,8 @@ class SessionManager:
 
             return True
 
-        except Exception as e:
-            logger.error(f"Error updating session status: {e!s}")
+        except Exception:
+            logger.error("Error updating session status")
             session_db.rollback()
             return False
         finally:
@@ -256,8 +269,8 @@ class SessionManager:
             finally:
                 session_db.close()
 
-        except Exception as e:
-            logger.error(f"Error retrieving session: {e!s}")
+        except Exception:
+            logger.error("Error retrieving session")
             return None
 
     def mark_session_failed(self, session_id: str, error_message: str) -> bool:
@@ -271,21 +284,20 @@ class SessionManager:
         Returns:
             bool: True if successful
         """
+        from metrics.prometheus_metrics import (
+            SESSIONS_ACTIVE,
+            SESSIONS_FAILED,
+        )
+
+        SESSIONS_FAILED.inc()
+        print("SESSIONS_FAILED =", SESSIONS_FAILED._value.get())
+        SESSIONS_ACTIVE.dec()
         logger.warning(f"Marking session {session_id} as failed: {error_message}")
 
         return self.update_session_status(session_id, self.FAILED, {"error_message": error_message})
 
     def mark_session_completed(self, session_id: str, risk_score: float) -> bool:
-        """
-        Mark a session as completed with final risk score
 
-        Args:
-            session_id: Session identifier
-            risk_score: Final calculated risk score
-
-        Returns:
-            bool: True if successful
-        """
         logger.info(f"Marking session {session_id} as completed with risk score {risk_score}")
 
         session_db = SessionLocal()
@@ -301,6 +313,7 @@ class SessionManager:
             interview.risk_score = risk_score
             interview.end_time = _utcnow()
             interview.updated_at = _utcnow()
+
             session_db.commit()
 
             # Update Redis
@@ -315,8 +328,8 @@ class SessionManager:
             logger.info(f"Session {session_id} marked as completed")
             return True
 
-        except Exception as e:
-            logger.error(f"Error marking session completed: {e!s}")
+        except Exception:
+            logger.error("Error marking session completed")
             session_db.rollback()
             return False
         finally:

@@ -10,7 +10,8 @@ import {
   Settings,
   Shield,
   Video,
-  UserCircle
+  UserCircle,
+  Mail
 } from "lucide-react";
 import { jsx, jsxs } from "react/jsx-runtime";
 const items = [
@@ -20,7 +21,8 @@ const items = [
   { href: "/candidates", label: "Candidates", icon: UserCircle },
   { href: "/workers", label: "Workers", icon: Users },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/settings", label: "Settings", icon: Settings }
+  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "http://localhost:8080", label: "Digest Control", icon: Mail, external: true }
 ];
 function Sidebar({ mobile = false, onNavigate }) {
   const pathname = usePathname();
@@ -36,22 +38,29 @@ function Sidebar({ mobile = false, onNavigate }) {
     ] }),
     /* @__PURE__ */ jsx("nav", { className: "flex-1 space-y-0.5 p-3", children: items.map((it) => {
       const active = pathname === it.href || it.href !== "/" && pathname.startsWith(it.href);
-      return /* @__PURE__ */ jsxs(
-        Link,
-        {
-          href: it.href,
-          onClick: onNavigate,
-          className: cn(
-            "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition",
-            active ? "bg-accent/15 text-accent-light" : "text-zinc-400 hover:bg-bg-card hover:text-zinc-100"
-          ),
-          children: [
-            /* @__PURE__ */ jsx(it.icon, { size: 16 }),
-            /* @__PURE__ */ jsx("span", { children: it.label })
-          ]
-        },
-        it.href
-      );
+      const linkProps = it.external ? {
+        href: it.href,
+        target: "_blank",
+        rel: "noopener noreferrer",
+        onClick: onNavigate,
+        className: cn(
+          "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition text-zinc-400 hover:bg-bg-card hover:text-zinc-100"
+        )
+      } : {
+        href: it.href,
+        onClick: onNavigate,
+        className: cn(
+          "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition",
+          active ? "bg-accent/15 text-accent-light" : "text-zinc-400 hover:bg-bg-card hover:text-zinc-100"
+        )
+      };
+      const content = [
+        /* @__PURE__ */ jsx(it.icon, { size: 16 }),
+        /* @__PURE__ */ jsx("span", { children: it.label })
+      ];
+      return it.external ? 
+        /* @__PURE__ */ jsxs("a", { ...linkProps, children: content }, it.href) :
+        /* @__PURE__ */ jsxs(Link, { ...linkProps, children: content }, it.href);
     }) }),
     /* @__PURE__ */ jsx("div", { className: "border-t border-border p-4 text-[10px] text-muted", children: "v0.2.0 \xB7 \xA9 Mukta Redij" })
   ] });

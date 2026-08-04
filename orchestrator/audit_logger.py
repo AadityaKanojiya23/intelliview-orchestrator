@@ -231,15 +231,19 @@ class AuditLogger:
         )
         self.log_event(event)
 
+    def _get_category(self, category: str) -> str:
+        """Return the normalized category name."""
+        return self.CATEGORIES.get(category, category)
+    
     def get_recent_events(self, limit: int = 100) -> list[dict[str, Any]]:
         """Return recent audit events from the in-memory buffer."""
         return list(reversed(self._buffer[-limit:]))
 
     def get_events_by_category(self, category: str, limit: int = 100) -> list[dict[str, Any]]:
         """Filter recent events by category."""
-        cat_key = self.CATEGORIES.get(category, category)
+        cat_key = self._get_category(category)
         return [e for e in reversed(self._buffer) if e.get("category") == cat_key][:limit]
-
+    
     def export_events(
         self,
         format: str = "json",
@@ -265,7 +269,7 @@ class AuditLogger:
         if end_time:
             events = [e for e in events if e.get("timestamp", "") <= end_time]
         if category:
-            cat_key = self.CATEGORIES.get(category, category)
+            cat_key = self._get_category(category)
             events = [e for e in events if e.get("category") == cat_key]
 
         if format == "jsonl":
