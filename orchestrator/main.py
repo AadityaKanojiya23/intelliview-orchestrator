@@ -31,7 +31,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
@@ -1248,37 +1248,58 @@ async def clear_session_cache():
 @app.get("/interviews")
 async def list_interviews(
     limit: int = 100,
+    offset: int = 0,
     status: str | None = None,
     session_db: Session = Depends(get_db),
 ):
     """
-    List interview sessions, newest first.
+    List interview sessions, newest first. Optional `status` filter.
+
+    Returns:
+        dict: List of interview sessions + total count.
     """
+  
 
-    stmt = select(InterviewSession)
+    try:
+        stmt = select(InterviewSession)
+        if status:
+            stmt = stmt.where(InterviewSession.status == status.upper())
 
-    if status:
-        stmt = stmt.where(InterviewSession.status == status.upper())
+        count_stmt = select(func.count()).select_from(InterviewSession)
 
-    stmt = stmt.order_by(InterviewSession.created_at.desc().nullslast()).limit(limit)
-    rows = session_db.execute(stmt).scalars().all()
-    return {
-        "total_count": len(rows),
-        "sessions": [
-            {
-                "session_id": r.session_id,
-                "candidate_id": r.candidate_id,
-                "status": r.status,
-                "risk_score": r.risk_score,
-                "assigned_node": r.assigned_node,
-                "start_time": r.start_time.isoformat() if r.start_time else None,
-                "end_time": r.end_time.isoformat() if r.end_time else None,
-                "created_at": r.created_at.isoformat() if r.created_at else None,
-                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
-            }
-            for r in rows
-        ],
-    }
+        if status:
+            count_stmt = count_stmt.where(
+                InterviewSession.status == status.upper()
+            )
+
+        total_count = session_db.execute(count_stmt).scalar()
+        stmt = (
+             stmt.order_by(InterviewSession.created_at.desc().nullslast())
+            .offset(offset)
+            .limit(limit)
+            )
+        rows = session_db.execute(stmt).scalars().all()
+        return {
+            "total_count": total_count,
+            "sessions": [
+                {
+                    "session_id": r.session_id,
+                    "candidate_id": r.candidate_id,
+                    "status": r.status,
+                    "risk_score": r.risk_score,
+                    "assigned_node": r.assigned_node,
+                    "start_time": r.start_time.isoformat() if r.start_time else None,
+                    "end_time": r.end_time.isoformat() if r.end_time else None,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                    "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+                }
+                for r in rows
+            ],
+        }
+    except Exception as e:
+        logger.error(f"Error listing interviews: {e!s}")
+        raise HTTPException(status_code=500, detail="Error listing interviews")
+
 
 
 # ========== Question Endpoints ==========
