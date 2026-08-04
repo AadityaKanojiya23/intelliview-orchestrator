@@ -21,6 +21,9 @@ RUN apt-get update \
 
 COPY requirements.txt ./
 
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install -r requirements.txt
+
 RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
 
 COPY . .
