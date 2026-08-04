@@ -1,0 +1,10 @@
+Hello {{name}},
+
+Your interview has been scheduled.
+
+Date: {{date}}
+
+Time: {{time}}
+
+Thank you,
+Interview Team

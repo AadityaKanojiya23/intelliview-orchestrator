@@ -1,0 +1,8 @@
+Hello {{name}},
+
+Your interview conducted on {{date}} at {{time}} has been completed successfully.
+
+Thank you for participating.
+
+Regards,
+Interview Team

@@ -1,0 +1,8 @@
+Hello {{name}},
+
+Your interview scheduled on {{date}} at {{time}} has been cancelled.
+
+We will contact you soon with a new schedule.
+
+Thank you,
+Interview Team
