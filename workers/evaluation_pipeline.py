@@ -22,7 +22,7 @@ from workers.prompts import (
     TECHNICAL_ACCURACY_PROMPT,
     COMMUNICATION_EVALUATION_PROMPT,
 )
-from workers.prompts import QUALITY_EVALUATION_PROMPT 
+
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,7 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                 except json.JSONDecodeError:
                     logger.error("Invalid JSON from LLM (openai, quality): %s", response)
                 return None
+            
                 return {
                     "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
                     "relevance": round(parsed.get("relevance", 0.5), 2),
@@ -79,8 +80,7 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                 except json.JSONDecodeError:
                     logger.error("Invalid JSON from LLM (openai, quality): %s", response)
                 return None
-            
-                return {
+            return {
                     "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
                     "relevance": round(parsed.get("relevance", 0.5), 2),
                     "completeness": round(parsed.get("completeness", 0.5), 2),
@@ -104,7 +104,7 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                 try:
                     parsed = json.loads(response)
                 except json.JSONDecodeError:
-                    logger.error("Invalid JSON from LLM (grok, quality): %s", response)
+                    logger.error("Invalid JSON from LLM (gemini, quality): %s", response)
                     return None
                 return {
                     "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
@@ -113,7 +113,7 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                     "clarity": round(parsed.get("clarity", 0.5), 2),
                     "feedback": parsed.get("feedback", ""),
                     "provider": "grok",
-                }
+                } 
     except Exception as exc:
         logger.debug("Grok quality evaluation failed: %s", exc)
 
