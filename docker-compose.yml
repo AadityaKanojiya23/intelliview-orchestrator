@@ -118,13 +118,11 @@ services:
     command: python -m workers.worker_entrypoint
     restart: unless-stopped
     healthcheck:
-      test:
-        - CMD-SHELL
-        - celery -A workers.celery_app.celery_app inspect ping
+      test: ["CMD", "celery", "-A", "workers.celery_app", "inspect", "ping"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 20s
+      start_period: 30s
+      retries: 5
     deploy:
       resources:
         limits:
@@ -287,7 +285,7 @@ services:
     networks:
       - ai-interview-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/"]
       interval: 15s
       timeout: 5s
       start_period: 30s
