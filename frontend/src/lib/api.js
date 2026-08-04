@@ -76,9 +76,9 @@ const endpoints = {
   faultStatistics: () => api.get("/fault-statistics"),
   failureLog: (limit = 50) => api.get(`/failure-log?limit=${limit}`),
   deadLetterQueue: (limit = 50) => api.get(`/dead-letter-queue?limit=${limit}`),
-  retrySession: (session_id) => api.post(`/retry-session/${session_id}`),
-  detectFailures: () => api.post("/detect-failures"),
-  clearCache: () => api.delete("/clear-cache")
+retrySession: (session_id) => api.post(`/retry-session/${session_id}`),
+detectFailures: () => api.post("/detect-failures"),
+reportWebVitals: (payload) => api.post("/metrics/web-vitals", payload)
 };
 export {
   ApiClient,

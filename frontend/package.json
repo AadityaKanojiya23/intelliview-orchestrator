@@ -19,10 +19,13 @@
     "next": "14.2.31",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "recharts": "3.10.1",
-    "swr": "2.4.2",
-    "web-vitals": "4.2.4",
-    "zustand": "5.0.14"
+    "recharts": "2.15.0",
+    "lucide-react": "0.469.0",
+    "clsx": "2.1.1",
+    "date-fns": "4.1.0",
+    "zustand": "5.0.2",
+    "framer-motion": "11.15.0",
+    "cmdk": "1.0.4"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
