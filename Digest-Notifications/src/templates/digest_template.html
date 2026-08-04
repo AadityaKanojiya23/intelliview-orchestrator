@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ frequency.capitalize() }} Interview Digest</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f8fafc;
+      color: #1e293b;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrapper {
+      width: 100%;
+      table-layout: fixed;
+      background-color: #f8fafc;
+      padding: 40px 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      border: 1px solid #e2e8f0;
+    }
+    .header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      padding: 32px;
+      color: #ffffff;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+    .header p {
+      margin: 8px 0 0 0;
+      font-size: 14px;
+      color: #94a3b8;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background-color: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      margin-bottom: 12px;
+    }
+    .content {
+      padding: 32px;
+    }
+    .summary-bar {
+      background-color: #f1f5f9;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: #475569;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .summary-bar strong {
+      color: #0f172a;
+    }
+    .date-group {
+      margin-bottom: 28px;
+    }
+    .date-header {
+      font-size: 14px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 6px;
+    }
+    .card {
+      background-color: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+      transition: border-color 0.2s ease;
+    }
+    .card:hover {
+      border-color: #cbd5e1;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #0f172a;
+      margin: 0 0 4px 0;
+    }
+    .card-subtitle {
+      font-size: 13px;
+      color: #475569;
+      margin: 0 0 12px 0;
+    }
+    .card-meta {
+      font-size: 12px;
+      color: #64748b;
+      display: flex;
+      flex-wrap: wrap;
+    }
+    .meta-item {
+      display: inline-flex;
+      align-items: center;
+      margin-right: 16px;
+      margin-top: 4px;
+    }
+    .meta-icon {
+      margin-right: 4px;
+      color: #94a3b8;
+    }
+    .footer {
+      background-color: #f8fafc;
+      padding: 24px 32px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+    }
+    .footer p {
+      margin: 4px 0;
+    }
+    .footer a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <span class="badge">{{ frequency.capitalize() }} Digest</span>
+        <h1>Upcoming Interviews</h1>
+        <p>Hello {{ greeting_name }}, here is your summarized view.</p>
+      </div>
+      <div class="content">
+        <div class="summary-bar">
+          <span>Total batch size: <strong>{{ total_count }} upcoming interview{{ "s" if total_count != 1 else "" }}</strong></span>
+          <span style="font-size: 11px; color: #94a3b8;">Generated {{ generated_at }}</span>
+        </div>
+
+        {% if total_upcoming_count is defined and total_upcoming_count > total_count %}
+        <div style="background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; font-size: 14px; color: #b45309; text-align: center; font-weight: 500;">
+          ⚠️ <strong>Notice:</strong> Showing {{ total_count }} of {{ total_upcoming_count }} upcoming interviews (limited by batch size cap).
+        </div>
+        {% endif %}
+
+        {% if total_count == 0 %}
+        <div style="text-align: center; padding: 40px 0; color: #64748b;">
+          <p style="margin: 0; font-size: 16px;">No upcoming interviews scheduled for this period.</p>
+        </div>
+        {% else %}
+          {% for date_label, interviews in grouped_interviews.items() %}
+          <div class="date-group">
+            <div class="date-header">{{ date_label }}</div>
+            {% for interview in interviews %}
+            <div class="card">
+              <h3 class="card-title">{{ interview.candidate_name }}</h3>
+              <p class="card-subtitle">{{ interview.role_title }}</p>
+              <div class="card-meta">
+                <span class="meta-item">
+                  <span class="meta-icon">🕒</span> {{ interview.display_time }}
+                </span>
+                <span class="meta-item">
+                  <span class="meta-icon">👤</span> Interviewer: {{ interview.interviewer_name }}
+                </span>
+                {% if interview.meeting_link %}
+                <span class="meta-item">
+                  <span class="meta-icon">🔗</span> <a href="{{ interview.meeting_link }}" target="_blank" style="color: #3b82f6; text-decoration: none;">Meeting Link</a>
+                </span>
+                {% elif interview.location %}
+                <span class="meta-item">
+                  <span class="meta-icon">📍</span> Location: {{ interview.location }}
+                </span>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+      <div class="footer">
+        <p>This is an automated system notification.</p>
+        <p>Managed via Orchestrator Communications Service.</p>
+        <p style="margin-top: 12px;"><a href="#">Notification Settings</a> &bull; <a href="{{ unsubscribe_url }}">Unsubscribe</a></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

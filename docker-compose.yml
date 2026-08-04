@@ -100,6 +100,7 @@ services:
       API_TOKEN: "${API_TOKEN}"
       WORKER_CONCURRENCY: "4"
       WORKER_ID: "${WORKER_ID:-worker-1}"
+      CV_SERVICE_URL: "http://cv-service:8001"
     depends_on:
       redis:
         condition: service_healthy
@@ -107,23 +108,47 @@ services:
         condition: service_healthy
       fastapi:
         condition: service_healthy
+      cv-service:
+        condition: service_started
+    volumes:
+      - .:/app
+      
     networks:
       - ai-interview-network
     command: python -m workers.worker_entrypoint
     restart: unless-stopped
     healthcheck:
-      test:
-        - CMD-SHELL
-        - celery -A workers.celery_app.celery_app inspect ping
+      test: ["CMD", "celery", "-A", "workers.celery_app", "inspect", "ping"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 20s
+      start_period: 30s
+      retries: 5
     deploy:
       resources:
         limits:
           memory: 2G
           cpus: "4.0"
+
+  cv-service:
+    build:
+      context: ./cv_service
+      dockerfile: Dockerfile
+
+    container_name: ai-interview-cv-service
+
+    ports:
+      - "8001:8001"
+
+    networks:
+      - ai-interview-network
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   flower:
     build:
@@ -144,7 +169,7 @@ services:
       - ai-interview-network
     command: celery -A workers.celery_app.celery_app flower --url_prefix=flower
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:5555/flower"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:5555/flower/"]
       interval: 30s
       timeout: 5s
       start_period: 15s
@@ -217,9 +242,7 @@ services:
       - "4317:4317"
     networks:
       - ai-interview-network
-    depends_on:
-      prometheus:
-        condition: service_healthy
+ 
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
       interval: 15s
@@ -231,21 +254,7 @@ services:
         limits:
           memory: 256M
           cpus: "0.5"
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: ai-interview-frontend
-    ports:
-      - "3000:3000"
-    environment:
-      NODE_ENV: production
-    depends_on:
-      fastapi:
-        condition: service_started
-    networks:
-      - ai-interview-network
-    restart: unless-stopped          
+       
 
   frontend:
     build:
@@ -262,11 +271,34 @@ services:
     networks:
       - ai-interview-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/"]
       interval: 15s
       timeout: 5s
       start_period: 30s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+
+  digest-notifications:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-interview-digest-notifications
+    ports:
+      - "8080:8080"
+    environment:
+      API_TOKEN: "${API_TOKEN:-dev-token-change-me}"
+      DIGEST_BATCH_SIZE: "5"
+    volumes:
+      - .:/app
+    networks:
+      - ai-interview-network
+    working_dir: /app/Digest-Notifications
+    command: python src/digest.py --serve --port 8080 --host 0.0.0.0
+    restart: unless-stopped
     deploy:
       resources:
         limits:

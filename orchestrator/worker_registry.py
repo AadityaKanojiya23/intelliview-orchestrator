@@ -19,6 +19,8 @@ from typing import Any
 
 # Import Prometheus worker monitoring metrics
 from metrics.prometheus_metrics import (
+    CURRENT_WORKERS,
+    SYSTEM_UTILIZATION,
     WORKER_ACTIVE_TASKS,
     WORKER_CAPACITY,
     WORKERS_HEALTHY,
@@ -266,6 +268,7 @@ class WorkerRegistry:
 
             # Update total registered workers metric
             WORKERS_REGISTERED.set(len(self.local_workers))
+            CURRENT_WORKERS.set(len(self.local_workers))
             # Update healthy worker count
             WORKERS_HEALTHY.set(sum(1 for w in self.local_workers.values() if w["status"] == "healthy"))
             # Update unhealthy worker count
@@ -467,6 +470,7 @@ class WorkerRegistry:
         with self.lock:
             total_workers = len(self.local_workers)
             healthy_workers = sum(1 for w in self.local_workers.values() if w["status"] == "healthy")
+            CURRENT_WORKERS.set(total_workers)
             total_capacity = sum(w["capacity"] for w in self.local_workers.values())
             total_active_tasks = sum(w["active_tasks"] for w in self.local_workers.values())
             total_processed = sum(w.get("total_tasks_processed", 0) for w in self.local_workers.values())
@@ -486,17 +490,23 @@ class WorkerRegistry:
                 }
                 for wid, w in self.local_workers.items()
             ]
-
+            capacity_utilization = round(
+                (total_active_tasks / total_capacity * 100) if total_capacity > 0 else 0,
+                2,
+            )
+            SYSTEM_UTILIZATION.set(
+                round(
+                    total_active_tasks / total_capacity if total_capacity else 0,
+                    2,
+                )
+            )
             return {
                 "total_workers": total_workers,
                 "healthy_workers": healthy_workers,
                 "unhealthy_workers": total_workers - healthy_workers,
                 "total_capacity": total_capacity,
                 "total_active_tasks": total_active_tasks,
-                "capacity_utilization": round(
-                    (total_active_tasks / total_capacity * 100) if total_capacity > 0 else 0,
-                    2,
-                ),
+                "capacity_utilization": capacity_utilization,
                 "total_tasks_processed": total_processed,
                 "average_active_tasks": round(avg_active, 2),
                 "min_active_tasks": min(active_loads) if active_loads else 0,
@@ -554,6 +564,7 @@ class WorkerRegistry:
 
             # Update Prometheus metrics
             WORKERS_REGISTERED.set(len(self.local_workers))
+            CURRENT_WORKERS.set(len(self.local_workers))
 
             WORKERS_HEALTHY.set(sum(1 for w in self.local_workers.values() if w["status"] == "healthy"))
 

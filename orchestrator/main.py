@@ -22,7 +22,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -30,10 +30,11 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
+from orchestrator.middleware.capacity_guard import CapacityGuardMiddleware
 
 from config import (
     API_TOKEN,
@@ -62,6 +63,7 @@ from monitoring.dashboard_api import create_dashboard_routes
 from monitoring.metrics_collector import MetricsCollector
 from monitoring.websocket_manager import ws_manager
 from orchestrator import http_cache
+from orchestrator.audit_logger import audit_logger
 from orchestrator.auth import create_access_token
 from orchestrator.candidate_manager import CandidateManager
 from orchestrator.fault_manager import FaultManager
@@ -69,6 +71,7 @@ from orchestrator.health_monitor import HealthMonitor
 from orchestrator.interview_templates import InterviewTemplateManager
 from orchestrator.load_balancer import BalancingStrategy, LoadBalancer
 from orchestrator.logging_config import configure_logging, log_event
+from orchestrator.notification_manager import NotificationManager
 from orchestrator.question_bank import QuestionBank
 from orchestrator.rate_limiter import RateLimiterMiddleware
 from orchestrator.redis_client import (
@@ -91,10 +94,19 @@ logger = logging.getLogger(__name__)
 
 APP_START_TIME = datetime.now(timezone.utc)
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Execute on application startup/shutdown."""
+    """Execute on application startup/shutdown.
+
+    Startup: ensure schema exists, run an initial health probe, and warn
+    loudly if the default API token is still in use.
+
+    Shutdown: best-effort graceful drain — flush the request-id log line,
+    close the shared Redis client, and notify clients.
+    """
+
+    settings = get_settings()
+    settings.validate_configuration()
 
     Base.metadata.create_all(bind=engine)
 
@@ -230,21 +242,21 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         elapsed_ms = (_time.perf_counter() - start) * 1000
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Response-Time-ms"] = f"{elapsed_ms:.1f}"
-        if request.url.path != "/health":
-            log_event(
-                logger,
-                logging.INFO,
-                "request",
-                request_id=request_id,
-                method=request.method,
-                path=request.url.path,
-                status=response.status_code,
-                elapsed_ms=round(elapsed_ms, 1),
-            )
+        log_event(
+            logger,
+            logging.DEBUG if request.url.path == "/health" else logging.INFO,
+            "request",
+            request_id=request_id,
+            method=request.method,
+            path=request.url.path,
+            status=response.status_code,
+            elapsed_ms=round(elapsed_ms, 1),
+        )
         return response
 
 
 app.add_middleware(RequestContextMiddleware)
+app.add_middleware(CapacityGuardMiddleware)
 
 # CORS — configurable via env. Default "*" is for local dev only.
 _cors_origins = (
@@ -267,6 +279,7 @@ app.add_middleware(
 
 
 # ========== Auth ==========
+
 
 
 def require_token(x_api_token: str | None = Header(default=None)) -> None:
@@ -314,6 +327,7 @@ metrics_collector = MetricsCollector()
 question_bank = QuestionBank()
 candidate_manager = CandidateManager()
 interview_template_manager = InterviewTemplateManager()
+notification_manager = NotificationManager()
 
 # Register dashboard routes
 dashboard_routes = create_dashboard_routes(
@@ -360,6 +374,28 @@ class StartInterviewRequest(BaseModel):
     @classmethod
     def _strip_optional(cls, v):
         return v.strip() if isinstance(v, str) else v
+
+
+class CreateNotificationRequest(BaseModel):
+    user_id: str = Field(min_length=1, max_length=255)
+    message: str = Field(min_length=1, max_length=500)
+
+    @field_validator("message")
+    @classmethod
+    def validate_message(cls, value: str):
+        value = value.strip()
+        if not value:
+            raise ValueError("Message cannot be empty.")
+        return value
+
+
+class NotificationResponse(BaseModel):
+    id: int
+    user_id: str
+    message: str
+    read: bool
+    created_at: datetime
+    model_config = {"from_attributes": True}
 
 
 class WorkerRegistrationRequest(BaseModel):
@@ -539,7 +575,19 @@ class CreateTemplateRequest(BaseModel):
     category_distribution: dict[str, float] | None = None
     difficulty_distribution: dict[str, float] | None = None
 
+class HealthResponse(BaseModel):
+    """Response model for GET /health"""
+    status: str
+    timestamp: str
 
+
+
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    return HealthResponse(
+        status="system running",
+        timestamp=datetime.now(timezone.utc).isoformat()
+    )
 @app.get("/health")
 async def health():
     uptime = int((datetime.now(timezone.utc) - APP_START_TIME).total_seconds())
@@ -698,6 +746,11 @@ async def start_interview(
         # Check if system can accept task
         if not scheduler.can_accept_task():
             logger.warning(f"System at capacity, queuing task: {session_id}")
+            raise HTTPException(
+                status_code=503,
+                detail="All workers at capacity, please retry shortly.",
+                headers={"Retry-After": "5"},
+            )
 
         # Use scheduler to intelligently assign task
         scheduler.schedule_task(session_id, priority=priority)
@@ -999,6 +1052,83 @@ async def get_task_status(
         raise HTTPException(status_code=500, detail=f"Error fetching task status: {e}")
 
 
+# ========== Notification Center Endpoints ==========
+
+
+@app.post("/notifications", response_model=NotificationResponse)
+async def create_notification(request: CreateNotificationRequest):
+    """
+    Create a new notification.
+    """
+
+    notification = notification_manager.create_notification(
+        user_id=request.user_id,
+        message=request.message,
+    )
+
+    return NotificationResponse(
+        id=notification.id,
+        user_id=notification.user_id,
+        message=notification.message,
+        read=notification.read,
+        created_at=notification.created_at,
+    )
+
+
+@app.get("/notifications", response_model=list[NotificationResponse])
+async def get_notifications(
+    user_id: str,
+    skip: int = 0,
+    limit: int = 20,
+):
+    """
+    Get all notifications for a user.
+    """
+
+    notifications = notification_manager.get_notifications(
+        user_id=user_id,
+        skip=skip,
+        limit=limit,
+    )
+
+    return [
+        NotificationResponse(
+            id=notification.id,
+            user_id=notification.user_id,
+            message=notification.message,
+            read=notification.read,
+            created_at=notification.created_at,
+        )
+        for notification in notifications
+    ]
+
+
+@app.patch("/notifications/{notification_id}/read", response_model=NotificationResponse)
+async def mark_notification_as_read(notification_id: int, user_id: str):
+    """
+    Mark a notification as read.
+    """
+
+    notification = notification_manager.mark_as_read(
+        notification_id=notification_id,
+        user_id=user_id,
+    )
+
+    if notification is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Notification not found",
+        )
+
+    return NotificationResponse(
+        id=notification.id,
+        user_id=notification.user_id,
+        message=notification.message,
+        read=notification.read,
+        created_at=notification.created_at,
+    )
+
+
 # ========== Session Tracking Endpoints ==========
 
 
@@ -1215,37 +1345,58 @@ async def clear_session_cache():
 @app.get("/interviews")
 async def list_interviews(
     limit: int = 100,
+    offset: int = 0,
     status: str | None = None,
     session_db: Session = Depends(get_db),
 ):
     """
-    List interview sessions, newest first.
+    List interview sessions, newest first. Optional `status` filter.
+
+    Returns:
+        dict: List of interview sessions + total count.
     """
+  
 
-    stmt = select(InterviewSession)
+    try:
+        stmt = select(InterviewSession)
+        if status:
+            stmt = stmt.where(InterviewSession.status == status.upper())
 
-    if status:
-        stmt = stmt.where(InterviewSession.status == status.upper())
+        count_stmt = select(func.count()).select_from(InterviewSession)
 
-    stmt = stmt.order_by(InterviewSession.created_at.desc().nullslast()).limit(limit)
-    rows = session_db.execute(stmt).scalars().all()
-    return {
-        "total_count": len(rows),
-        "sessions": [
-            {
-                "session_id": r.session_id,
-                "candidate_id": r.candidate_id,
-                "status": r.status,
-                "risk_score": r.risk_score,
-                "assigned_node": r.assigned_node,
-                "start_time": r.start_time.isoformat() if r.start_time else None,
-                "end_time": r.end_time.isoformat() if r.end_time else None,
-                "created_at": r.created_at.isoformat() if r.created_at else None,
-                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
-            }
-            for r in rows
-        ],
-    }
+        if status:
+            count_stmt = count_stmt.where(
+                InterviewSession.status == status.upper()
+            )
+
+        total_count = session_db.execute(count_stmt).scalar()
+        stmt = (
+             stmt.order_by(InterviewSession.created_at.desc().nullslast())
+            .offset(offset)
+            .limit(limit)
+            )
+        rows = session_db.execute(stmt).scalars().all()
+        return {
+            "total_count": total_count,
+            "sessions": [
+                {
+                    "session_id": r.session_id,
+                    "candidate_id": r.candidate_id,
+                    "status": r.status,
+                    "risk_score": r.risk_score,
+                    "assigned_node": r.assigned_node,
+                    "start_time": r.start_time.isoformat() if r.start_time else None,
+                    "end_time": r.end_time.isoformat() if r.end_time else None,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                    "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+                }
+                for r in rows
+            ],
+        }
+    except Exception as e:
+        logger.error(f"Error listing interviews: {e!s}")
+        raise HTTPException(status_code=500, detail="Error listing interviews")
+
 
 
 # ========== Question Endpoints ==========
@@ -1749,8 +1900,8 @@ async def get_scheduling_status():
         raise HTTPException(status_code=500, detail=f"Error fetching scheduling status: {e!s}")
 
 
-@app.post("/switch-strategy", dependencies=[Depends(require_role("admin"))])
-async def switch_load_balancing_strategy(strategy: str):
+@app.post("/switch-strategy", dependencies=[Depends(require_token)])
+async def switch_load_balancing_strategy(strategy: str, request: Request):
     """
     Change the active load balancing strategy
 
@@ -1781,17 +1932,33 @@ async def switch_load_balancing_strategy(strategy: str):
                 detail=f"Invalid strategy. Valid options: {', '.join(valid_strategies.keys())}",
             )
 
+        # Capture the outgoing strategy BEFORE switching so the audit trail
+        # and response both reflect the true before/after transition.
+        previous_strategy = load_balancer.strategy
+
         # Switch strategy
         new_strategy = valid_strategies[strategy.upper()]
         load_balancer.switch_strategy(new_strategy)
 
         logger.info(f"Load balancing strategy switched to: {strategy}")
 
+        # Record this as a config-change audit event so there's a
+        # tamper-evident trail of who changed runtime scheduling behavior
+        # and when — this is an administrative action with system-wide
+        # effect, so it belongs in the audit log alongside other mutations.
+        audit_logger.log_config_change(
+            setting="load_balancing_strategy",
+            old_value=previous_strategy.name,
+            new_value=new_strategy.name,
+            actor=request.headers.get("x-api-token", "unknown")[:8] or "unknown",
+            request_id=getattr(request.state, "request_id", ""),
+        )
+
         return {
             "status": "success",
             "message": f"Strategy switched to {strategy}",
-            "previous_strategy": load_balancer.strategy.name,
-            "new_strategy": strategy,
+            "previous_strategy": previous_strategy.name,
+            "new_strategy": new_strategy.name,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except HTTPException:
@@ -2130,6 +2297,106 @@ async def detect_and_handle_failures():
     except Exception as e:
         logger.error(f"Error during failure detection: {e!s}")
         raise HTTPException(status_code=500, detail=f"Error during failure detection: {e!s}")
+
+
+# ========== Audit Log Endpoints ==========
+
+_AUDIT_CATEGORIES = frozenset(audit_logger.CATEGORIES.keys())
+_AUDIT_EXPORT_FORMATS = frozenset({"json", "jsonl"})
+
+
+@app.get("/audit-log", dependencies=[Depends(require_token)])
+async def get_audit_log(category: str | None = None, limit: int = 100):
+    """
+    Get recent audit events (API mutations, config changes, security
+    events, AI decisions, data access)
+
+    Args:
+        category: Optional filter - one of: mutation, ai_decision,
+            security, config, system, data_access
+        limit: Maximum number of events to return (default: 100)
+
+    Returns:
+        dict: Recent audit events, newest first
+    """
+    try:
+        if category and category not in _AUDIT_CATEGORIES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid category. Valid options: {', '.join(sorted(_AUDIT_CATEGORIES))}",
+            )
+
+        logger.debug(f"Fetching audit log (category={category}, limit={limit})")
+
+        events = (
+            audit_logger.get_events_by_category(category, limit=limit)
+            if category
+            else audit_logger.get_recent_events(limit=limit)
+        )
+
+        return {
+            "count": len(events),
+            "category": category,
+            "events": events,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching audit log: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching audit log: {e!s}")
+
+
+@app.get("/audit-log/export", dependencies=[Depends(require_token)])
+async def export_audit_log(
+    format: str = "json",
+    category: str | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
+):
+    """
+    Export audit events for compliance / offline analysis
+
+    Args:
+        format: Output format - "json" or "jsonl" (default: "json")
+        category: Optional filter - one of: mutation, ai_decision,
+            security, config, system, data_access
+        start_time: ISO timestamp filter (inclusive)
+        end_time: ISO timestamp filter (inclusive)
+
+    Returns:
+        Raw exported audit events in the requested format
+    """
+    try:
+        if format not in _AUDIT_EXPORT_FORMATS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid format. Valid options: {', '.join(sorted(_AUDIT_EXPORT_FORMATS))}",
+            )
+        if category and category not in _AUDIT_CATEGORIES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid category. Valid options: {', '.join(sorted(_AUDIT_CATEGORIES))}",
+            )
+
+        logger.info(f"Exporting audit log (format={format}, category={category})")
+
+        exported = audit_logger.export_events(
+            format=format,
+            start_time=start_time,
+            end_time=end_time,
+            category=category,
+        )
+
+        from fastapi.responses import PlainTextResponse
+
+        media_type = "application/json" if format == "json" else "application/x-ndjson"
+        return PlainTextResponse(content=exported, media_type=media_type)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting audit log: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error exporting audit log: {e!s}")
 
 
 # ========== Moment Tracking Endpoints ==========
