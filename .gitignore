@@ -40,4 +40,6 @@ frontend/.next/
 frontend/out/
 frontend/.env.local
 frontend/*.tsbuildinfo
-STABILIZATION_REPORT.md
+
+.env.local
+subscribers.db

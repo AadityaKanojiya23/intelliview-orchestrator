@@ -19,6 +19,7 @@ import os
 import re
 import time
 import time as _time
+from database.subscriber_store import create_table, list_subscribers
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -111,6 +112,14 @@ async def lifespan(app: FastAPI):
 
     Base.metadata.create_all(bind=engine)
 
+        # Initialize webhook subscriber store
+    create_table()
+
+    subscribers = list_subscribers()
+    logger.info(
+        "Loaded %d webhook subscribers",
+        len(subscribers)
+    )
     if API_TOKEN == "dev-token-change-me":
         raise RuntimeError(
             "CRITICAL SECURITY ERROR: Default API_TOKEN detected! "
