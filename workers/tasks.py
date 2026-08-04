@@ -44,6 +44,7 @@ from orchestrator.state_sync import StateSynchronizer
 from workers.celery_app import celery_app
 from workers.evaluation_pipeline import evaluate_answers
 from workers.risk_engine import RiskScoringEngine
+from cv_service.client import CVClient
 
 logger = logging.getLogger(__name__)
 
@@ -80,26 +81,27 @@ def _update_infra_health(healthy: bool = True):
 # Individual stage tasks
 # ---------------------------------------------------------------------------
 
+from cv_service.client import CVClient
+
 
 @celery_app.task(bind=True, max_retries=3, name="workers.tasks._run_video")
 def _run_video(self, session_id: str) -> dict:
-    from workers.video_pipeline import run_video_analysis
+    """Video analysis stage."""
 
     logger.info("Starting video analysis stage for session %s", session_id)
     start = time.perf_counter()
 
-    # Dynamic health check update
     _update_infra_health(True)
 
-    # Call the correct imported function
-    video_result = run_video_analysis(session_id)
+    client = CVClient()
+    video_result = client.analyze_video(session_id)
 
-    # Observe pipeline stage latency
     latency = time.perf_counter() - start
     PIPELINE_LATENCY.labels(stage="video").observe(latency)
     logger.info("Video analysis stage completed in %.2fs", latency)
 
     return video_result
+
 
 
 @celery_app.task(bind=True, max_retries=3, name="workers.tasks._run_audio")
