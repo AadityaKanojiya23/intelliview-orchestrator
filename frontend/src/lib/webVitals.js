@@ -1,27 +1,31 @@
 import { onCLS, onFCP, onINP, onLCP, onTTFB } from "web-vitals";
-import { endpoints } from "./api";
 
-async function sendMetric(metric) {
-  console.log("Web Vital:", metric);
+export function reportWebVitals() {
+  const logMetric = (metric) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Web Vital:", {
+        name: metric.name,
+        value: metric.value,
+        rating: metric.rating,
+        id: metric.id,
+      });
+    }
 
-  try {
-    await endpoints.reportWebVitals({
-      name: metric.name,
-      value: metric.value,
-      rating: metric.rating,
-      delta: metric.delta,
-      id: metric.id,
-      navigationType: metric.navigationType,
+    // Optional: Send to backend API
+    /*
+    fetch("/api/web-vitals", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(metric),
     });
-  } catch (err) {
-    console.error("Failed to send Web Vital:", err);
-  }
-}
+    */
+  };
 
-export function initWebVitals() {
-  onCLS(sendMetric);
-  onFCP(sendMetric);
-  onINP(sendMetric);
-  onLCP(sendMetric);
-  onTTFB(sendMetric);
+  onCLS(logMetric);
+  onFCP(logMetric);
+  onINP(logMetric);
+  onLCP(logMetric);
+  onTTFB(logMetric);
 }
