@@ -1,126 +1,327 @@
-# Celery Workers — `intelliview-orchestrator`
+# Workers
 
-This module implements the **asynchronous processing pipeline** for interview sessions. It picks up a session from the queue, runs video and audio analysis in parallel, evaluates the candidate's answers, computes a risk score, and persists the final result — all coordinated through Celery with Redis as the broker and result backend.
+This folder holds the Celery worker code that actually runs an interview
+session: video analysis, audio analysis, answer evaluation, and risk
+scoring. If you're trying to understand how a session moves from "just
+submitted" to "here's the risk report," this is the place to look.
 
----
+## What's in here
 
-## 📁 Module Contents
+- `celery_app.py` – Celery app + broker/backend setup, plus the
+  `task_failure` signal that marks a session `FAILED` only once retries run
+  out.
+- `tasks.py` – the actual task graph: `process_interview_session`,
+  `_run_video`, `_run_audio`, `_after_parallel`, and the beat job
+  `scan_and_dispatch_retries`.
+- `video_pipeline.py`, `audio_pipeline.py`, `evaluation_pipeline.py` – the
+  three analysis stages.
+- `risk_engine.py` – combines all three stage outputs into a final risk
+  score/report.
+- `ai_client.py` – shared client the pipelines use to talk to the AI
+  provider.
+- `worker_agent.py` / `worker_entrypoint.py` – how a worker process boots.
+- `_stubs.py` – fakes used for local/test runs.
 
-| File | Responsibility |
-|---|---|
-| `celery_app.py` | Celery application instance, reliability config, Beat schedule, and the `task_failure` signal handler |
-| `tasks.py` | The actual task definitions and the pipeline orchestration logic |
-| `video_pipeline.py` | Video analysis stage (invoked by `_run_video`) |
-| `audio_pipeline.py` | Audio analysis stage (invoked by `_run_audio`) |
-| `evaluation_pipeline.py` | Answer evaluation stage |
-| `risk_engine.py` | Final risk scoring, run after evaluation |
+Session state itself isn't owned here — it lives in
+[`SessionManager`](../orchestrator/session_manager.py), synced across
+Postgres and Redis by [`StateSynchronizer`](../orchestrator/state_sync.py).
+This code just calls into that.
 
----
+## How this folder fits into the rest of the system
 
-## ⚙️ Celery Configuration (`celery_app.py`)
+```mermaid
+flowchart TB
+    subgraph API["Orchestrator (orchestrator/)"]
+        SCH[Scheduler]
+        SM[SessionManager]
+        SS[StateSynchronizer]
+        RM[RetryManager]
+        HM[HealthMonitor]
+    end
 
-The Celery app (`interview_tasks`) is initialised with Redis as **both broker and result backend**, and tuned for reliability over raw throughput:
+    subgraph WORK["Workers (workers/)"]
+        CA[celery_app.py]
+        TK[tasks.py]
+        VP[video_pipeline.py]
+        AP[audio_pipeline.py]
+        EP[evaluation_pipeline.py]
+        RE[risk_engine.py]
+        AI[ai_client.py]
+    end
 
-- **Serialization**: JSON only (`task_serializer`, `result_serializer`, `accept_content`)
-- **Time limits**: 30 min hard limit, 25 min soft limit per task
-- **`task_acks_late=True`**: a task is only acknowledged after it completes — if a worker dies mid-task, the job is redelivered instead of lost
-- **`task_reject_on_worker_lost=True`**: guarantees a lost worker's task isn't silently dropped
-- **`worker_prefetch_multiplier=1`**: ensures fair task distribution across workers instead of one worker hoarding a batch
-- **`broker_connection_retry_on_startup=True`**: workers keep retrying the Redis connection on boot instead of crashing
-- **Autodiscovery**: `celery_app.autodiscover_tasks(["workers"])` automatically registers all tasks defined under `workers/`
+    subgraph STORE["Storage"]
+        PG[(Postgres)]
+        RD[(Redis)]
+    end
 
-### Failure handling
-A `task_failure` signal handler is registered so that a session is only marked `FAILED` **after Celery has exhausted its retries** — not on every transient error. This avoids flapping a session's status on temporary issues (e.g. a brief Redis blip) and only surfaces a real failure once retries are genuinely exhausted.
-
-### Scheduled task (Celery Beat)
-A periodic task, `scan_and_dispatch_retries`, runs every **60 seconds** to catch and re-dispatch any sessions whose retry window has elapsed (see below).
-
----
-
-## 🔄 Celery Workflow (`tasks.py`)
-
-Each interview session moves through a defined pipeline of states:
-
-```
-QUEUED → PROCESSING → VIDEO_PROCESSING (+ AUDIO in parallel) → EVALUATING → COMPLETED
-```
-
-### 1. Entry point — `process_interview_session`
-- Fetches the session from Postgres; resets `FAILED` sessions back to `QUEUED` for a clean retry
-- Updates status to `PROCESSING`, records the assigned worker hostname and start time
-- Dispatches a **Celery `group`** running `_run_video` and `_run_audio` **in parallel**
-- Blocks (with a 600s timeout) until both finish, then hands off to `_after_parallel`
-- On any exception, retries with **exponential backoff** (`2^attempt` seconds, up to 3 attempts) via `self.retry(...)`
-
-### 2. Parallel stage tasks
-- `_run_video` → calls `video_pipeline.run_video_analysis`
-- `_run_audio` → calls `audio_pipeline.run_audio_analysis`
-- Each has its own retry budget (`max_retries=3`) independent of the parent task
-
-### 3. Post-parallel callback — `_after_parallel`
-Once both video and audio results are available:
-1. Status updated to `EVALUATING`
-2. `evaluate_answers()` scores the candidate's responses
-3. `RiskScoringEngine.generate_risk_report()` combines video, audio, and evaluation results into a final risk score + classification
-4. Results are written to Postgres (`InterviewSession` row), the session is marked `COMPLETED`, and its Redis state is cleared
-
-### 4. Retry scanning — `scan_and_dispatch_retries` (Beat, every 60s)
-Scans Redis for `retry_scheduled:*` keys whose `retry_after` timestamp has passed, and re-dispatches those sessions through the normal `Scheduler` with `TaskPriority.MEDIUM`, then deletes the processed key.
-
----
-
-## 📊 Metrics & Observability
-
-Worker activity is exported in Prometheus format via `monitoring/prometheus_metrics.py`, and visualized in Grafana. The metrics directly relevant to this module:
-
-**Worker health**
-| Metric | Type | Description |
-|---|---|---|
-| `intelliview_workers_registered` | Gauge | Number of registered workers |
-| `intelliview_workers_healthy` / `intelliview_workers_unhealthy` | Gauge | Healthy vs. unhealthy worker counts |
-| `intelliview_worker_active_tasks{worker_id}` | Gauge | Active tasks per worker |
-| `intelliview_worker_capacity{worker_id}` | Gauge | Capacity per worker |
-| `intelliview_worker_heartbeat_age_seconds{worker_id}` | Gauge | Seconds since a worker's last heartbeat — flags stalled/dead workers |
-
-**Session & pipeline processing**
-| Metric | Type | Description |
-|---|---|---|
-| `intelliview_sessions_created_total` / `_completed_total` / `_failed_total` | Counter | Session lifecycle counts |
-| `intelliview_sessions_active` | Gauge | Currently active sessions |
-| `intelliview_session_processing_duration_seconds` | Histogram | End-to-end session processing time (buckets 1s–600s) |
-| `intelliview_pipeline_latency_seconds{stage}` | Histogram | Per-stage latency (video / audio / evaluation) |
-| `intelliview_pipeline_errors_total{stage, error_type}` | Counter | Errors per pipeline stage |
-| `intelliview_risk_score` | Histogram | Distribution of generated risk scores |
-
-**Retry / fault tolerance**
-| Metric | Type | Description |
-|---|---|---|
-| `intelliview_retries_total` | Counter | Total retry attempts across tasks |
-| `intelliview_failures_total{failure_type}` | Counter | Failures by type, post-retry |
-| `intelliview_dead_letter_queue_size` | Gauge | Sessions that exhausted retries |
-| `intelliview_queue_depth` | Gauge | Current Celery queue depth |
-| `intelliview_circuit_breaker_state` | Gauge | 0=closed, 1=open, 2=half_open |
-
-These map directly onto the worker code's behavior: `task_track_started`, the retry/backoff logic in `process_interview_session`, and the `task_failure` signal handler in `celery_app.py` are the natural emission points for the retry, failure, and latency metrics above. Metrics are scraped from `/metrics` and rendered on Grafana dashboards (see `monitoring/grafana/provisioning`).
-
----
-
-## 🧵 Concurrency Model
-
-- **Video + audio run in parallel** per session via `celery.group`, minimizing per-session latency
-- **Evaluation + risk scoring run sequentially**, since they depend on both prior results
-- **Horizontal scaling**: additional worker processes/nodes can be added freely since `worker_prefetch_multiplier=1` ensures even task distribution, and `task_acks_late` + `task_reject_on_worker_lost` make it safe to kill/restart workers without losing in-flight jobs
-
----
-
-## 🚀 Running a Worker
-
-```bash
-celery -A workers.celery_app worker --loglevel=info
+    SCH -->|dispatch session_id| TK
+    TK --> VP
+    TK --> AP
+    TK --> EP
+    EP --> AI
+    VP --> AI
+    AP --> AI
+    TK --> RE
+    TK -->|status updates| SM
+    SM --> PG
+    SM --> RD
+    SS --> PG
+    SS --> RD
+    RM --> RD
+    HM -->|scans for stuck sessions| PG
+    CA -->|task_failure signal| SM
+    TK -->|scan_and_dispatch_retries| RM
+    RM -->|retry_scheduled keys| SCH
 ```
 
-To run the periodic retry-scanning beat schedule:
+Nothing in `workers/` talks to Postgres or Redis directly except through
+`SessionManager` — the pipelines themselves (`video_pipeline.py`,
+`audio_pipeline.py`, `evaluation_pipeline.py`) are mostly stateless, they
+just get a `session_id`, do their analysis, and hand a dict back up to
+`tasks.py`.
 
-```bash
-celery -A workers.celery_app beat --loglevel=info
+## How a session actually flows through this
+
+`process_interview_session` is the one entry point the
+[`Scheduler`](../orchestrator/scheduler.py) calls. Roughly:
+
+1. If the session was previously `FAILED`, it gets reset to `QUEUED` for
+   another go.
+2. Session flips to `PROCESSING`, worker hostname gets recorded.
+3. Session flips to `VIDEO_PROCESSING`, and video + audio analysis run at
+   the same time as a Celery `group` (they don't depend on each other, so
+   no reason to run them sequentially).
+4. Once both come back, `_after_parallel` takes over: marks the session
+   `EVALUATING`, runs answer evaluation, then risk scoring, then writes
+   everything to Postgres and marks it `COMPLETED`.
+5. If `process_interview_session` throws anywhere, it calls `self.retry(...)`
+   with a backoff of `2 ** attempt` seconds, up to 3 attempts. Note that the
+   session is **not** immediately marked `FAILED` on an exception — that only
+   happens once Celery gives up, via the `task_failure` signal in
+   `celery_app.py`.
+6. Separately, `scan_and_dispatch_retries` runs every 60s (Celery Beat),
+   checks Redis for anything whose scheduled retry time has passed, and
+   re-dispatches it through the Scheduler.
+
+Here's the same thing as a sequence diagram, since the parallel step trips
+people up the most:
+
+```mermaid
+sequenceDiagram
+    participant S as Scheduler
+    participant T as process_interview_session
+    participant V as _run_video
+    participant A as _run_audio
+    participant P as _after_parallel
+    participant R as RiskScoringEngine
+    participant DB as Postgres / Redis
+
+    S->>T: dispatch(session_id)
+    T->>DB: status = PROCESSING
+    T->>DB: status = VIDEO_PROCESSING
+    par video + audio run together
+        T->>V: _run_video.s(session_id)
+        T->>A: _run_audio.s(session_id)
+    end
+    V-->>T: video_result
+    A-->>T: audio_result
+    T->>P: _after_parallel(video_result, audio_result)
+    P->>DB: status = EVALUATING
+    P->>P: evaluate_answers(session_id)
+    P->>R: generate_risk_report(...)
+    R-->>P: risk_report
+    P->>DB: persist results, status = COMPLETED
 ```
+
+## State machine
+
+First, the path a session actually takes in normal operation — this is
+what `process_interview_session` and `_after_parallel` walk every time,
+with no exceptions and no retries:
+
+```mermaid
+stateDiagram-v2
+    [*] --> CREATED
+    CREATED --> QUEUED
+    QUEUED --> PROCESSING
+    PROCESSING --> VIDEO_PROCESSING
+    VIDEO_PROCESSING --> AUDIO_PROCESSING
+    AUDIO_PROCESSING --> EVALUATING
+    EVALUATING --> COMPLETED
+    COMPLETED --> [*]
+```
+
+Now here's the full picture — every transition the
+*validator* allows, per `SessionManager.VALID_TRANSITIONS`. It's a lot
+busier than the happy path above because the validator is more permissive
+than the code that actually runs: it allows things like resuming from
+`EVALUATING` back to `PROCESSING`, or `QUEUED` jumping straight to
+`VIDEO_PROCESSING`, that `tasks.py` never actually exercises today. Treat
+this one as "what's technically legal," not "what commonly happens":
+
+```mermaid
+stateDiagram-v2
+    [*] --> CREATED
+
+    CREATED --> QUEUED
+    CREATED --> FAILED
+    CREATED --> CANCELLED
+
+    QUEUED --> PROCESSING
+    QUEUED --> FAILED
+    QUEUED --> CANCELLED
+
+    PROCESSING --> VIDEO_PROCESSING
+    PROCESSING --> AUDIO_PROCESSING
+    PROCESSING --> EVALUATING
+    PROCESSING --> COMPLETED
+    PROCESSING --> FAILED
+    PROCESSING --> TIMEOUT
+
+    VIDEO_PROCESSING --> AUDIO_PROCESSING
+    VIDEO_PROCESSING --> PROCESSING
+    VIDEO_PROCESSING --> FAILED
+    VIDEO_PROCESSING --> TIMEOUT
+
+    AUDIO_PROCESSING --> EVALUATING
+    AUDIO_PROCESSING --> PROCESSING
+    AUDIO_PROCESSING --> FAILED
+    AUDIO_PROCESSING --> TIMEOUT
+
+    EVALUATING --> COMPLETED
+    EVALUATING --> PROCESSING
+    EVALUATING --> FAILED
+    EVALUATING --> TIMEOUT
+
+    TIMEOUT --> FAILED
+
+    COMPLETED --> [*]
+    FAILED --> [*]
+    CANCELLED --> [*]
+```
+
+A quick word on each state, and who's responsible for setting it:
+
+- **CREATED** – session row exists, nothing has happened yet
+  (`SessionManager.create_session`).
+- **QUEUED** – sitting in line for a worker (`Scheduler`).
+- **PROCESSING** – a worker has picked it up and is about to start the
+  actual stages (`process_interview_session`).
+- **VIDEO_PROCESSING** – video + audio are running in parallel; this is the
+  status shown while both are in flight (`process_interview_session`).
+- **AUDIO_PROCESSING** – part of the same valid-transition set for the
+  audio side; in practice video and audio run together under one
+  `VIDEO_PROCESSING` status update (`session_manager.py`).
+- **EVALUATING** – both analysis stages are done, now scoring the answers
+  and building the risk report (`_after_parallel`).
+- **COMPLETED** – terminal, risk report is saved (`_after_parallel`).
+- **FAILED** – terminal, either retries got exhausted or something broke
+  post-parallel (`celery_app.py`'s `task_failure` handler, or
+  `_after_parallel`'s except block).
+- **TIMEOUT** – a stage took too long and `HealthMonitor` flagged it; always
+  rolls into `FAILED` next.
+- **CANCELLED** – terminal, session was cancelled before it ever got picked
+  up (`SessionManager`).
+
+## Retries, failures, timeouts
+
+There are actually two layers of retry logic and it's easy to conflate
+them:
+
+- **Task-level retries** — plain Celery retry with exponential backoff,
+  handled inside `process_interview_session`, `_run_video`, `_run_audio`
+  (`max_retries=3`, delay = `2 ** attempt` seconds).
+- **Session-level retry bookkeeping** — `RetryManager` tracks attempt counts
+  and schedules a retry time in Redis; `scan_and_dispatch_retries` is what
+  actually notices that time has passed and kicks the session back into the
+  scheduler.
+
+```mermaid
+flowchart TD
+    A[Task raises exception] --> B{Retries left? max_retries=3}
+    B -- yes --> C["self.retry(countdown=2**attempt)"]
+    C --> A
+    B -- no --> D[task_failure signal fires]
+    D --> E[Session marked FAILED]
+    E --> F[RetryManager.schedule_retry]
+    F --> G[retry_scheduled:* key in Redis]
+    G --> H[Beat job: scan_and_dispatch_retries every 60s]
+    H --> I{retry_after has passed?}
+    I -- no --> H
+    I -- yes --> J[Scheduler.schedule_task]
+    J --> A
+```
+
+Stuck sessions (stuck, not failed — e.g. a worker died mid-task) are caught
+separately by `HealthMonitor.detect_stuck_sessions`, using the
+`PROCESSING_TIMEOUT` / `QUEUED_TIMEOUT` thresholds defined on
+`SessionManager`. That path looks like this:
+
+```mermaid
+flowchart TD
+    A[HealthMonitor runs periodically] --> B[Scan sessions in PROCESSING / QUEUED / VIDEO_PROCESSING / AUDIO_PROCESSING / EVALUATING]
+    B --> C{Time in current state > threshold?}
+    C -- "PROCESSING > PROCESSING_TIMEOUT" --> D[Mark session TIMEOUT]
+    C -- "QUEUED > QUEUED_TIMEOUT" --> D
+    C -- no --> A
+    D --> E[TIMEOUT --> FAILED]
+    E --> F[RetryManager.schedule_retry]
+    F --> G[Picked up by scan_and_dispatch_retries later]
+```
+
+This is a separate mechanism from the Celery-level retry in
+`process_interview_session` — that one fires from inside the task when an
+exception is raised. `HealthMonitor` instead catches the case where nothing
+raised an exception at all; the worker process just died, got OOM-killed,
+or lost its connection, and the session is left sitting in a
+non-terminal state with nobody actively working on it.
+
+## Gotcha: FAILED isn't actually terminal
+
+The state diagram above shows `FAILED` with no way out, because that's what
+`SessionManager.VALID_TRANSITIONS` says. In practice there's a bypass, right
+at the top of `process_interview_session`:
+
+```python
+if interview.status == "FAILED":
+    interview.status = "QUEUED"
+    db_session.commit()
+```
+
+`scan_and_dispatch_retries` doesn't check a session's current status before
+re-dispatching it — it just reads `retry_scheduled:*` keys from Redis and
+fires the session_id back into the `Scheduler` once the retry time has
+passed. So when the task runs again, Postgres may still say `FAILED`, and
+this line quietly flips it back to `QUEUED` and carries on — bypassing
+`session_manager.update_session_status()` entirely (no validation, no
+Redis sync through the normal path, just a direct write).
+
+```mermaid
+flowchart LR
+    A[Session status: FAILED] --> B[scan_and_dispatch_retries fires]
+    B --> C[Scheduler.schedule_task re-dispatches]
+    C --> D[process_interview_session starts]
+    D --> E{status == FAILED?}
+    E -- yes --> F["interview.status = QUEUED\n(direct write, bypasses SessionManager)"]
+    F --> G[continues into PROCESSING as normal]
+    E -- no --> G
+```
+
+Two things worth knowing if you're touching this code:
+
+- This reset doesn't check `RetryManager`'s attempt count or the Celery-level
+  `self.request.retries` counter — they're separate tallies from this check.
+  Anything that re-dispatches a `FAILED` session_id (a bug, a manual retry,
+  a duplicate beat tick) gets it un-failed with no extra gate.
+- If you're debugging "why did this failed session start processing again
+  with no obvious retry log," this is the line to check first.
+
+## Where to look next
+
+- [`orchestrator/session_manager.py`](../orchestrator/session_manager.py) — source of truth for state transitions.
+- [`orchestrator/state_sync.py`](../orchestrator/state_sync.py) — Postgres/Redis sync.
+- [`orchestrator/scheduler.py`](../orchestrator/scheduler.py) — how sessions get dispatched to workers.
+- [`orchestrator/retry_manager.py`](../orchestrator/retry_manager.py) — retry attempt tracking + backoff scheduling.
+- [`orchestrator/health_monitor.py`](../orchestrator/health_monitor.py) — timeout/stuck-session detection.
+- [`monitoring/dashboard.html`](../monitoring/dashboard.html), [`monitoring/metrics_collector.py`](../monitoring/metrics_collector.py) — live view of what's happening.
+- [Celery docs](https://docs.celeryq.dev/en/stable/) — for the retry/group/beat mechanics referenced above.

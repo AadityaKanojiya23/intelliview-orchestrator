@@ -35,5 +35,6 @@ opentelemetry-exporter-otlp
 # === Dev / test ===
 pytest==8.3.4
 pytest-asyncio==0.25.0
-testcontainers[postgres]==4.13.2
 
+#for hallucination_detector
+sentence-transformers

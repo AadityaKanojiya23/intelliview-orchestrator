@@ -18,6 +18,7 @@ import {
 import Card from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { Skeleton, ErrorState, EmptyState } from "@/components/States";
+import VideoPlayer from "@/components/VideoPlayer";
 import { endpoints } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
@@ -211,19 +212,26 @@ export default function InterviewPage() {
           </Card>
         )}
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-4">
-            <Card className="overflow-hidden">
-              <div className="relative aspect-video bg-bg-card">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className={cn(
-                    "h-full w-full object-cover transition-opacity",
-                    videoEnabled && !isPaused ? "opacity-100" : "opacity-0"
-                  )}
+          <Card title="Interview Recording Playback" description="Review a local interview video with WebVTT captions.">
+            <VideoPlayer />
+          </Card>
+
+          <Card title="Audio Visualization">
+            <div className="flex items-end gap-[2px] h-16">
+              {audioLevels.map((level, i) => (
+                <div
+                  key={i}
+                  className="flex-1 rounded-t transition-all duration-75"
+                  style={{
+                    height: `${Math.max(2, (level / maxLevel) * 100)}%`,
+                    backgroundColor:
+                      level / maxLevel > 0.7
+                        ? "#ef4444"
+                        : level / maxLevel > 0.4
+                          ? "#f59e0b"
+                          : "#6366f1",
+                    opacity: isLive ? 1 : 0.3,
+                  }}
                 />
                 {!videoEnabled && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-muted">
