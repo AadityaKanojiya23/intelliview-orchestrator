@@ -72,6 +72,7 @@ from orchestrator.health_monitor import HealthMonitor
 from orchestrator.interview_templates import InterviewTemplateManager
 from orchestrator.load_balancer import BalancingStrategy, LoadBalancer
 from orchestrator.logging_config import configure_logging, log_event
+from orchestrator.notification_manager import NotificationManager
 from orchestrator.question_bank import QuestionBank
 from orchestrator.rate_limiter import RateLimiterMiddleware
 from orchestrator.redis_client import (
@@ -331,6 +332,7 @@ metrics_collector = MetricsCollector()
 question_bank = QuestionBank()
 candidate_manager = CandidateManager()
 interview_template_manager = InterviewTemplateManager()
+notification_manager = NotificationManager()
 
 # Register dashboard routes
 dashboard_routes = create_dashboard_routes(
@@ -377,6 +379,28 @@ class StartInterviewRequest(BaseModel):
     @classmethod
     def _strip_optional(cls, v):
         return v.strip() if isinstance(v, str) else v
+
+
+class CreateNotificationRequest(BaseModel):
+    user_id: str = Field(min_length=1, max_length=255)
+    message: str = Field(min_length=1, max_length=500)
+
+    @field_validator("message")
+    @classmethod
+    def validate_message(cls, value: str):
+        value = value.strip()
+        if not value:
+            raise ValueError("Message cannot be empty.")
+        return value
+
+
+class NotificationResponse(BaseModel):
+    id: int
+    user_id: str
+    message: str
+    read: bool
+    created_at: datetime
+    model_config = {"from_attributes": True}
 
 
 class WorkerRegistrationRequest(BaseModel):
@@ -1031,6 +1055,83 @@ async def get_task_status(
     except Exception as e:
         logger.error(f"Error fetching task status for {task_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching task status: {e}")
+
+
+# ========== Notification Center Endpoints ==========
+
+
+@app.post("/notifications", response_model=NotificationResponse)
+async def create_notification(request: CreateNotificationRequest):
+    """
+    Create a new notification.
+    """
+
+    notification = notification_manager.create_notification(
+        user_id=request.user_id,
+        message=request.message,
+    )
+
+    return NotificationResponse(
+        id=notification.id,
+        user_id=notification.user_id,
+        message=notification.message,
+        read=notification.read,
+        created_at=notification.created_at,
+    )
+
+
+@app.get("/notifications", response_model=list[NotificationResponse])
+async def get_notifications(
+    user_id: str,
+    skip: int = 0,
+    limit: int = 20,
+):
+    """
+    Get all notifications for a user.
+    """
+
+    notifications = notification_manager.get_notifications(
+        user_id=user_id,
+        skip=skip,
+        limit=limit,
+    )
+
+    return [
+        NotificationResponse(
+            id=notification.id,
+            user_id=notification.user_id,
+            message=notification.message,
+            read=notification.read,
+            created_at=notification.created_at,
+        )
+        for notification in notifications
+    ]
+
+
+@app.patch("/notifications/{notification_id}/read", response_model=NotificationResponse)
+async def mark_notification_as_read(notification_id: int, user_id: str):
+    """
+    Mark a notification as read.
+    """
+
+    notification = notification_manager.mark_as_read(
+        notification_id=notification_id,
+        user_id=user_id,
+    )
+
+    if notification is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Notification not found",
+        )
+
+    return NotificationResponse(
+        id=notification.id,
+        user_id=notification.user_id,
+        message=notification.message,
+        read=notification.read,
+        created_at=notification.created_at,
+    )
 
 
 # ========== Session Tracking Endpoints ==========
