@@ -35,6 +35,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
+from orchestrator.middleware.capacity_guard import CapacityGuardMiddleware
 
 from config import (
     API_TOKEN,
@@ -259,6 +260,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(RequestContextMiddleware)
+app.add_middleware(CapacityGuardMiddleware)
 
 # CORS — configurable via env. Default "*" is for local dev only.
 _cors_origins = (
@@ -712,6 +714,11 @@ async def start_interview(
         # Check if system can accept task
         if not scheduler.can_accept_task():
             logger.warning(f"System at capacity, queuing task: {session_id}")
+            raise HTTPException(
+                status_code=503,
+                detail="All workers at capacity, please retry shortly.",
+                headers={"Retry-After": "5"},
+            )
 
         # Use scheduler to intelligently assign task
         scheduler.schedule_task(session_id, priority=priority)
