@@ -16,6 +16,7 @@ import logging
 import socket
 import time
 from datetime import datetime, timezone
+import redis
 
 from celery import chord, group
 from sqlalchemy import select
@@ -45,6 +46,8 @@ from workers.celery_app import celery_app
 from workers.evaluation_pipeline import evaluate_answers
 from workers.risk_engine import RiskScoringEngine
 from cv_service.client import CVClient
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -341,8 +344,6 @@ def process_interview_session(self, session_id):
 # ---------------------------------------------------------------------------
 # Celery Beat: periodic retry scanner
 # ---------------------------------------------------------------------------
-
-
 @celery_app.task(name="workers.tasks.scan_and_dispatch_retries")
 def scan_and_dispatch_retries():
     """Scan Redis for retry entries whose ``retry_after`` timestamp has
@@ -355,23 +356,36 @@ def scan_and_dispatch_retries():
     try:
         cursor = 0
         dispatched = 0
+
         while True:
-            cursor, keys = redis_client.scan(cursor, match=f"{retry_scheduled_prefix}*", count=50)
+            cursor, keys = redis_client.scan(
+                cursor,
+                match=f"{retry_scheduled_prefix}*",
+                count=50,
+            )
+
             for key in keys:
                 try:
+                    # Ignore processing locks
+                    if key.endswith(":processing"):
+                        continue
+
                     raw = redis_client.get(key)
                     if not raw:
                         continue
+
                     data = json.loads(raw)
+
                     retry_after_str = data.get("retry_after")
                     if not retry_after_str:
                         continue
+
                     retry_after = datetime.fromisoformat(retry_after_str)
                     if retry_after.tzinfo is None:
                         retry_after = retry_after.replace(tzinfo=timezone.utc)
 
                     if datetime.now(timezone.utc) < retry_after:
-                        continue  # not due yet
+                        continue
 
                     session_id = data.get("session_id")
                     if not session_id:
@@ -380,21 +394,59 @@ def scan_and_dispatch_retries():
                     from orchestrator.scheduler import Scheduler, TaskPriority
 
                     scheduler = Scheduler()
-                    scheduler.schedule_task(session_id, priority=TaskPriority.MEDIUM)
-                    dispatched += 1
+                    processing_key = f"{key}:processing"
 
-                    redis_client.delete(key)
-                    logger.info("Dispatched retry for session %s", session_id)
+                    try:
+                        redis_client.raw.rename(key, processing_key)
+                    except redis.ResponseError:
+                        # Key was already claimed by another worker or deleted
+                        continue
+
+                    try:
+                        success = scheduler.schedule_task(
+                            session_id,
+                            priority=TaskPriority.MEDIUM,
+                        )
+
+                        if success:
+                            dispatched += 1
+                            # Clean up claim upon successful schedule
+                            redis_client.delete(processing_key)
+                            logger.info(
+                                "Dispatched retry for session %s",
+                                session_id,
+                            )
+                        else:
+                            
+                            redis_client.raw.rename(processing_key, key)
+
+                    except Exception:
+                        
+                        try:
+                            redis_client.raw.rename(processing_key, key)
+                        except Exception:
+                            logger.exception(
+                                "Failed to restore retry key %s",
+                                key,
+                            )
+                        raise
 
                 except Exception as exc:
-                    logger.debug("Error processing retry key %s: %s", key, exc)
+                    logger.debug(
+                        "Error processing retry key %s: %s",
+                        key,
+                        exc,
+                    )
                     continue
 
             if cursor == 0:
                 break
 
         if dispatched:
-            logger.info("Scan-and-dispatch complete: %d retries dispatched", dispatched)
+            logger.info(
+                "Scan-and-dispatch complete: %d retries dispatched",
+                dispatched,
+            )
 
     except Exception as exc:
         logger.error("scan_and_dispatch_retries failed: %s", exc)
