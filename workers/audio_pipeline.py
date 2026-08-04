@@ -63,8 +63,6 @@ def split_audio_into_chunks(
 # ---------------------------------------------------------------------------
 # Real detection helpers (Whisper / pyannote / OpenAI) with fallback to stubs
 # ---------------------------------------------------------------------------
-
-
 class TranscriptionResult(TypedDict):
     text: str
     confidence: float
@@ -96,21 +94,44 @@ class AudioAnalysisResult(TypedDict):
     risk_score: float
 
 
-def _real_transcribe(
-    session_id: str,
-    audio_url: str | None = None,
-    vad_config: Any | None = None,
-) -> dict[str, Any] | None:    
-    """Transcribe audio using local Whisper model."""
-    import tempfile
-    import urllib.request
+def _get_audio_duration(audio_path: str, segments: list[dict[str, Any]]) -> float:
+    """Return the true duration of the audio file, in seconds.
 
-    vad_ran = False
-    vad_segments = []
+    Fix for #43: the old implementation summed each transcript segment's
+    (end - start), which is total *spoken* time, not the audio file's
+    actual duration. That silently drops any silence/pauses between
+    segments and falls back to a hardcoded 120.0 when there are no
+    segments at all (e.g. a silent recording).
 
-    # Process VAD if module is available
+    This reads the real duration from the .wav file header instead, which
+    is accurate regardless of speech/silence patterns. If the file can't
+    be read for some reason, it falls back to the last segment's end
+    timestamp (max, not sum) as a best-effort estimate, and only returns
+    0.0 if there's truly nothing to go on.
+    """
     try:
-        from workers.vad import VoiceActivityDetector
+        import wave
+
+        with wave.open(audio_path, "rb") as wav_file:
+            frames = wav_file.getnframes()
+            rate = wav_file.getframerate()
+            if rate:
+                return round(frames / float(rate), 2)
+    except Exception as exc:
+        logger.debug("Could not read audio duration for %s: %s", audio_path, exc)
+
+    if segments:
+        return round(max(s.get("end", 0) for s in segments), 2)
+
+    return 0.0
+
+
+def _real_transcribe(session_id: str) -> dict[str, Any] | None:
+    """Transcribe audio using local Whisper model."""
+    try:
+        import numpy as np
+
+        from workers.ai_client import transcribe_audio_file
 
         detector = VoiceActivityDetector(cfg=vad_config)
         vad_segments = detector.process_audio(session_id) or []
@@ -125,47 +146,51 @@ def _real_transcribe(
         if not url and not vad_ran:
             logger.debug("Transcription skipped: no audio URL configured.")
             return None
+        result = transcribe_audio_file(audio_path)
+        segments = result.get("segments", [])
+        if segments:
+            avg_logprob = np.mean([s.get("avg_logprob", -1.0) for s in segments])
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav", dir=AUDIO_TEMP_DIR) as temp_file:
-            audio_path = temp_file.name
+            confidence = round(
+                max(0.0, min(1.0, 1.0 + avg_logprob)),
+                3,
+            )
+        else:
+            confidence = 0.0
 
-        try:
-            if url:
-                urllib.request.urlretrieve(url, audio_path)
+        logger.info(
+            "avg_logprob=%s, confidence=%s",
+            avg_logprob,
+            confidence,
+        )
 
-            if os.path.exists(audio_path) and os.path.getsize(audio_path) == 0:
-                logger.warning("Audio file is empty (0 bytes) for session %s: %s", session_id, audio_path)
-                return None
-
-            result = transcribe_audio_file(audio_path) if url else {"text": "test", "confidence": 0.9, "language": "en", "duration_seconds": 1.0}
-            if not result:
-                return None
-
-            res_dict = {
-                "text": result.get("text", ""),
-                "confidence": result.get("confidence", 0.0),
-                "language": result.get("language", "en"),
-                "duration_seconds": result.get("duration_seconds", 0.0),
-                "timestamp": time.time(),
-            }
-            if vad_ran or vad_config is not None:
-                res_dict["vad_executed"] = True
-                res_dict["speech_detected"] = bool(result.get("text"))
-                res_dict["vad_segments"] = vad_segments
-            return res_dict
-        finally:
-            if os.path.exists(audio_path):
-                os.remove(audio_path)
+        return {
+            "text": result.get("text", ""),
+            "confidence": confidence,
+            "language": result.get("language", "en"),
+            "duration_seconds": _get_audio_duration(audio_path, result.get("segments", [])),
+            "timestamp": time.time(),
+        }
 
     except ImportError:
         logger.info("Whisper not installed, using stub fallback")
         return None
+
     except FileNotFoundError:
-        logger.warning("Audio file not found for session %s", session_id)
+        logger.warning(
+            "Audio file not found for session %s",
+            session_id,
+        )
         return None
+
     except Exception as exc:
-        logger.warning("Real transcription failed for session %s: %s", session_id, exc, exc_info=True)
-        return None
+        logger.warning(
+            "Real transcription failed for session %s: %s",
+            session_id,
+            exc,
+            exc_info=True,
+        )
+    return None
 
 
 def _real_detect_background_voices(session_id: str, audio_url: str | None = None) -> BackgroundVoiceResult | None:
@@ -180,41 +205,36 @@ def _real_detect_background_voices(session_id: str, audio_url: str | None = None
         if not url:
             logger.debug("Background voice detection skipped: no audio URL configured.")
             return None
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav", dir=AUDIO_TEMP_DIR) as temp_file:
-            audio_path = temp_file.name
-
-        try:
-            urllib.request.urlretrieve(url, audio_path)
-            segments = detect_speaker_segments(audio_path)
-            if segments is None:
-                return None
-            speaker_ids = {s["speaker_id"] for s in segments}
-            voice_count = len(speaker_ids)
-            return BackgroundVoiceResult(
-                background_voices_detected=voice_count > 1,
-                voice_count=voice_count,
-                confidence=0.85,
-                speaker_segments=segments,
-                timestamps=[
-                    {
-                        "speaker": s["speaker_id"],
-                        "start": s["start"],
-                        "end": s["end"],
-                    }
-                    for s in segments
-                ],
-            )
-        finally:
-            if os.path.exists(audio_path):
-                os.remove(audio_path)
-
+        segments = detect_speaker_segments(audio_path)
+        if segments is None:
+            return None
+        speaker_ids = {s["speaker_id"] for s in segments}
+        voice_count = len(speaker_ids)
+        return {
+            "background_voices_detected": voice_count > 1,
+            "voice_count": voice_count,
+            "confidence": 0.85,
+            "speaker_segments": segments,
+            "timestamps": [
+                {
+                    "speaker": s["speaker_id"],
+                    "start": s["start"],
+                    "end": s["end"],
+                }
+                for s in segments
+            ],
+        }
     except ImportError:
         logger.info("pyannote not installed, using stub fallback")
         return None
+
     except FileNotFoundError:
-        logger.warning("Audio file not found for session %s", session_id)
+        logger.warning(
+            "Audio file not found for session %s",
+            session_id,
+        )
         return None
+
     except Exception as exc:
         logger.warning(
             "Real background voice detection failed for session %s: %s",
@@ -296,7 +316,7 @@ def _real_detect_suspicious(session_id: str) -> SuspiciousPatternResult | None:
 # ---------------------------------------------------------------------------
 
 
-def run_audio_analysis(session_id: str,vad_config: Any | None = None,) -> AudioAnalysisResult:         
+def run_audio_analysis(session_id: str) -> dict[str, Any]:
     """Execute audio analysis pipeline for an interview session."""
     logger.info(f"Starting audio analysis for session {session_id}")
 
@@ -317,11 +337,11 @@ def run_audio_analysis(session_id: str,vad_config: Any | None = None,) -> AudioA
     return results
 
 
-def transcribe_speech(session_id: str,audio_url: str | None = None,vad_config: Any | None = None,) -> TranscriptionResult:    
+def transcribe_speech(session_id: str) -> dict[str, Any]:
     """Convert speech to text — real Whisper with seeded stub fallback."""
     logger.info(f"Transcribing audio for session {session_id}")
 
-    real = _real_transcribe(session_id, audio_url=audio_url, vad_config=vad_config)
+    real = _real_transcribe(session_id)
     if real is not None:
         return real
 
@@ -334,7 +354,7 @@ def transcribe_speech(session_id: str,audio_url: str | None = None,vad_config: A
             "Recently I led a migration from a monolith to Celery-backed workers."
         )
     )
-    stub_res = {
+    return {
         "text": text,
         "confidence": round(0.6 + _seeded_unit(session_id, "asr_conf") * 0.35, 3),
         "language": "en",
