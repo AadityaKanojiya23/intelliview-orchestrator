@@ -39,7 +39,9 @@ def create_template_routes(interview_template_manager) -> APIRouter:
     async def list_templates(interview_type: str | None = None, limit: int = 100):
         """List interview templates with optional type filter"""
         try:
-            templates = interview_template_manager.list_templates(interview_type=interview_type, limit=limit)
+            templates = interview_template_manager.list_templates(
+                interview_type=interview_type, limit=limit
+            )
             return {"count": len(templates), "templates": templates}
         except Exception as e:
             logger.error(f"Error listing templates: {e!s}")

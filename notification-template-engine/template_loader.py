@@ -76,7 +76,9 @@ def load_template(locale, event, format="txt"):
         file_path = os.path.join("templates", locale, f"{event}.txt")
 
     if not os.path.exists(file_path):
-        logging.warning(f"Template for locale '{locale}' not found. Falling back to English.")
+        logging.warning(
+            f"Template for locale '{locale}' not found. Falling back to English."
+        )
 
         if format == "html":
             file_path = os.path.join("templates", "en", "html", f"{event}.html")
@@ -84,7 +86,9 @@ def load_template(locale, event, format="txt"):
             file_path = os.path.join("templates", "en", f"{event}.txt")
 
     if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Template not found for event '{event}' with format '{format}'.")
+        raise FileNotFoundError(
+            f"Template not found for event '{event}' with format '{format}'."
+        )
 
     try:
         with open(file_path, "r", encoding="utf-8") as file:

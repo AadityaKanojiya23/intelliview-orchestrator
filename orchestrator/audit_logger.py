@@ -239,10 +239,14 @@ class AuditLogger:
         """Return recent audit events from the in-memory buffer."""
         return list(reversed(self._buffer[-limit:]))
 
-    def get_events_by_category(self, category: str, limit: int = 100) -> list[dict[str, Any]]:
+    def get_events_by_category(
+        self, category: str, limit: int = 100
+    ) -> list[dict[str, Any]]:
         """Filter recent events by category."""
         cat_key = self._get_category(category)
-        return [e for e in reversed(self._buffer) if e.get("category") == cat_key][:limit]
+        return [e for e in reversed(self._buffer) if e.get("category") == cat_key][
+            :limit
+        ]
 
     def export_events(
         self,

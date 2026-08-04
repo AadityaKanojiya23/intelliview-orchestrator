@@ -141,7 +141,10 @@ class TestNotificationSystem(unittest.TestCase):
 
         self.assertEqual(user.locale, "en")
         self.assertTrue(
-            any("Unsupported locale 'fr'. Falling back to English." in message for message in logs.output)
+            any(
+                "Unsupported locale 'fr'. Falling back to English." in message
+                for message in logs.output
+            )
         )
 
 

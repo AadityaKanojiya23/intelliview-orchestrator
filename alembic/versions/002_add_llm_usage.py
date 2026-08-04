@@ -17,7 +17,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("interview_sessions", sa.Column("llm_usage", sa.JSON(), nullable=True))
+    op.add_column(
+        "interview_sessions", sa.Column("llm_usage", sa.JSON(), nullable=True)
+    )
 
 
 def downgrade() -> None:

@@ -53,7 +53,9 @@ def test_create_interview_session(db_session):
 
 
 def test_create_question(db_session):
-    question = Question(question_id="q1", text="What is Python?", category="Python", difficulty="easy")
+    question = Question(
+        question_id="q1", text="What is Python?", category="Python", difficulty="easy"
+    )
 
     db_session.add(question)
     db_session.commit()
@@ -66,7 +68,9 @@ def test_create_question(db_session):
 
 
 def test_create_interview_template(db_session):
-    template = InterviewTemplate(template_id="t1", name="Python Interview", interview_type="technical")
+    template = InterviewTemplate(
+        template_id="t1", name="Python Interview", interview_type="technical"
+    )
 
     db_session.add(template)
     db_session.commit()

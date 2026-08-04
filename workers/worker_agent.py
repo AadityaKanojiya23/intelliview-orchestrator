@@ -43,7 +43,9 @@ class WorkerAgent:
         self.active_tasks = 0
 
         self.tasks_completed = 0  # track total completed tasks
-        self.max_tasks_before_restart = int(os.getenv("MAX_TASKS_BEFORE_RESTART", "100"))  # restart limit
+        self.max_tasks_before_restart = int(
+            os.getenv("MAX_TASKS_BEFORE_RESTART", "100")
+        )  # restart limit
         self._restart_requested = False  # restart flag
 
         self._stop = False
@@ -121,7 +123,9 @@ class WorkerAgent:
             # orchestrator's existing "active_tasks < capacity" check
             # to stop routing new work here, without needing any
             # orchestrator-side change.
-            reported_active_tasks = self.capacity if self.draining else self.active_tasks
+            reported_active_tasks = (
+                self.capacity if self.draining else self.active_tasks
+            )
 
             self._post(
                 "/worker/heartbeat",
@@ -132,7 +136,9 @@ class WorkerAgent:
             )
 
     def _handle_shutdown(self, signum, frame) -> None:
-        logger.info("Received signal %s, shutting down worker %s", signum, self.worker_id)
+        logger.info(
+            "Received signal %s, shutting down worker %s", signum, self.worker_id
+        )
         self._stop = True
         self.deregister()
 
@@ -173,7 +179,9 @@ class WorkerAgent:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
 
     api_url = os.getenv("API_URL", "http://fastapi:8000")
     worker_id = os.getenv("WORKER_ID", f"worker-{os.getpid()}")

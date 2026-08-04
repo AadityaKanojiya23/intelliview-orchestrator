@@ -96,6 +96,8 @@ def create_candidate_routes(candidate_manager) -> APIRouter:
             raise
         except Exception as e:
             logger.error(f"Error fetching candidate history: {e!s}")
-            raise HTTPException(status_code=500, detail="Error fetching candidate history")
+            raise HTTPException(
+                status_code=500, detail="Error fetching candidate history"
+            )
 
     return router

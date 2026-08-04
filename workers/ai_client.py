@@ -203,7 +203,9 @@ def gemini_generate(
 
         if hasattr(response, "usage_metadata") and response.usage_metadata:
             prompt_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
-            completion_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
+            completion_tokens = getattr(
+                response.usage_metadata, "candidates_token_count", 0
+            )
             total_tokens = getattr(response.usage_metadata, "total_token_count", 0)
 
         usage = _build_usage_dict(
@@ -257,7 +259,9 @@ def gemini_chat(
 
         if response and hasattr(response, "usage_metadata") and response.usage_metadata:
             prompt_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
-            completion_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
+            completion_tokens = getattr(
+                response.usage_metadata, "candidates_token_count", 0
+            )
             total_tokens = getattr(response.usage_metadata, "total_token_count", 0)
 
         usage = _build_usage_dict(
@@ -395,7 +399,9 @@ def transcribe_audio_file(
         for seg in speech_segments:
             samples = getattr(seg, "audio_samples", None)
             if samples is None and os.path.exists(audio_path):
-                raw_samples, sr = detector._load_samples(audio_path, detector.config.sample_rate)
+                raw_samples, sr = detector._load_samples(
+                    audio_path, detector.config.sample_rate
+                )
                 if len(raw_samples) > 0:
                     start_sec = getattr(
                         seg,
@@ -423,7 +429,9 @@ def transcribe_audio_file(
                 all_texts.append(seg_text)
 
             detected_language = seg_result.get("language", detected_language)
-            seg_start = getattr(seg, "start", seg.get("start", 0.0) if isinstance(seg, dict) else 0.0)
+            seg_start = getattr(
+                seg, "start", seg.get("start", 0.0) if isinstance(seg, dict) else 0.0
+            )
 
             for w_seg in seg_result.get("segments", []):
                 aligned_w_seg = dict(w_seg)
@@ -432,9 +440,13 @@ def transcribe_audio_file(
                 aligned_whisper_segments.append(aligned_w_seg)
 
         combined_text = " ".join(all_texts).strip()
-        vad_summary = [s.to_dict() if hasattr(s, "to_dict") else s for s in speech_segments]
+        vad_summary = [
+            s.to_dict() if hasattr(s, "to_dict") else s for s in speech_segments
+        ]
         speech_duration = sum(
-            getattr(s, "duration", s.get("duration", 0.0) if isinstance(s, dict) else 0.0)
+            getattr(
+                s, "duration", s.get("duration", 0.0) if isinstance(s, dict) else 0.0
+            )
             for s in speech_segments
         )
 
@@ -465,7 +477,9 @@ def detect_speaker_segments(audio_path: str) -> list[dict[str, Any]] | None:
         hypothesis = diarization(audio_path)
         segments = []
         for turn, _, speaker in hypothesis.itertracks(yield_label=True):
-            segments.append({"start": turn.start, "end": turn.end, "speaker_id": speaker})
+            segments.append(
+                {"start": turn.start, "end": turn.end, "speaker_id": speaker}
+            )
         return segments
     except Exception:
         return None
@@ -485,7 +499,9 @@ def _cuda_available() -> bool:
 # ---------------------------------------------------------------------------
 
 
-def detect_faces_in_frame(frame_bytes: bytes | None = None, frame_path: str = "") -> dict[str, Any] | None:
+def detect_faces_in_frame(
+    frame_bytes: bytes | None = None, frame_path: str = ""
+) -> dict[str, Any] | None:
     """Detect faces in a single frame using MediaPipe.
 
     Accepts raw bytes or a file path. Returns dict with face_count,
@@ -507,7 +523,9 @@ def detect_faces_in_frame(frame_bytes: bytes | None = None, frame_path: str = ""
             return None
 
         rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        with mp.solutions.face_detection.FaceDetection(model_selection=1, min_detection_confidence=0.5) as fd:
+        with mp.solutions.face_detection.FaceDetection(
+            model_selection=1, min_detection_confidence=0.5
+        ) as fd:
             results = fd.process(rgb)
             detections = []
             if results.detections:
@@ -528,7 +546,9 @@ def detect_faces_in_frame(frame_bytes: bytes | None = None, frame_path: str = ""
         return None
 
 
-def detect_hand_gaze(frame_bytes: bytes | None = None, frame_path: str = "") -> dict[str, Any] | None:
+def detect_hand_gaze(
+    frame_bytes: bytes | None = None, frame_path: str = ""
+) -> dict[str, Any] | None:
     """Detect hand/palm positions that may indicate phone use, using MediaPipe Hands."""
     if not HAS_MEDIAPIPE:
         return None

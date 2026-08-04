@@ -225,10 +225,14 @@ class LoadBalancer:
             for w in available:
                 wid = w["worker_id"]
                 configured_weight = w.get("weight", w["capacity"])
-                self._wrr_current_weights[wid] = self._wrr_current_weights.get(wid, 0) + configured_weight
+                self._wrr_current_weights[wid] = (
+                    self._wrr_current_weights.get(wid, 0) + configured_weight
+                )
 
             # Step 2: select worker with the highest current_weight
-            best = max(available, key=lambda w: self._wrr_current_weights[w["worker_id"]])
+            best = max(
+                available, key=lambda w: self._wrr_current_weights[w["worker_id"]]
+            )
 
             # Step 3: reduce selected worker's current_weight by total weight
             total_weight = sum(w.get("weight", w["capacity"]) for w in available)
@@ -246,10 +250,15 @@ class LoadBalancer:
         """
         current_time = time.time()
 
-        if self._worker_cache is None or current_time - self._cache_timestamp > self._cache_ttl:
+        if (
+            self._worker_cache is None
+            or current_time - self._cache_timestamp > self._cache_ttl
+        ):
             self._registry_lookup_count += 1
 
-            logger.debug(f"Refreshing worker cache (Registry Lookup #{self._registry_lookup_count})")
+            logger.debug(
+                f"Refreshing worker cache (Registry Lookup #{self._registry_lookup_count})"
+            )
             self._worker_cache = self.worker_registry.get_available_workers()
             self._cache_timestamp = current_time
 
