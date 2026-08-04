@@ -1,0 +1,83 @@
+[
+  {
+    "id": "int-101",
+    "candidate_name": "Alex Rivera",
+    "role": "Frontend Engineer",
+    "interviewer_name": "Sarah Connor",
+    "date": "2026-06-27",
+    "time": "10:00",
+    "status": "Scheduled"
+  },
+  {
+    "id": "int-102",
+    "candidate_name": "Jordan Smith",
+    "role": "Backend Engineer",
+    "interviewer_name": "Thomas Anderson",
+    "date": "2026-06-27",
+    "time": "14:00",
+    "status": "Scheduled"
+  },
+  {
+    "id": "int-103",
+    "candidate_name": "Taylor Chen",
+    "role": "Data Scientist",
+    "interviewer_name": "Dr. Angela Yu",
+    "date": "2026-06-28",
+    "time": "11:00",
+    "status": "Scheduled"
+  },
+  {
+    "id": "int-104",
+    "candidate_name": "Morgan Davis",
+    "role": "DevOps Engineer",
+    "interviewer_name": "Bruce Wayne",
+    "date": "2026-06-29",
+    "time": "09:30",
+    "status": "Scheduled"
+  },
+  {
+    "id": "int-105",
+    "candidate_name": "Sam Wilson",
+    "role": "Product Manager",
+    "interviewer_name": "Clark Kent",
+    "date": "2026-06-29",
+    "time": "15:00",
+    "status": "Scheduled"
+  },
+  {
+    "id": "int-106",
+    "candidate_name": "Casey Martinez",
+    "role": "QA Engineer",
+    "interviewer_name": "Diana Prince",
+    "date": "2026-06-30",
+    "time": "13:00",
+    "status": "Scheduled"
+  },
+  {
+    "id": "int-107",
+    "candidate_name": "Jamie Taylor",
+    "role": "UX Designer",
+    "interviewer_name": "Tony Stark",
+    "date": "2026-07-01",
+    "time": "10:30",
+    "status": "Scheduled"
+  },
+  {
+    "id": "int-108",
+    "candidate_name": "Robin Patel",
+    "role": "Security Engineer",
+    "interviewer_name": "Peter Parker",
+    "date": "2026-07-02",
+    "time": "16:00",
+    "status": "Scheduled"
+  },
+  {
+    "id": "int-1782560860912",
+    "candidate_name": "Sandeep Patel",
+    "role": "Developer",
+    "interviewer_name": "Ram Singh",
+    "date": "2026-06-28",
+    "time": "17:00",
+    "status": "Scheduled"
+  }
+]

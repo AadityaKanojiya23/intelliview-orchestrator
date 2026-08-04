@@ -1,0 +1,8 @@
+Hello {{name}},
+
+This is a reminder that your interview is scheduled on {{date}} at {{time}}.
+
+Please be available on time.
+
+Thank you,
+Interview Team

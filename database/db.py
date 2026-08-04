@@ -32,7 +32,11 @@ if DATABASE_SSLMODE and DATABASE_SSLMODE != "disable":
 
 engine = create_engine(DATABASE_URL, **_engine_kwargs)
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+)
 
 Base = declarative_base()
 
@@ -40,10 +44,15 @@ Base = declarative_base()
 def get_db():
     """
     FastAPI dependency that provides a database session.
-    Automatically closes the session after the request finishes.
+
+    Rolls back failed transactions and always closes the session.
     """
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        logger.exception("Database session failed; transaction rolled back")
+        raise
     finally:
         db.close()
