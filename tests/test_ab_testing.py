@@ -113,7 +113,10 @@ def test_same_session_used():
         sample_evaluation(),
     )
 
-    assert results["production_model"]["session_id"] == results["experimental_model"]["session_id"]
+    assert (
+        results["production_model"]["session_id"]
+        == results["experimental_model"]["session_id"]
+    )
 
 
 def test_comparison_contains_difference():

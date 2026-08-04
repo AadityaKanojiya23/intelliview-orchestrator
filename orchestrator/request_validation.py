@@ -103,7 +103,9 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                     )
                     return JSONResponse(
                         status_code=400,
-                        content={"detail": "Request contains invalid characters or patterns"},
+                        content={
+                            "detail": "Request contains invalid characters or patterns"
+                        },
                     )
 
         return await call_next(request)

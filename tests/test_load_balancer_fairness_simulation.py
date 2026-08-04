@@ -54,7 +54,8 @@ class SimulationRegistry:
         return [
             worker
             for worker in self.workers
-            if worker["status"] == "healthy" and worker["active_tasks"] < worker["capacity"]
+            if worker["status"] == "healthy"
+            and worker["active_tasks"] < worker["capacity"]
         ]
 
     def get_least_loaded_worker(self):

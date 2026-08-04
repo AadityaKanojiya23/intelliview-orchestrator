@@ -247,7 +247,9 @@ def create_dashboard_routes(
         try:
             logger.debug("Fetching performance metrics")
 
-            performance_metrics = metrics_collector.get_performance_metrics(session_tracker)
+            performance_metrics = metrics_collector.get_performance_metrics(
+                session_tracker
+            )
 
             return {
                 "status": "success",
@@ -309,7 +311,9 @@ def create_dashboard_routes(
     # ========== WebSocket Real-Time Metrics Endpoint ==========
 
     @router.websocket("/ws/metrics")
-    async def websocket_metrics(websocket: WebSocket, token: str | None = Query(default=None)):
+    async def websocket_metrics(
+        websocket: WebSocket, token: str | None = Query(default=None)
+    ):
         """
         WebSocket endpoint for real-time metrics push
 
@@ -350,8 +354,12 @@ def create_dashboard_routes(
                     try:
                         metrics = {
                             "system": metrics_collector.get_system_metrics(),
-                            "workers": metrics_collector.get_worker_metrics(worker_registry),
-                            "sessions": metrics_collector.get_session_metrics(session_tracker),
+                            "workers": metrics_collector.get_worker_metrics(
+                                worker_registry
+                            ),
+                            "sessions": metrics_collector.get_session_metrics(
+                                session_tracker
+                            ),
                         }
                         await ws_manager.send_to_connection(
                             websocket,

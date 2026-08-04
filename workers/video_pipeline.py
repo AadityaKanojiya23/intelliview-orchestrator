@@ -51,7 +51,9 @@ def _real_detect_face(session_id: str) -> dict[str, Any] | None:
         return {
             "faces_found": faces_found,
             "face_count": result["face_count"],
-            "confidence": round(max((f["confidence"] for f in result["faces"]), default=0.0), 3),
+            "confidence": round(
+                max((f["confidence"] for f in result["faces"]), default=0.0), 3
+            ),
             "bounding_boxes": result["faces"],
             "timestamp": time.time(),
         }
@@ -60,7 +62,9 @@ def _real_detect_face(session_id: str) -> dict[str, Any] | None:
         return None
 
 
-def _real_detect_head_movement(session_id: str, video_url: str | None = None) -> dict[str, Any] | None:
+def _real_detect_head_movement(
+    session_id: str, video_url: str | None = None
+) -> dict[str, Any] | None:
     """Detect gaze deviation using MediaPipe face mesh landmarks.
 
     Accepts a ``video_url`` pointing to the candidate's video stream.
@@ -107,7 +111,9 @@ def _real_detect_head_movement(session_id: str, video_url: str | None = None) ->
             return None
 
         rgb = cv2.cvtColor(frames[-1], cv2.COLOR_BGR2RGB)
-        with mp.solutions.face_mesh.FaceMesh(static_image_mode=True, min_detection_confidence=0.5) as mesh:
+        with mp.solutions.face_mesh.FaceMesh(
+            static_image_mode=True, min_detection_confidence=0.5
+        ) as mesh:
             results = mesh.process(rgb)
             if not results.multi_face_landmarks:
                 return {
@@ -166,7 +172,9 @@ def _real_detect_multiple_persons(session_id: str) -> dict[str, Any] | None:
         return {
             "multiple_persons_detected": count > 1,
             "person_count": count,
-            "detection_confidence": round(max((f["confidence"] for f in result["faces"]), default=0.0), 3),
+            "detection_confidence": round(
+                max((f["confidence"] for f in result["faces"]), default=0.0), 3
+            ),
             "timestamp": time.time(),
         }
     except Exception as exc:

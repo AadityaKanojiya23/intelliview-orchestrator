@@ -98,7 +98,9 @@ class CandidateManager:
         db = SessionLocal()
         try:
             rows = (
-                db.execute(select(Candidate).order_by(Candidate.created_at.desc()).limit(limit))
+                db.execute(
+                    select(Candidate).order_by(Candidate.created_at.desc()).limit(limit)
+                )
                 .scalars()
                 .all()
             )
@@ -118,7 +120,9 @@ class CandidateManager:
         finally:
             db.close()
 
-    def update_candidate_score(self, candidate_id: str, session_id: str, score: float) -> bool:
+    def update_candidate_score(
+        self, candidate_id: str, session_id: str, score: float
+    ) -> bool:
         """Update candidate's running average score after an interview"""
         db = SessionLocal()
         try:
