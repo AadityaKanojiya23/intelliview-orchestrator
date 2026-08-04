@@ -1,33 +1,17 @@
 """Celery Application Setup.
-
 Initialises Celery with the Redis broker, sensible reliability defaults,
 and a `session_failed` signal that lets us mark the DB session as
-FAILED only after Celery has exhausted its retries (rather than on
-every transient exception).
+FAILED only after Celery has exhausted its retries.
 """
-"""
-# TODO:
- Separate worker deployment is pending.
- These queues prepare task routing for future deployment where:
- - interview queue will be processed by workers with
-   worker_prefetch_multiplier=1 for long-running tasks.
- - maintenance queue will be processed by dedicated workers with a
-   higher worker_prefetch_multiplier for short-running tasks.
 
 from celery import Celery, signals
-from kombu import Queue
+from opentelemetry.instrumentation.celery import CeleryInstrumentor
 
-"""
-from celery import Celery, signals
-from kombu import Queue
 from config import REDIS_URL
-from workers.metrics_server import start_worker_metrics
-
-
-
-
+from metrics.prometheus_metrics import TASKS_PERMANENTLY_FAILED
 
 celery_app = Celery("interview_tasks", broker=REDIS_URL, backend=REDIS_URL)
+CeleryInstrumentor().instrument()
 
 
 celery_app.conf.update(
@@ -43,12 +27,9 @@ celery_app.conf.update(
     task_soft_time_limit=25 * 60,  # 25 minutes soft limit
     task_acks_late=True,  # re-deliver if worker dies mid-task
     task_reject_on_worker_lost=True,
-
     # Long-running interview tasks should reserve only one task at a time
     worker_prefetch_multiplier=1,
-
     broker_connection_retry_on_startup=True,
-   
     # Periodic beat schedule — scan for due retries every 60 seconds
     beat_schedule={
         "scan-due-retries": {
@@ -95,6 +76,7 @@ def _extract_session_id(args: tuple, kwargs: dict) -> str | None:
 
 @signals.task_failure.connect
 def _on_task_failure(sender, task_id, exception, args, kwargs, traceback, einfo, **_extra):
+    print(f"HANDLER EXECUTED: {task_id}")
     """When a session-aware task fails permanently (retries exhausted), mark
     the session as FAILED so the dashboard reflects reality.
 
@@ -119,13 +101,30 @@ def _on_task_failure(sender, task_id, exception, args, kwargs, traceback, einfo,
         session_id = _extract_session_id(args, kwargs)
         if not session_id:
             return
-        SessionManager().mark_session_failed(session_id, f"Celery task exhausted retries: {exception!s}")
-        send_mock_email_alert.delay(session_id)
+        TASKS_PERMANENTLY_FAILED.inc()
+        SessionManager().mark_session_failed(
+            session_id,
+            f"Celery task exhausted retries: {exception!s}",
+        )
+
+        # TODO: enable notification task when implemented
+        # send_mock_email_alert.delay(session_id)
     except Exception as exc:
         # Don't let a signal handler crash the worker.
         import logging
 
         logging.getLogger(__name__).warning("task_failure handler failed: %s", exc)
+
+
+@celery_app.task(name="workers.tasks.send_mock_email_alert")
+def send_mock_email_alert(session_id: str) -> None:
+    """Mock email alert task — logs the notification.
+
+    In production this would call SendGrid / SES / etc.
+    """
+    import logging
+
+    logging.getLogger(__name__).info("Mock email alert sent for session %s", session_id)
 
 
 if __name__ == "__main__":
