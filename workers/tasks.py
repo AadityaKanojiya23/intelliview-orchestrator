@@ -33,6 +33,9 @@ from metrics.prometheus_metrics import (
     REDIS_HEALTH,
     RETRY_COUNT,
     RISK_SCORE,
+    TASKS_COMPLETED,
+    TASKS_RETRIED,
+    TASKS_STARTED,
     WORKERS_HEALTHY,
 )
 from orchestrator.redis_client import get_redis_client
@@ -195,6 +198,7 @@ def process_interview_session(self, session_id):
 
     task_name = self.name
     start_time = time.perf_counter()
+    TASKS_STARTED.inc()
 
     # Track currently active task tracking gauge
     CELERY_ACTIVE_TASKS.labels(task_name=task_name).inc()
@@ -299,6 +303,7 @@ def process_interview_session(self, session_id):
         CELERY_TASKS_PROCESSED_TOTAL.labels(task="process_interview_session").inc()
         logger.info("Incremented processed metric for %s", task_name)
 
+        TASKS_COMPLETED.inc()
         return {
             "session_id": session_id,
             "status": "processing_parallel",
@@ -319,6 +324,7 @@ def process_interview_session(self, session_id):
             exc,
             exc_info=True,
         )
+        TASKS_RETRIED.inc()
         RETRY_COUNT.inc()
         raise self.retry(exc=exc, countdown=retry_delay)
 

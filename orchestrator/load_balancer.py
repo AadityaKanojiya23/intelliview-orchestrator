@@ -11,6 +11,7 @@ import threading
 from enum import Enum
 from typing import Any
 
+from metrics.prometheus_metrics import SYSTEM_UTILIZATION
 from orchestrator.worker_registry import WorkerRegistry
 
 logger = logging.getLogger(__name__)
@@ -235,6 +236,7 @@ class LoadBalancer:
     def get_load_status(self) -> dict[str, Any]:
         """Get current system load status"""
         stats = self.worker_registry.get_worker_statistics()
+        SYSTEM_UTILIZATION.set(stats["capacity_utilization"] / 100)
         available_workers = len(self.worker_registry.get_available_workers())
 
         return {
