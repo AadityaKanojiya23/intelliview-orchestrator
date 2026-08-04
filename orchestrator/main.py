@@ -1130,24 +1130,37 @@ async def mark_notification_as_read(notification_id: int, user_id: str):
 
 
 # ========== Session Tracking Endpoints ==========
-
-
 @app.get("/active-sessions")
 @http_cache.cached("active-sessions", ttl=2)
 async def get_active_sessions(
-    session_db: Session = Depends(get_db),
+    status: str | None = None,
+    since: str | None = None,
+    sort_by: str | None = "start_time",
+    order: str | None = "desc",
 ):
     """
-    Get all currently active sessions
+    Get currently active sessions (CREATED, QUEUED, PROCESSING, ...).
 
-    Returns sessions in states: CREATED, QUEUED, PROCESSING
-
-    Returns:
-        dict: List of active sessions with brief details
+    Query params:
+        status: Optional single status to filter down to (e.g. "QUEUED").
+        since: Optional ISO 8601 datetime string; only sessions started
+            after this value are returned. Invalid values return a 400.
+        sort_by: Column to sort by (default "start_time").
+        order: "asc" or "desc" (default "desc").
     """
     try:
-        active = session_tracker.get_active_sessions()
+        active = session_tracker.get_active_sessions(
+            status=status,
+            since=since,
+            sort_by=sort_by,
+            order=order,
+        )
         return {"count": len(active), "sessions": active}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e),
+        )
     except Exception as e:
         logger.error(f"Error fetching active sessions: {e!s}")
         raise HTTPException(status_code=500, detail="Error fetching active sessions")
