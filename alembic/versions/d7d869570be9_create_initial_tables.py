@@ -38,9 +38,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("candidate_id"),
         sa.UniqueConstraint("email"),
     )
-    op.create_index(
-        op.f("ix_candidates_candidate_id"), "candidates", ["candidate_id"], unique=False
-    )
+    op.create_index(op.f("ix_candidates_candidate_id"), "candidates", ["candidate_id"], unique=False)
     op.create_table(
         "interview_sessions",
         sa.Column("session_id", sa.String(length=255), nullable=False),
@@ -115,12 +113,8 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("question_id"),
     )
-    op.create_index(
-        op.f("ix_questions_category"), "questions", ["category"], unique=False
-    )
-    op.create_index(
-        op.f("ix_questions_question_id"), "questions", ["question_id"], unique=False
-    )
+    op.create_index(op.f("ix_questions_category"), "questions", ["category"], unique=False)
+    op.create_index(op.f("ix_questions_question_id"), "questions", ["question_id"], unique=False)
     # ### end Alembic commands ###
 
 
@@ -130,19 +124,11 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_questions_question_id"), table_name="questions")
     op.drop_index(op.f("ix_questions_category"), table_name="questions")
     op.drop_table("questions")
-    op.drop_index(
-        op.f("ix_interview_templates_template_id"), table_name="interview_templates"
-    )
-    op.drop_index(
-        op.f("ix_interview_templates_interview_type"), table_name="interview_templates"
-    )
+    op.drop_index(op.f("ix_interview_templates_template_id"), table_name="interview_templates")
+    op.drop_index(op.f("ix_interview_templates_interview_type"), table_name="interview_templates")
     op.drop_table("interview_templates")
-    op.drop_index(
-        op.f("ix_interview_sessions_session_id"), table_name="interview_sessions"
-    )
-    op.drop_index(
-        op.f("ix_interview_sessions_candidate_id"), table_name="interview_sessions"
-    )
+    op.drop_index(op.f("ix_interview_sessions_session_id"), table_name="interview_sessions")
+    op.drop_index(op.f("ix_interview_sessions_candidate_id"), table_name="interview_sessions")
     op.drop_table("interview_sessions")
     op.drop_index(op.f("ix_candidates_candidate_id"), table_name="candidates")
     op.drop_table("candidates")

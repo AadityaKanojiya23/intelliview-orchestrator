@@ -10,9 +10,7 @@ class RiskMonitoringService:
     def log_prediction(db: Session, session_id: str, risk_level: str) -> None:
         """Saves the initial automated risk prediction."""
         try:
-            entry = RiskPredictionMonitoring(
-                session_id=session_id, predicted_risk_level=risk_level
-            )
+            entry = RiskPredictionMonitoring(session_id=session_id, predicted_risk_level=risk_level)
             db.add(entry)
             db.commit()
         except Exception:
@@ -48,12 +46,8 @@ class RiskMonitoringService:
         )
 
         total_high = query.count()
-        confirmed = query.filter(
-            RiskPredictionMonitoring.recruiter_outcome == "CONFIRM"
-        ).count()
-        false_positives = query.filter(
-            RiskPredictionMonitoring.is_false_positive == True
-        ).count()
+        confirmed = query.filter(RiskPredictionMonitoring.recruiter_outcome == "CONFIRM").count()
+        false_positives = query.filter(RiskPredictionMonitoring.is_false_positive == True).count()
 
         reviewed = confirmed + false_positives
         fp_rate = (false_positives / reviewed * 100) if reviewed > 0 else 0.0

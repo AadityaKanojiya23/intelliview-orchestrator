@@ -64,9 +64,7 @@ class WorkerRegistry:
                     logger.info("Worker Registry initialized with Pub/Sub Sync")
                 except RuntimeError:
                     # No running event loop (pytest/unit tests)
-                    logger.debug(
-                        "Skipping Pub/Sub listener because no event loop is running"
-                    )
+                    logger.debug("Skipping Pub/Sub listener because no event loop is running")
             else:
                 logger.warning("Worker Registry initialized WITHOUT Redis connection")
 
@@ -106,9 +104,7 @@ class WorkerRegistry:
         except Exception as exc:
             logger.warning("Could not hydrate worker registry from Redis: %s", exc)
 
-    def register_worker(
-        self, worker_id: str, capacity: int = 4, weight: int | None = None
-    ) -> bool:
+    def register_worker(self, worker_id: str, capacity: int = 4, weight: int | None = None) -> bool:
         """
         Private helper to alert other cluster nodes to sync memory updates
 
@@ -180,16 +176,10 @@ class WorkerRegistry:
             WORKERS_REGISTERED.set(len(self.local_workers))
 
             # Update healthy worker count
-            WORKERS_HEALTHY.set(
-                sum(1 for w in self.local_workers.values() if w["status"] == "healthy")
-            )
+            WORKERS_HEALTHY.set(sum(1 for w in self.local_workers.values() if w["status"] == "healthy"))
 
             # Update unhealthy worker count
-            WORKERS_UNHEALTHY.set(
-                sum(
-                    1 for w in self.local_workers.values() if w["status"] == "unhealthy"
-                )
-            )
+            WORKERS_UNHEALTHY.set(sum(1 for w in self.local_workers.values() if w["status"] == "unhealthy"))
 
             # Store capacity allocated to this worker
             WORKER_CAPACITY.labels(worker_id=worker_id).set(capacity)
@@ -197,9 +187,7 @@ class WorkerRegistry:
             # Initialize active task metric for the new worker
             WORKER_ACTIVE_TASKS.labels(worker_id=worker_id).set(0)
 
-            logger.info(
-                f"Registered worker: {worker_id} with capacity {capacity}, weight {effective_weight}"
-            )
+            logger.info(f"Registered worker: {worker_id} with capacity {capacity}, weight {effective_weight}")
             return True
 
         except Exception as e:
@@ -224,17 +212,13 @@ class WorkerRegistry:
                     return False
 
                 self.local_workers[worker_id]["status"] = status
-                self.local_workers[worker_id]["updated_at"] = datetime.now(
-                    timezone.utc
-                ).isoformat()
+                self.local_workers[worker_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
 
             # Update in Redis
             if self.redis_client:
                 key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
                 self.redis_client.hset(key, "status", status)
-                self.redis_client.hset(
-                    key, "updated_at", datetime.now(timezone.utc).isoformat()
-                )
+                self.redis_client.hset(key, "updated_at", datetime.now(timezone.utc).isoformat())
 
                 # Broadcast modification to other running cluster instances
                 self._trigger_sync_broadcast(worker_id)
@@ -261,9 +245,7 @@ class WorkerRegistry:
             has_changed = False
             with self.lock:
                 if worker_id not in self.local_workers:
-                    logger.warning(
-                        f"Received heartbeat from unknown worker: {worker_id}"
-                    )
+                    logger.warning(f"Received heartbeat from unknown worker: {worker_id}")
                     return False
 
                 old_worker = self.local_workers.get(worker_id)
@@ -277,18 +259,14 @@ class WorkerRegistry:
                     has_changed = True
 
                 self.local_workers[worker_id]["active_tasks"] = active_tasks
-                self.local_workers[worker_id]["last_heartbeat"] = datetime.now(
-                    timezone.utc
-                ).isoformat()
+                self.local_workers[worker_id]["last_heartbeat"] = datetime.now(timezone.utc).isoformat()
                 self.local_workers[worker_id]["status"] = "healthy"
 
             # Update in Redis
             if self.redis_client:
                 key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
                 self.redis_client.hset(key, "active_tasks", active_tasks)
-                self.redis_client.hset(
-                    key, "last_heartbeat", datetime.now(timezone.utc).isoformat()
-                )
+                self.redis_client.hset(key, "last_heartbeat", datetime.now(timezone.utc).isoformat())
                 self.redis_client.hset(key, "status", "healthy")
 
                 # Also store heartbeat timestamp
@@ -304,16 +282,10 @@ class WorkerRegistry:
             WORKER_ACTIVE_TASKS.labels(worker_id=worker_id).set(active_tasks)
 
             # Refresh healthy worker metric after heartbeat
-            WORKERS_HEALTHY.set(
-                sum(1 for w in self.local_workers.values() if w["status"] == "healthy")
-            )
+            WORKERS_HEALTHY.set(sum(1 for w in self.local_workers.values() if w["status"] == "healthy"))
 
             # Refresh unhealthy worker metric after heartbeat
-            WORKERS_UNHEALTHY.set(
-                sum(
-                    1 for w in self.local_workers.values() if w["status"] == "unhealthy"
-                )
-            )
+            WORKERS_UNHEALTHY.set(sum(1 for w in self.local_workers.values() if w["status"] == "unhealthy"))
 
             return True
 
@@ -381,9 +353,7 @@ class WorkerRegistry:
         worker["penalty_weight"] = max(0.2, worker["penalty_weight"] - 0.2)
 
         # Penalty lasts for 60 seconds
-        worker["penalty_until"] = (
-            datetime.now(timezone.utc) + timedelta(seconds=60)
-        ).isoformat()
+        worker["penalty_until"] = (datetime.now(timezone.utc) + timedelta(seconds=60)).isoformat()
 
     if self.redis_client:
         key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
@@ -466,10 +436,7 @@ def get_worker_weight(self, worker: dict[str, Any]) -> float:
         available = []
         with self.lock:
             for worker in self.local_workers.values():
-                if (
-                    worker["status"] == "healthy"
-                    and worker["active_tasks"] < worker["capacity"]
-                ):
+                if worker["status"] == "healthy" and worker["active_tasks"] < worker["capacity"]:
                     available.append(worker)
 
         return available
@@ -492,19 +459,11 @@ def get_worker_weight(self, worker: dict[str, Any]) -> float:
         """Get overall worker registry statistics"""
         with self.lock:
             total_workers = len(self.local_workers)
-            healthy_workers = sum(
-                1 for w in self.local_workers.values() if w["status"] == "healthy"
-            )
+            healthy_workers = sum(1 for w in self.local_workers.values() if w["status"] == "healthy")
             total_capacity = sum(w["capacity"] for w in self.local_workers.values())
-            total_active_tasks = sum(
-                w["active_tasks"] for w in self.local_workers.values()
-            )
-            total_processed = sum(
-                w.get("total_tasks_processed", 0) for w in self.local_workers.values()
-            )
-            idle_workers = sum(
-                1 for w in self.local_workers.values() if w["active_tasks"] == 0
-            )
+            total_active_tasks = sum(w["active_tasks"] for w in self.local_workers.values())
+            total_processed = sum(w.get("total_tasks_processed", 0) for w in self.local_workers.values())
+            idle_workers = sum(1 for w in self.local_workers.values() if w["active_tasks"] == 0)
             active_loads = [w["active_tasks"] for w in self.local_workers.values()]
             avg_active = (total_active_tasks / total_workers) if total_workers else 0
 
@@ -530,11 +489,7 @@ def get_worker_weight(self, worker: dict[str, Any]) -> float:
                 "total_capacity": total_capacity,
                 "total_active_tasks": total_active_tasks,
                 "capacity_utilization": round(
-                    (
-                        (total_active_tasks / total_capacity * 100)
-                        if total_capacity > 0
-                        else 0
-                    ),
+                    ((total_active_tasks / total_capacity * 100) if total_capacity > 0 else 0),
                     2,
                 ),
                 "total_tasks_processed": total_processed,
@@ -585,9 +540,7 @@ def get_worker_weight(self, worker: dict[str, Any]) -> float:
 
     if worker["failure_count"] >= 3:
         worker["penalty_weight"] = 0.5
-        worker["penalty_until"] = (
-            datetime.now(timezone.utc) + timedelta(minutes=5)
-        ).isoformat()
+        worker["penalty_until"] = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
 
     def clear_penalty(self, worker_id: str):
         worker = self.local_workers.get(worker_id)
@@ -654,15 +607,9 @@ def record_failure(self, worker_id: str):
             WORKERS_REGISTERED.set(len(self.local_workers))
             CURRENT_WORKERS.set(len(self.local_workers))
 
-            WORKERS_HEALTHY.set(
-                sum(1 for w in self.local_workers.values() if w["status"] == "healthy")
-            )
+            WORKERS_HEALTHY.set(sum(1 for w in self.local_workers.values() if w["status"] == "healthy"))
 
-            WORKERS_UNHEALTHY.set(
-                sum(
-                    1 for w in self.local_workers.values() if w["status"] == "unhealthy"
-                )
-            )
+            WORKERS_UNHEALTHY.set(sum(1 for w in self.local_workers.values() if w["status"] == "unhealthy"))
 
             return True
         except Exception as e:

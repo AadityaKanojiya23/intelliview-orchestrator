@@ -196,9 +196,7 @@ class TestLlmGenerateQuestionIntegration:
                 result = _llm_generate_question("sess-bad")
 
         assert result is None
-        assert any(
-            "rejected" in msg.lower() for msg in caplog.messages
-        ), caplog.messages
+        assert any("rejected" in msg.lower() for msg in caplog.messages), caplog.messages
 
     def test_empty_llm_response_returns_none(self):
         from workers.evaluation_pipeline import _llm_generate_question

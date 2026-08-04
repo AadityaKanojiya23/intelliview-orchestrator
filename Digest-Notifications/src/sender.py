@@ -63,7 +63,9 @@ def send_digest_for_recipient(
     unsubscribe_url = build_unsubscribe_url(unsubscribe_base_url, recipient.user_id)
     html_body = render_digest_html(payload, unsubscribe_url=unsubscribe_url)
 
-    subject = f"Your {recipient.frequency.value.capitalize()} Interview Digest ({payload.total_count} upcoming)"
+    subject = (
+        f"Your {recipient.frequency.value.capitalize()} Interview Digest ({payload.total_count} upcoming)"
+    )
 
     result = email_sender.send_html_email(
         to_email=recipient.email,
