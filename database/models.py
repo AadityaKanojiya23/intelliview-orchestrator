@@ -89,6 +89,9 @@ class InterviewSession(Base):
     audio_analysis = Column(JSON, nullable=True)
     evaluation_analysis = Column(JSON, nullable=True)
 
+    # Token & cost usage tracking stored as JSON
+    llm_usage = Column(JSON, nullable=True, default=dict)
+
     # Interview Q&A tracking
     questions_asked = Column(JSON, nullable=True, default=list)
     answers_provided = Column(JSON, nullable=True, default=list)
@@ -217,32 +220,4 @@ class InterviewTemplate(Base):
     )
 
     def __repr__(self):
-        return (
-            f"<InterviewTemplate(template_id='{self.template_id}', "
-            f"name='{self.name}', "
-            f"type='{self.interview_type}')>"
-        )
-
-
-class Notification(Base):
-    """In-app notification"""
-
-    __tablename__ = "notifications"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-
-    user_id = Column(String(255), nullable=False, index=True)
-
-    message = Column(String(500), nullable=False)
-
-    read = Column(Boolean, nullable=False, default=False)
-
-    created_at = Column(DateTime, nullable=False, default=utcnow)
-
-    def __repr__(self):
-        return (
-            f"<Notification(id={self.id}, "
-            f"user_id='{self.user_id}', "
-            f"message='{self.message}', "
-            f"read={self.read})>"
-        )
+        return f"<InterviewTemplate(template_id='{self.template_id}', name='{self.name}', type='{self.interview_type}')>"
