@@ -11,7 +11,7 @@ import { Skeleton, ErrorState, EmptyState } from "@/components/States";
 import Sparkline from "@/components/Sparkline";
 import { formatPercent, formatRelative } from "@/lib/utils";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui";
-import React, { useState } from "react";
+import React from "react";
 import SortableHeader from "../components/SortableHeader";
 
 const MAX_SAMPLES = 20;
@@ -213,16 +213,6 @@ export default function OverviewPage() {
           </Table>
         )}
       </Card>
-        <tbody>
-          {workers.map((worker) => (
-            <tr key={worker.id}>
-              <td>{worker.name}</td>
-              <td>{worker.role}</td>
-              <td>{worker.salary}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-muted">

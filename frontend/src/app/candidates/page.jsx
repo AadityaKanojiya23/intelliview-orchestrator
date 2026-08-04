@@ -35,7 +35,6 @@ import {
   YAxis,
 } from "recharts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { cn } from "@/lib/utils";
 
 function useCandidateData() {
   const completed = useSWR("/completed-sessions?limit=100", { refreshInterval: 10000 });

@@ -25,8 +25,8 @@ export default function WorkersPage() {
       w.worker_id.toLowerCase().includes(q)
     );
   }, [workers.data?.workers, search]);
-     if (!workers.data?.workers) return [];
-     let data = workers.data.workers;
+  const sorted = useMemo(() => {
+    let data = filtered;
     if (search.trim()) {
       const q = search.toLowerCase();
       data = data.filter((w) =>
@@ -47,9 +47,6 @@ export default function WorkersPage() {
 
     return data;
   }, [workers.data?.workers, search, sortConfig]);
-    return workers.data.workers.filter((w) => w.worker_id.toLowerCase().includes(q));
-  }, [workers.data?.workers, search]);
-
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
