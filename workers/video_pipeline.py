@@ -32,7 +32,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-from workers._stubs import _seeded_unit  # noqa: E402
+from workers._stubs import _seeded_unit
 
 # ---------------------------------------------------------------------------
 # Real detection helpers (MediaPipe / OpenCV) with fallback to stubs

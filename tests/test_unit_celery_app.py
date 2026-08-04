@@ -48,7 +48,7 @@ def _install_stubs():
 _install_stubs()
 
 # Now we can safely import the module under test.
-from workers.celery_app import (  # noqa: E402
+from workers.celery_app import (
     _SESSION_TASK_NAMES,
     _extract_session_id,
     _on_task_failure,

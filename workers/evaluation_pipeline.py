@@ -21,7 +21,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-from workers._stubs import _seeded_unit  # noqa: E402
+from workers._stubs import _seeded_unit
 from workers.prompt_categorization import categorize_prompt
 
 # ---------------------------------------------------------------------------
@@ -482,8 +482,7 @@ def _llm_generate_question(
                 {
                     "role": "system",
                     "content": (
-                        f"Generate one challenging {topic} interview question. "
-                        "Return only the question."
+                        f"Generate one challenging {topic} interview question. Return only the question."
                     ),
                 },
                 {"role": "user", "content": "Generate one question."},

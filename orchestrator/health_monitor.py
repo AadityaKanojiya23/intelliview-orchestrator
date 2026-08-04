@@ -256,10 +256,7 @@ class HealthMonitor:
             # surface it as unhealthy so readiness/alerting can react.
             if fragmentation_info["fragmentation_status"] == HealthStatus.CRITICAL:
                 dep.healthy = False
-                dep.error = (
-                    f"Redis memory fragmentation ratio too high: "
-                    f"{fragmentation_info['fragmentation_ratio']}"
-                )
+                dep.error = f"Redis memory fragmentation ratio too high: {fragmentation_info['fragmentation_ratio']}"
             dep.last_check = datetime.now(timezone.utc).isoformat()
         except Exception as exc:
             dep.healthy = False

@@ -32,10 +32,10 @@ logger = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from config import get_settings  # noqa: E402
-from database.db import Base, SessionLocal, engine  # noqa: E402
-from database.models import InterviewSession  # noqa: E402
-from orchestrator.worker_registry import WorkerRegistry  # noqa: E402
+from config import get_settings
+from database.db import Base, SessionLocal, engine
+from database.models import InterviewSession
+from orchestrator.worker_registry import WorkerRegistry
 
 WORKER_FIXTURES = [
     {

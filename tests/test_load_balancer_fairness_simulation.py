@@ -125,7 +125,6 @@ def run_real_simulation(strategy):
     start_time = time.perf_counter()
 
     for _ in range(TOTAL_TASKS):
-
         worker = load_balancer.select_worker()
 
         assert worker is not None
@@ -157,7 +156,7 @@ def test_real_round_robin_10000_tasks():
     print(f"Total Tasks: {total_assigned}")
     print(f"Distribution: {dict(distribution)}")
     print(f"Fairness: {fairness * 100:.2f}%")
-    print(f"Execution Time: " f"{execution_time:.6f} seconds")
+    print(f"Execution Time: {execution_time:.6f} seconds")
 
     assert total_assigned == TOTAL_TASKS
 
@@ -181,7 +180,7 @@ def test_real_least_loaded_10000_tasks():
     print(f"Total Tasks: {total_assigned}")
     print(f"Distribution: {dict(distribution)}")
     print(f"Fairness: {fairness * 100:.2f}%")
-    print(f"Execution Time: " f"{execution_time:.6f} seconds")
+    print(f"Execution Time: {execution_time:.6f} seconds")
 
     assert total_assigned == TOTAL_TASKS
 
@@ -201,7 +200,6 @@ def test_real_load_balancer_no_tasks_lost():
     ]
 
     for strategy in strategies:
-
         distribution, _ = run_real_simulation(strategy)
 
         assert sum(distribution.values()) == TOTAL_TASKS
@@ -218,11 +216,9 @@ def test_real_distribution_accuracy():
     expected_tasks = TOTAL_TASKS / TOTAL_WORKERS
 
     for strategy in strategies:
-
         distribution, _ = run_real_simulation(strategy)
 
         for task_count in distribution.values():
-
             difference = abs(task_count - expected_tasks)
 
             accuracy = 1 - difference / expected_tasks

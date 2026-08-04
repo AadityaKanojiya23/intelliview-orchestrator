@@ -70,7 +70,6 @@ from routers.sessions import (  # noqa: F401 (re-exported for tests)
 )
 from routers.templates import create_template_routes
 from routers.workers import create_worker_routes
-from workers.evaluation_pipeline import _llm_generate_question
 
 # Configure logging after imports so startup messages are structured.
 configure_logging()

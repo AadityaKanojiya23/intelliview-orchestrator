@@ -26,7 +26,6 @@ threshold = 0.90
 
 # Compare current responses with baseline
 for test in tests:
-
     current = get_current_response(test["prompt"])
 
     score = similarity(test["expected"], current)

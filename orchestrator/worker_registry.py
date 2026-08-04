@@ -174,7 +174,7 @@ class WorkerRegistry:
                 # Broadcast modification to other running cluster instances
                 self._trigger_sync_broadcast(worker_id)
 
-            logger.info(f"Registered worker: {worker_id} " f"with capacity {capacity}")
+            logger.info(f"Registered worker: {worker_id} with capacity {capacity}")
 
             # Update total registered workers metric
             WORKERS_REGISTERED.set(len(self.local_workers))
@@ -593,7 +593,7 @@ def get_worker_weight(self, worker: dict[str, Any]) -> float:
         worker = self.local_workers.get(worker_id)
 
         if not worker:
-            return None
+            return
 
         worker["failure_count"] = 0
         worker["penalty_weight"] = 1.0
@@ -604,9 +604,7 @@ def get_worker_weight(self, worker: dict[str, Any]) -> float:
         penalty_until = worker.get("penalty_until")
 
     if penalty_until:
-
         if datetime.now(timezone.utc) > datetime.fromisoformat(penalty_until):
-
             worker["penalty_weight"] = 1.0
             worker["failure_count"] = 0
             worker["penalty_until"] = None

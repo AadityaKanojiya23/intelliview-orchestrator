@@ -319,7 +319,6 @@ def process_interview_session(self, session_id):
         )
 
     except Exception as exc:
-
         # Record worker failure
         registry.record_failure(worker_hostname)
 
