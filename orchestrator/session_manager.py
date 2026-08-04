@@ -130,7 +130,6 @@ class SessionManager:
             return session_id
 
         except Exception:
-            logger.error("Error creating session")
             session_db.rollback()
             raise
         finally:
@@ -179,19 +178,6 @@ class SessionManager:
             interview.status = new_status
             interview.updated_at = _utcnow()
             session_db.commit()
-            from metrics.prometheus_metrics import (
-                SESSIONS_ACTIVE,
-                SESSIONS_COMPLETED,
-                SESSIONS_FAILED,
-            )
-
-            if new_status == self.COMPLETED:
-                SESSIONS_COMPLETED.inc()
-                SESSIONS_ACTIVE.dec()
-
-            elif new_status == self.FAILED:
-                SESSIONS_FAILED.inc()
-                SESSIONS_ACTIVE.dec()
 
             # Update Redis cache
             session_data = self.state_sync.get_session_state(session_id)
@@ -210,7 +196,6 @@ class SessionManager:
             return True
 
         except Exception:
-            logger.error("Error updating session status")
             session_db.rollback()
             return False
         finally:
@@ -270,7 +255,7 @@ class SessionManager:
                 session_db.close()
 
         except Exception:
-            logger.error("Error retrieving session")
+            session_db.rollback()
             return None
 
     def mark_session_failed(self, session_id: str, error_message: str) -> bool:
@@ -284,14 +269,6 @@ class SessionManager:
         Returns:
             bool: True if successful
         """
-        from metrics.prometheus_metrics import (
-            SESSIONS_ACTIVE,
-            SESSIONS_FAILED,
-        )
-
-        SESSIONS_FAILED.inc()
-        print("SESSIONS_FAILED =", SESSIONS_FAILED._value.get())
-        SESSIONS_ACTIVE.dec()
         logger.warning(f"Marking session {session_id} as failed: {error_message}")
 
         return self.update_session_status(session_id, self.FAILED, {"error_message": error_message})
@@ -313,7 +290,6 @@ class SessionManager:
             interview.risk_score = risk_score
             interview.end_time = _utcnow()
             interview.updated_at = _utcnow()
-
             session_db.commit()
 
             # Update Redis
@@ -329,7 +305,6 @@ class SessionManager:
             return True
 
         except Exception:
-            logger.error("Error marking session completed")
             session_db.rollback()
             return False
         finally:

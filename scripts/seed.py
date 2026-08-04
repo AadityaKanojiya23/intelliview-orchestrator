@@ -153,11 +153,11 @@ def seed_sessions(reset: bool = False) -> None:
         db.commit()
         print(f"  + inserted {len(rows)} demo sessions")
     except Exception:
-        db.rollback()
-        logger.exception("Failed to seed demo sessions")
-        raise
+            db.rollback()
+            raise
     finally:
-        db.close()
+            db.close()
+
 
 
 def main() -> int:
