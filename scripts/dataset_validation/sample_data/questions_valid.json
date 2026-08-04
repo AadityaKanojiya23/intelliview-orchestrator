@@ -1,0 +1,6 @@
+[
+  {"question_id": "q_001", "text": "Describe your experience with distributed systems.", "category": "technical", "difficulty": "medium", "tags": ["systems"], "usage_count": 12, "avg_score": 78.5},
+  {"question_id": "q_002", "text": "Tell me about a time you disagreed with a teammate.", "category": "behavioral", "difficulty": "easy", "tags": ["teamwork"], "usage_count": 5, "avg_score": 82.0},
+  {"question_id": "q_003", "text": "How would you design a rate limiter for a public API?", "category": "technical", "difficulty": "hard", "tags": ["design"], "usage_count": 3, "avg_score": 65.2},
+  {"question_id": "q_004", "text": "What would you do if a production deploy broke checkout at 2am?", "category": "situational", "difficulty": "medium", "tags": ["ops"], "usage_count": 7, "avg_score": 70.0}
+]

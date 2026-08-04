@@ -1,5 +1,6 @@
 "use client";
 import { memo } from "react";
+import Button from './Button';
 import { Dialog, DialogContent, DialogTitle } from "@/components/Dialog";
 import Pipeline from "@/components/Pipeline";
 import { StatusBadge, Badge } from "@/components/Badge";
@@ -33,13 +34,14 @@ function SessionDetailImpl({ sessionId, onClose }) {
             </div>
             <div className="flex items-center gap-2">
               {data && <StatusBadge status={data.status} />}
-              <button
-                onClick={() => mutate()}
-                className="rounded-md border border-border bg-bg-card p-1.5 text-muted hover:text-zinc-200"
+             <Button
+                 variant="ghost"
+                size="icon"
+                 onClick={() => mutate()}
                 aria-label="Refresh"
               >
                 <RefreshCw size={12} />
-              </button>
+              </Button>
             </div>
           </div>
         </div>

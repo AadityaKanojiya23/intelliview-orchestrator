@@ -1,5 +1,4 @@
 """Celery Application Setup.
-
 Initialises Celery with the Redis broker, sensible reliability defaults,
 and a `session_failed` signal that lets us mark the DB session as
 FAILED only after Celery has exhausted its retries.
@@ -9,6 +8,7 @@ from celery import Celery, signals
 from opentelemetry.instrumentation.celery import CeleryInstrumentor
 
 from config import REDIS_URL
+from metrics.prometheus_metrics import TASKS_PERMANENTLY_FAILED
 
 celery_app = Celery("interview_tasks", broker=REDIS_URL, backend=REDIS_URL)
 CeleryInstrumentor().instrument()
@@ -76,6 +76,7 @@ def _extract_session_id(args: tuple, kwargs: dict) -> str | None:
 
 @signals.task_failure.connect
 def _on_task_failure(sender, task_id, exception, args, kwargs, traceback, einfo, **_extra):
+    print(f"HANDLER EXECUTED: {task_id}")
     """When a session-aware task fails permanently (retries exhausted), mark
     the session as FAILED so the dashboard reflects reality.
 
@@ -100,6 +101,7 @@ def _on_task_failure(sender, task_id, exception, args, kwargs, traceback, einfo,
         session_id = _extract_session_id(args, kwargs)
         if not session_id:
             return
+        TASKS_PERMANENTLY_FAILED.inc()
         SessionManager().mark_session_failed(
             session_id,
             f"Celery task exhausted retries: {exception!s}",
