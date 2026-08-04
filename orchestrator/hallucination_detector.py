@@ -25,8 +25,8 @@ swap in stronger, meaning-aware signals since hallucination detection
 needs semantic understanding, not just lexical overlap.
 """
 
-from dataclasses import dataclass, asdict
-from typing import Optional
+from dataclasses import asdict, dataclass
+
 import numpy as np
 
 
@@ -34,13 +34,15 @@ import numpy as np
 class HallucinationResult:
     source_context: str
     generated_response: str
-    semantic_similarity: float      # 0-1, higher = more topically aligned
-    entailment_score: float         # 0-1, higher = source supports the claim
-    contradiction_score: float      # 0-1, higher = source contradicts the claim
-    neutral_score: float            # 0-1, source neither confirms nor denies
-    hallucination_score: float      # 0-1, final combined score (higher = more likely hallucinated)
+    semantic_similarity: float  # 0-1, higher = more topically aligned
+    entailment_score: float  # 0-1, higher = source supports the claim
+    contradiction_score: float  # 0-1, higher = source contradicts the claim
+    neutral_score: float  # 0-1, source neither confirms nor denies
+    hallucination_score: (
+        float  # 0-1, final combined score (higher = more likely hallucinated)
+    )
     is_hallucination: bool
-    risk_level: str                 # "low" | "medium" | "high"
+    risk_level: str  # "low" | "medium" | "high"
     explanation: str
 
     def to_dict(self):
@@ -75,7 +77,7 @@ class HallucinationDetector:
 
         # Lazy imports so the module can be imported/tested without the
         # (heavy) ML deps installed unless evaluate() is actually called.
-        from sentence_transformers import SentenceTransformer, CrossEncoder
+        from sentence_transformers import CrossEncoder, SentenceTransformer
 
         self.embedder = SentenceTransformer(semantic_model_name)
         # CrossEncoder NLI models output logits for
@@ -109,7 +111,9 @@ class HallucinationDetector:
         return e_x / e_x.sum()
 
     # ---------- Combine into final score ----------
-    def evaluate(self, source_context: str, generated_response: str) -> HallucinationResult:
+    def evaluate(
+        self, source_context: str, generated_response: str
+    ) -> HallucinationResult:
         similarity = self._semantic_similarity(source_context, generated_response)
         nli = self._nli_scores(source_context, generated_response)
 
@@ -121,7 +125,9 @@ class HallucinationDetector:
         nli_risk = (nli["contradiction"] * 0.6) + (non_support * 0.4)
         similarity_risk = 1 - similarity
 
-        hallucination_score = (self.w_similarity * similarity_risk) + (self.w_nli * nli_risk)
+        hallucination_score = (self.w_similarity * similarity_risk) + (
+            self.w_nli * nli_risk
+        )
         hallucination_score = round(min(1.0, max(0.0, hallucination_score)), 4)
 
         is_hallucination = hallucination_score >= self.threshold
@@ -133,7 +139,9 @@ class HallucinationDetector:
         else:
             risk_level = "high"
 
-        explanation = self._build_explanation(similarity, nli, hallucination_score, risk_level)
+        explanation = self._build_explanation(
+            similarity, nli, hallucination_score, risk_level
+        )
 
         return HallucinationResult(
             source_context=source_context,

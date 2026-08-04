@@ -3,17 +3,15 @@ store.py — In-memory config store
 Simulates a database. Replace with SQLAlchemy/MongoDB adapter as needed.
 """
 
-from datetime import datetime, timezone
-from typing import Dict, Optional
 import uuid
+from datetime import datetime, timezone
 
-from models import RiskConfigCreate, RiskConfigUpdate, RiskConfigResponse, RiskWeights
-
+from models import RiskConfigCreate, RiskConfigResponse, RiskConfigUpdate, RiskWeights
 
 # Default fallback config — used when no job-specific config exists
 DEFAULT_WEIGHTS = RiskWeights()
 
-_store: Dict[str, dict] = {}
+_store: dict[str, dict] = {}
 
 
 def _now():
@@ -26,32 +24,35 @@ def _to_response(record: dict) -> RiskConfigResponse:
 
 # ── CRUD ──────────────────────────────────────────────────────────────────────
 
+
 def create_config(data: RiskConfigCreate) -> RiskConfigResponse:
     # Prevent duplicate job positions
     for record in _store.values():
         if record["job_position"].lower() == data.job_position.lower():
-            raise ValueError(f"Config for '{data.job_position}' already exists. Use PUT to update.")
+            raise ValueError(
+                f"Config for '{data.job_position}' already exists. Use PUT to update."
+            )
 
     config_id = str(uuid.uuid4())
     now = _now()
     record = {
-        "id":           config_id,
+        "id": config_id,
         "job_position": data.job_position,
-        "weights":      data.weights,
-        "description":  data.description,
-        "created_at":   now,
-        "updated_at":   now,
+        "weights": data.weights,
+        "description": data.description,
+        "created_at": now,
+        "updated_at": now,
     }
     _store[config_id] = record
     return _to_response(record)
 
 
-def get_config(config_id: str) -> Optional[RiskConfigResponse]:
+def get_config(config_id: str) -> RiskConfigResponse | None:
     record = _store.get(config_id)
     return _to_response(record) if record else None
 
 
-def get_config_by_position(job_position: str) -> Optional[RiskConfigResponse]:
+def get_config_by_position(job_position: str) -> RiskConfigResponse | None:
     for record in _store.values():
         if record["job_position"].lower() == job_position.lower():
             return _to_response(record)
@@ -62,7 +63,9 @@ def list_configs() -> list[RiskConfigResponse]:
     return [_to_response(r) for r in _store.values()]
 
 
-def update_config(config_id: str, data: RiskConfigUpdate) -> Optional[RiskConfigResponse]:
+def update_config(
+    config_id: str, data: RiskConfigUpdate
+) -> RiskConfigResponse | None:
     record = _store.get(config_id)
     if not record:
         return None

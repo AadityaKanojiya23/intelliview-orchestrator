@@ -32,7 +32,6 @@ class OverrideRule(ABC):
             "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
             or None if the rule does not apply.
         """
-        pass
 
 
 class MultiplePersonsRule(OverrideRule):

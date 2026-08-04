@@ -11,12 +11,10 @@ Pipeline:
 
 from __future__ import annotations
 
-import json
 import logging
 import socket
 import time
 from datetime import datetime, timezone
-import redis
 
 from celery import group
 from celery.exceptions import TimeoutError
@@ -25,27 +23,19 @@ from sqlalchemy import select
 from database.db import SessionLocal
 from database.models import InterviewSession
 from monitoring.prometheus_metrics import (
-    CELERY_ACTIVE_TASKS,
-    CELERY_TASK_RUNTIME,
-    CELERY_TASKS_PROCESSED_TOTAL,  # Updated custom counter
     FAILURE_COUNT,
     PIPELINE_LATENCY,
     POSTGRES_HEALTH,
-    QUEUE_DEPTH,
     REDIS_HEALTH,
     RETRY_COUNT,
     RISK_SCORE,
     WORKERS_HEALTHY,
 )
-from orchestrator.redis_client import get_redis_client
 from orchestrator.session_manager import SessionManager
 from orchestrator.state_sync import StateSynchronizer
 from workers.celery_app import celery_app
 from workers.evaluation_pipeline import evaluate_answers
 from workers.risk_engine import RiskScoringEngine
-from cv_service.client import CVClient
-
-
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +46,7 @@ state_sync = StateSynchronizer()
 # ---------------------------------------------------------------------------
 # Helper methods
 # ---------------------------------------------------------------------------
+
 
 def _get_session_state(session_id: str) -> dict:
     """Get session state from the state synchronizer."""
@@ -74,6 +65,7 @@ def _update_session_state(session_id: str, **kwargs):
 # Helper to set background infrastructure health states
 # ---------------------------------------------------------------------------
 
+
 def _update_infra_health(healthy: bool = True):
     """Sets system infrastructure gauges to reflect live operations."""
     state = 1.0 if healthy else 0.0
@@ -86,7 +78,6 @@ def _update_infra_health(healthy: bool = True):
 # Individual stage tasks
 # ---------------------------------------------------------------------------
 
-from cv_service.client import CVClient
 
 
 @celery_app.task(bind=True, max_retries=3, name="workers.tasks._run_video")
@@ -149,14 +140,18 @@ def _after_parallel(self, session_id: str, video_result: dict, audio_result: dic
     """Runs after video + audio group completes; then evaluation + risk."""
     try:
         logger.info("Parallel video+audio done for %s - running evaluation", session_id)
-        session_manager.update_session_status(session_id, session_manager.EVALUATING, {"stage": "evaluation"})
+        session_manager.update_session_status(
+            session_id, session_manager.EVALUATING, {"stage": "evaluation"}
+        )
 
         start = time.perf_counter()
         evaluation_result = evaluate_answers(session_id)
 
         latency = time.perf_counter() - start
         PIPELINE_LATENCY.labels(stage="evaluation").observe(latency)
-        logger.info("Answer evaluation completed for session %s in %.2fs", session_id, latency)
+        logger.info(
+            "Answer evaluation completed for session %s in %.2fs", session_id, latency
+        )
 
         risk_report = RiskScoringEngine.generate_risk_report(
             session_id, video_result, audio_result, evaluation_result
@@ -165,13 +160,17 @@ def _after_parallel(self, session_id: str, video_result: dict, audio_result: dic
         RISK_SCORE.observe(final_risk_score)
 
         risk_classification = risk_report["risk_classification"]
-        logger.info("Risk report: %s (score: %s)", risk_classification, final_risk_score)
+        logger.info(
+            "Risk report: %s (score: %s)", risk_classification, final_risk_score
+        )
 
         now = datetime.now(timezone.utc)
         db_session = SessionLocal()
         try:
             interview = db_session.execute(
-                select(InterviewSession).where(InterviewSession.session_id == session_id)
+                select(InterviewSession).where(
+                    InterviewSession.session_id == session_id
+                )
             ).scalar_one_or_none()
             if interview:
                 interview.risk_score = final_risk_score
@@ -189,9 +188,13 @@ def _after_parallel(self, session_id: str, video_result: dict, audio_result: dic
         logger.info("Successfully completed processing for session %s", session_id)
 
     except Exception as exc:
-        logger.error("Post-parallel stage failed for %s: %s", session_id, exc, exc_info=True)
+        logger.error(
+            "Post-parallel stage failed for %s: %s", session_id, exc, exc_info=True
+        )
         FAILURE_COUNT.labels(failure_type="post_parallel_error").inc()
-        session_manager.mark_session_failed(session_id, f"Post-parallel stage failed: {exc}")
+        session_manager.mark_session_failed(
+            session_id, f"Post-parallel stage failed: {exc}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -199,25 +202,32 @@ def _after_parallel(self, session_id: str, video_result: dict, audio_result: dic
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(bind=True, max_retries=3, name="workers.tasks.process_interview_session")
+@celery_app.task(
+    bind=True, max_retries=3, name="workers.tasks.process_interview_session"
+)
 def process_interview_session(self, session_id):
-    task_name = self.name
-    start_time = time.perf_counter()
-
+    """
     Video and audio run in parallel via a Celery group; the evaluation
     and risk scoring stages run sequentially after both complete.
     """
+    task_name = self.name
+    start_time = time.perf_counter()
+
     worker_hostname = socket.gethostname()
     registry = WorkerRegistry()
 
     try:
         worker_hostname = socket.gethostname()
-        logger.info("Worker %s starting interview session: %s", worker_hostname, session_id)
+        logger.info(
+            "Worker %s starting interview session: %s", worker_hostname, session_id
+        )
 
         db_session = SessionLocal()
         try:
             interview = db_session.execute(
-                select(InterviewSession).where(InterviewSession.session_id == session_id)
+                select(InterviewSession).where(
+                    InterviewSession.session_id == session_id
+                )
             ).scalar_one_or_none()
 
             if interview is None:
@@ -243,7 +253,9 @@ def process_interview_session(self, session_id):
         db_session = SessionLocal()
         try:
             interview = db_session.execute(
-                select(InterviewSession).where(InterviewSession.session_id == session_id)
+                select(InterviewSession).where(
+                    InterviewSession.session_id == session_id
+                )
             ).scalar_one_or_none()
 
             if interview:
@@ -291,9 +303,7 @@ def process_interview_session(self, session_id):
     except TimeoutError as exc:
         retry_delay = 2 ** (self.request.retries + 1)
 
-        FAILURE_COUNT.labels(
-            failure_type="celery_task_error"
-        ).inc()
+        FAILURE_COUNT.labels(failure_type="celery_task_error").inc()
 
         logger.warning(
             "Timed out waiting for subtasks for session %s (attempt %d/3). Retrying in %ds.",

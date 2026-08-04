@@ -7,7 +7,7 @@ Includes token usage tracking for OpenAI, Gemini, and Grok calls.
 
 import logging
 import os
-from typing import Any, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +130,7 @@ def chat_completion(
     model: str = "gpt-4o",
     temperature: float = 0.7,
     max_tokens: int = 1024,
-) -> Tuple[str | None, dict[str, Any]]:
+) -> tuple[str | None, dict[str, Any]]:
     """
     Send a chat completion request to OpenAI.
     Returns a tuple: (content_text or None, usage_dict).
@@ -179,7 +179,7 @@ def gemini_generate(
     *,
     temperature: float = 0.7,
     max_output_tokens: int = 1024,
-) -> Tuple[str | None, dict[str, Any]]:
+) -> tuple[str | None, dict[str, Any]]:
     """
     Generate text using Gemini.
     Returns a tuple: (content_text or None, usage_dict).
@@ -232,7 +232,7 @@ def gemini_chat(
     *,
     temperature: float = 0.7,
     max_output_tokens: int = 1024,
-) -> Tuple[str | None, dict[str, Any]]:
+) -> tuple[str | None, dict[str, Any]]:
     """
     Multi-turn chat with Gemini.
     Returns a tuple: (response_text or None, usage_dict).
@@ -292,7 +292,7 @@ def grok_completion(
     model: str = "grok-2-1212",
     temperature: float = 0.7,
     max_tokens: int = 1024,
-) -> Tuple[str | None, dict[str, Any]]:
+) -> tuple[str | None, dict[str, Any]]:
     """
     Send a chat completion request to Grok.
     Returns a tuple: (content_text or None, usage_dict).

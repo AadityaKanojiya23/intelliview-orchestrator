@@ -11,7 +11,6 @@ Responsibilities:
 """
 
 import asyncio
-import json
 import logging
 from datetime import datetime, timedelta, timezone
 from threading import Lock
@@ -20,7 +19,6 @@ from typing import Any
 # Import Prometheus worker monitoring metrics
 from metrics.prometheus_metrics import (
     CURRENT_WORKERS,
-    SYSTEM_UTILIZATION,
     WORKER_ACTIVE_TASKS,
     WORKER_CAPACITY,
     WORKERS_HEALTHY,
@@ -372,7 +370,7 @@ class WorkerRegistry:
     with self.lock:
         worker = self.local_workers.get(worker_id)
         if not worker:
-            return
+            return None
 
         worker["failed_tasks"] += 1
         worker["failure_count"] += 1
@@ -577,7 +575,7 @@ def get_worker_weight(self, worker: dict[str, Any]) -> float:
     worker = self.local_workers.get(worker_id)
 
     if not worker:
-        return
+        return None
 
     worker["failure_count"] += 1
 
@@ -592,7 +590,7 @@ def get_worker_weight(self, worker: dict[str, Any]) -> float:
     worker = self.local_workers.get(worker_id)
 
     if not worker:
-        return
+        return None
 
     worker["failure_count"] = 0
     worker["penalty_weight"] = 1.0

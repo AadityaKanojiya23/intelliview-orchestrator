@@ -1,7 +1,6 @@
 """Unit tests for FaultManager — failure logging, DLQ, recovery queue."""
 
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from orchestrator.fault_manager import FailureType, FaultManager
 

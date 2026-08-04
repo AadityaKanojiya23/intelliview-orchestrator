@@ -15,7 +15,6 @@ from enum import Enum
 from threading import Lock
 from typing import Any
 
-from metrics.prometheus_metrics import SYSTEM_UTILIZATION
 from orchestrator.worker_registry import WorkerRegistry
 
 logger = logging.getLogger(__name__)

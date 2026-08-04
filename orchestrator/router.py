@@ -3,11 +3,10 @@ router.py — Risk Weight Configuration API
 Exposes CRUD endpoints for recruiters to manage per-position risk weights.
 """
 
-from fastapi import APIRouter, HTTPException, status
-from typing import List
 
-from models import RiskConfigCreate, RiskConfigUpdate, RiskConfigResponse
 import store
+from fastapi import APIRouter, HTTPException, status
+from models import RiskConfigCreate, RiskConfigResponse, RiskConfigUpdate
 
 router = APIRouter(prefix="/risk-configs", tags=["Risk Weight Configuration"])
 
@@ -34,7 +33,7 @@ def create_config(data: RiskConfigCreate):
 
 @router.get(
     "/",
-    response_model=List[RiskConfigResponse],
+    response_model=list[RiskConfigResponse],
     summary="List all risk weight configurations",
 )
 def list_configs():
@@ -50,7 +49,10 @@ def list_configs():
 def get_config(config_id: str):
     config = store.get_config(config_id)
     if not config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Config '{config_id}' not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Config '{config_id}' not found",
+        )
     return config
 
 
@@ -65,7 +67,7 @@ def get_by_position(job_position: str):
     if not config:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No config found for position '{job_position}'. Default weights will be used."
+            detail=f"No config found for position '{job_position}'. Default weights will be used.",
         )
     return config
 
@@ -82,7 +84,10 @@ def update_config(config_id: str, data: RiskConfigUpdate):
     """
     config = store.update_config(config_id, data)
     if not config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Config '{config_id}' not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Config '{config_id}' not found",
+        )
     return config
 
 
@@ -95,4 +100,7 @@ def delete_config(config_id: str):
     """Delete a configuration. The risk engine will fall back to defaults."""
     deleted = store.delete_config(config_id)
     if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Config '{config_id}' not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Config '{config_id}' not found",
+        )

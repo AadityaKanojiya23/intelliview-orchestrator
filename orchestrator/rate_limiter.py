@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from urllib import request
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
