@@ -35,7 +35,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
-from orchestrator.middleware.capacity_guard import CapacityGuardMiddleware
+from workers.evaluation_pipeline import _llm_generate_question
 
 from config import (
     API_TOKEN,
@@ -507,7 +507,8 @@ class AskQuestionRequest(BaseModel):
     session_id: str
     category: str | None = None
 
-
+    # Question selection strategy
+    strategy: str = "static"
 class AskQuestionResponse(BaseModel):
     """Response model for a question"""
 
@@ -1560,40 +1561,172 @@ async def create_template(
 
 
 # ========== Interview Q&A Endpoints ==========
-
-
 @app.post("/interviews/ask-question")
 async def ask_question(
     request: AskQuestionRequest,
     session_db: Session = Depends(get_db),
 ):
     """Get next question for a session"""
+
     try:
         session_data = session_manager.get_session(request.session_id)
+
         if not session_data:
             raise HTTPException(status_code=404, detail="Session not found")
 
         asked_ids = session_data.get("questions_asked", [])
-        question = question_bank.get_next_question(
-            category=request.category,
-            exclude_ids=[q.get("question_id") for q in asked_ids] if asked_ids else [],
-        )
-        if not question:
-            raise HTTPException(status_code=404, detail="No more questions available")
 
-        return AskQuestionResponse(
-            session_id=request.session_id,
-            question_id=question["question_id"],
-            text=question["text"],
-            category=question["category"],
-            difficulty=question["difficulty"],
-        )
+        # -----------------------------
+        # STATIC STRATEGY
+        # -----------------------------
+        if request.strategy == "static":
+
+            question = question_bank.get_next_question(
+                category=request.category,
+                exclude_ids=[
+                    q.get("question_id") for q in asked_ids
+                ] if asked_ids else [],
+            )
+
+            if not question:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No more questions available"
+                )
+
+            return AskQuestionResponse(
+                session_id=request.session_id,
+                question_id=question["question_id"],
+                text=question["text"],
+                category=question["category"],
+                difficulty=question["difficulty"],
+            )
+
+        # -----------------------------
+        # GENERATIVE STRATEGY
+        # -----------------------------
+        elif request.strategy == "generative":
+
+            generated = _llm_generate_question(
+                request.session_id,
+                request.category or "general"
+            )
+
+            if not generated:
+                raise HTTPException(
+                    status_code=500,
+                    detail="LLM failed to generate question"
+                )
+
+            return AskQuestionResponse(
+                session_id=request.session_id,
+                question_id="llm-generated",
+                text=generated,
+                category=request.category or "general",
+                difficulty="adaptive",
+            )
+
+        # -----------------------------
+        # HYBRID STRATEGY
+        # -----------------------------
+        elif request.strategy == "hybrid":
+
+            generated = _llm_generate_question(
+                request.session_id,
+                request.category or "general"
+            )
+
+            if generated:
+
+                return AskQuestionResponse(
+                    session_id=request.session_id,
+                    question_id="llm-generated",
+                    text=generated,
+                    category=request.category or "general",
+                    difficulty="adaptive",
+                )
+            else:
+               raise HTTPException(...)
+                    # -----------------------------
+        # ADAPTIVE STRATEGY
+        # -----------------------------
+        elif request.strategy == "adaptive":
+
+            generated = _llm_generate_question(
+                request.session_id,
+                request.category or "general"
+            )
+
+            if generated:
+
+                return AskQuestionResponse(
+                    session_id=request.session_id,
+                    question_id="llm-generated",
+                    text=generated,
+                    category=request.category or "general",
+                    difficulty="adaptive",
+                )
+
+            # Fallback to question bank
+            question = question_bank.get_next_question(
+                category=request.category,
+                exclude_ids=[
+                    q.get("question_id") for q in asked_ids
+                ] if asked_ids else [],
+            )
+
+            if not question:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No more questions available"
+                )
+
+            return AskQuestionResponse(
+                session_id=request.session_id,
+                question_id=question["question_id"],
+                text=question["text"],
+                category=question["category"],
+                difficulty=question["difficulty"],
+            )
+
+            # Fallback to question bank
+            question = question_bank.get_next_question(
+                category=request.category,
+                exclude_ids=[
+                    q.get("question_id") for q in asked_ids
+                ] if asked_ids else [],
+            )
+
+            if not question:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No more questions available"
+                )
+
+            return AskQuestionResponse(
+                session_id=request.session_id,
+                question_id=question["question_id"],
+                text=question["text"],
+                category=question["category"],
+                difficulty=question["difficulty"],
+            )
+
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid strategy"
+            )
+
     except HTTPException:
         raise
+
     except Exception as e:
         logger.error(f"Error getting question: {e!s}")
-        raise HTTPException(status_code=500, detail="Error getting question")
 
+        raise HTTPException(
+            status_code=500,
+            detail="Error getting question"
+        )
 
 @app.post("/interviews/submit-answer")
 async def submit_answer(
