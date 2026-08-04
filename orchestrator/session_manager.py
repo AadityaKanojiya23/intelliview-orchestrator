@@ -21,6 +21,7 @@ from sqlalchemy import select
 from database.db import SessionLocal
 from database.models import InterviewSession
 from monitoring.websocket_manager import ws_manager
+from orchestrator.redis_client import is_circuit_open
 from orchestrator.state_sync import StateSynchronizer
 
 logger = logging.getLogger(__name__)
@@ -129,8 +130,7 @@ class SessionManager:
             logger.info(f"Session {session_id} created successfully")
             return session_id
 
-        except Exception as e:
-            logger.error(f"Error creating session: {e!s}")
+        except Exception:
             session_db.rollback()
             raise
         finally:
@@ -180,14 +180,15 @@ class SessionManager:
             interview.updated_at = _utcnow()
             session_db.commit()
 
-            # Update Redis cache
-            session_data = self.state_sync.get_session_state(session_id)
-            if session_data:
-                session_data["status"] = new_status
-                session_data["updated_at"] = _utcnow().isoformat()
-                if metadata:
-                    session_data.update(metadata)
-                self.state_sync.set_session_state(session_id, session_data)
+            # Update Redis cache (skip if circuit breaker is open)
+            if not is_circuit_open():
+                session_data = self.state_sync.get_session_state(session_id)
+                if session_data:
+                    session_data["status"] = new_status
+                    session_data["updated_at"] = _utcnow().isoformat()
+                    if metadata:
+                        session_data.update(metadata)
+                    self.state_sync.set_session_state(session_id, session_data)
 
             logger.info(f"Session {session_id} status updated to {new_status}")
 
@@ -196,8 +197,7 @@ class SessionManager:
 
             return True
 
-        except Exception as e:
-            logger.error(f"Error updating session status: {e!s}")
+        except Exception:
             session_db.rollback()
             return False
         finally:
@@ -256,8 +256,8 @@ class SessionManager:
             finally:
                 session_db.close()
 
-        except Exception as e:
-            logger.error(f"Error retrieving session: {e!s}")
+        except Exception:
+            session_db.rollback()
             return None
 
     def mark_session_failed(self, session_id: str, error_message: str) -> bool:
@@ -276,16 +276,7 @@ class SessionManager:
         return self.update_session_status(session_id, self.FAILED, {"error_message": error_message})
 
     def mark_session_completed(self, session_id: str, risk_score: float) -> bool:
-        """
-        Mark a session as completed with final risk score
 
-        Args:
-            session_id: Session identifier
-            risk_score: Final calculated risk score
-
-        Returns:
-            bool: True if successful
-        """
         logger.info(f"Marking session {session_id} as completed with risk score {risk_score}")
 
         session_db = SessionLocal()
@@ -303,20 +294,20 @@ class SessionManager:
             interview.updated_at = _utcnow()
             session_db.commit()
 
-            # Update Redis
-            session_data = self.state_sync.get_session_state(session_id)
-            if session_data:
-                session_data["status"] = self.COMPLETED
-                session_data["risk_score"] = risk_score
-                session_data["end_time"] = _utcnow().isoformat()
-                session_data["updated_at"] = _utcnow().isoformat()
-                self.state_sync.set_session_state(session_id, session_data)
+            # Update Redis (skip if circuit breaker is open)
+            if not is_circuit_open():
+                session_data = self.state_sync.get_session_state(session_id)
+                if session_data:
+                    session_data["status"] = self.COMPLETED
+                    session_data["risk_score"] = risk_score
+                    session_data["end_time"] = _utcnow().isoformat()
+                    session_data["updated_at"] = _utcnow().isoformat()
+                    self.state_sync.set_session_state(session_id, session_data)
 
             logger.info(f"Session {session_id} marked as completed")
             return True
 
-        except Exception as e:
-            logger.error(f"Error marking session completed: {e!s}")
+        except Exception:
             session_db.rollback()
             return False
         finally:

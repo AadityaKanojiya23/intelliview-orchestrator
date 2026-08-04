@@ -1,4 +1,5 @@
 "use client";
+import Input from './Input';
 import { useState, useEffect, useCallback } from "react";
 import { Lock, Unlock, Eye, EyeOff } from "lucide-react";
 
@@ -99,16 +100,17 @@ export default function ScreenLock({ isLocked, onUnlock }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative">
-            <input
+            <Input
               type={showPin ? "text" : "password"}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={setInput}
               placeholder="Enter PIN"
               autoFocus
-              className={`w-full h-14 text-center text-2xl tracking-[0.5em] rounded-xl bg-zinc-900 border ${
-                error ? "border-rose-500 animate-shake" : "border-zinc-800"
-              } text-zinc-50 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all`}
+              error={error}
+              className="h-14 text-center text-2xl tracking-[0.5em] rounded-xl bg-zinc-900 text-zinc-50 placeholder-zinc-600 focus:ring-accent"
             />
+              
+            
             <button
               type="button"
               onClick={() => setShowPin(!showPin)}

@@ -14,13 +14,25 @@ from orchestrator.main import app
 
 def _all_routes(application: FastAPI):
     out = []
-    for r in application.routes:
-        methods = getattr(r, "methods", None) or set()
-        path = getattr(r, "path", None) or getattr(r, "path_format", None)
-        if path:
-            for m in methods:
-                if m in {"GET", "POST", "PUT", "DELETE", "PATCH"}:
-                    out.append((m, path))
+
+    def _walk(routes, prefix=""):
+        for r in routes:
+            # FastAPI's include_router() wraps included routers in a lazy
+            # `_IncludedRouter` node that has no `.path`/`.methods` of its
+            # own — recurse into its wrapped router to reach the real routes.
+            original_router = getattr(r, "original_router", None)
+            if original_router is not None:
+                sub_prefix = getattr(getattr(r, "include_context", None), "prefix", "") or ""
+                _walk(original_router.routes, prefix + sub_prefix)
+                continue
+            methods = getattr(r, "methods", None) or set()
+            path = getattr(r, "path", None) or getattr(r, "path_format", None)
+            if path:
+                for m in methods:
+                    if m in {"GET", "POST", "PUT", "DELETE", "PATCH"}:
+                        out.append((m, prefix + path))
+
+    _walk(application.routes)
     return out
 
 
@@ -51,11 +63,13 @@ EXPECTED = {
     ("POST", "/retry-session/{session_id}"),
     ("GET", "/system-health"),
     ("GET", "/worker-health"),
+    ("GET", "/admin/fairness-audit"),
     ("GET", "/recovery-queue"),
     ("GET", "/failure-log"),
     ("GET", "/dead-letter-queue"),
     ("GET", "/fault-statistics"),
     ("POST", "/detect-failures"),
+    ("GET", "/interviews/{session_id}/report"),
 }
 
 

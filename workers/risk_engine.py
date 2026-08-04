@@ -1,12 +1,13 @@
+from workers.risk_spike_detector import RiskSpikeDetector
 """
 Risk Scoring Engine
 Combines signals from all pipelines to calculate final interview risk score
 
 Responsibilities:
 - Normalize signals from different pipelines
-- Apply weighted scoring
-- Generate final risk score (0-1 scale)
-- Provide risk classification
+- Generate weighted risk score (for reporting)
+- Classify interview risk using a decision tree
+- Generate final interview risk report
 
 All weights and thresholds are configurable via RISK_CONFIG, a single
 source of truth for every numeric constant in the scoring pipeline.
@@ -15,14 +16,15 @@ source of truth for every numeric constant in the scoring pipeline.
 import logging
 import os
 from typing import Any
+from workers.risk_override import RiskOverrideEngine
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Single-source risk configuration — all weights & thresholds here.
-# Override via environment variables (prefix RISK_), e.g.
 #   RISK_VIDEO_WEIGHT=0.5 RISK_LOW_RISK_THRESHOLD=0.25
-# ---------------------------------------------------------------------------
+# -----------------------------------------# Override via environment variables (prefix RISK_), e.g.
+# ----------------------------------
 
 RISK_CONFIG: dict[str, float] = {
     # Pipeline weights (must sum to 1.0)
@@ -46,6 +48,7 @@ RISK_CONFIG: dict[str, float] = {
     "eval_low_quality": float(os.getenv("RISK_EVAL_LOW_QUALITY", "0.30")),
     "eval_low_accuracy": float(os.getenv("RISK_EVAL_LOW_ACCURACY", "0.40")),
     "eval_poor_communication": float(os.getenv("RISK_EVAL_POOR_COMMUNICATION", "0.20")),
+    "eval_hallucination": float(os.getenv("RISK_EVAL_HALLUCINATION", "0.30")),
 }
 
 
@@ -83,6 +86,7 @@ class RiskScoringEngine:
         "low_quality_answers": RISK_CONFIG["eval_low_quality"],
         "low_accuracy": RISK_CONFIG["eval_low_accuracy"],
         "poor_communication": RISK_CONFIG["eval_poor_communication"],
+        "hallucination": RISK_CONFIG["eval_hallucination"],
     }
 
     @staticmethod
@@ -128,6 +132,7 @@ class RiskScoringEngine:
         quality_score = evaluation_result.get("answer_quality_score", {}).get("overall_quality_score", 50)
         accuracy_score = evaluation_result.get("technical_accuracy", {}).get("accuracy_score", 50)
         clarity_score = evaluation_result.get("communication_clarity", {}).get("clarity_score", 50)
+        hallucination_flagged = evaluation_result.get("hallucination_check", {}).get("is_hallucination", False)
 
         if quality_score < 40:
             risk_score += RiskScoringEngine.EVALUATION_FACTORS["low_quality_answers"]
@@ -135,6 +140,8 @@ class RiskScoringEngine:
             risk_score += RiskScoringEngine.EVALUATION_FACTORS["low_accuracy"]
         if clarity_score < 40:
             risk_score += RiskScoringEngine.EVALUATION_FACTORS["poor_communication"]
+        if hallucination_flagged:
+            risk_score += RiskScoringEngine.EVALUATION_FACTORS["hallucination"]
 
         return min(risk_score, 1.0)
 
@@ -147,6 +154,17 @@ class RiskScoringEngine:
             + RiskScoringEngine.EVALUATION_WEIGHT * evaluation_risk
         )
         return round(min(max(final_risk, 0.0), 1.0), 3)
+
+    @staticmethod
+    def _apply_critical_rule_overrides(final_risk: float, risk_classification: str) -> float:
+        """Apply rule-based overrides to the linear combined risk score."""
+        if risk_classification == "CRITICAL":
+            return max(final_risk, 0.95)
+        if risk_classification == "HIGH":
+            return max(final_risk, 0.8)
+        if risk_classification == "MEDIUM":
+            return max(final_risk, 0.6)
+        return final_risk
 
     @staticmethod
     def classify_risk(risk_score: float) -> str:
@@ -174,6 +192,21 @@ class RiskScoringEngine:
         evaluation_risk = RiskScoringEngine.calculate_evaluation_risk(evaluation_result)
         final_risk = RiskScoringEngine.calculate_final_risk(video_risk, audio_risk, evaluation_risk)
         risk_classification = RiskScoringEngine.classify_risk(final_risk)
+
+        override = RiskOverrideEngine.evaluate(
+            video_result,
+            audio_result,
+            evaluation_result,
+        )
+
+        if override is not None:
+            logger.info(
+                "Risk classification overridden from %s to %s",
+                risk_classification,
+                override,
+            )
+            risk_classification = override        
+
         risk_factors = RiskScoringEngine._identify_risk_factors(video_result, audio_result, evaluation_result)
 
         report = {
@@ -186,7 +219,13 @@ class RiskScoringEngine:
                 "evaluation_risk": evaluation_risk,
             },
             "risk_factors": risk_factors,
-            "recommendation": RiskScoringEngine._generate_recommendation(risk_classification),
+            "explanation": RiskScoringEngine._generate_explanation(
+                risk_classification,
+                risk_factors,
+            ),
+            "recommendation": RiskScoringEngine._generate_recommendation(
+                risk_classification,
+            ),
         }
 
         logger.info(f"Risk report generated: {risk_classification} (score: {final_risk})")
@@ -224,6 +263,8 @@ class RiskScoringEngine:
             risk_factors.append("Low answer quality detected")
         if accuracy_score < 40:
             risk_factors.append("Low technical accuracy detected")
+        if evaluation_result.get("hallucination_check", {}).get("is_hallucination"):
+            risk_factors.append("Fabricated or unsupported claims detected in response")
 
         return risk_factors
 

@@ -9,11 +9,16 @@ Run the stack first:
 Set API_BASE_URL to override the default http://localhost:8000.
 """
 
+import os
 import time
 import uuid
 
 import httpx
 import pytest
+
+API_HEADERS = {"X-API-Token": os.getenv("API_TOKEN", "dev-token-change-me")}
+
+pytestmark = pytest.mark.e2e
 
 
 def _wait_for_api(base_url: str, timeout: float = 30.0) -> None:
@@ -43,7 +48,9 @@ def test_start_interview_and_get_status(api_base_url):
     _wait_for_api(api_base_url)
     r = httpx.post(
         f"{api_base_url}/start-interview",
+        headers=API_HEADERS,
         json={"candidate_id": f"cand-{uuid.uuid4().hex[:8]}", "priority": "high"},
+        headers={"X-API-Token": "dev-token-change-me"},
         timeout=10.0,
     )
     assert r.status_code == 200, r.text
@@ -89,7 +96,7 @@ def test_worker_register_requires_token(api_base_url):
     r = httpx.post(
         f"{api_base_url}/register-worker",
         json={"worker_id": "test-w", "capacity": 2},
-        headers={"X-API-Token": "test-token"},
+        headers={"X-API-Token": "dev-token-change-me"},
         timeout=5.0,
     )
     assert r.status_code == 200, r.text
@@ -100,7 +107,9 @@ def test_full_pipeline_completes(api_base_url):
     _wait_for_api(api_base_url)
     r = httpx.post(
         f"{api_base_url}/start-interview",
+        headers=API_HEADERS,
         json={"candidate_id": f"e2e-{uuid.uuid4().hex[:8]}", "priority": "medium"},
+        headers={"X-API-Token": "dev-token-change-me"},
         timeout=10.0,
     )
     assert r.status_code == 200
@@ -118,3 +127,78 @@ def test_full_pipeline_completes(api_base_url):
         time.sleep(1.0)
     assert last is not None
     assert last["status"] in {"COMPLETED", "FAILED"}, f"Session stuck in {last['status']}"
+
+
+def test_candidate_lifecycle(api_base_url):
+    """End-to-end: create a candidate, then fetch it back by id, then list it."""
+    _wait_for_api(api_base_url)
+    email = f"e2e-{uuid.uuid4().hex[:8]}@example.com"
+    r = httpx.post(
+        f"{api_base_url}/candidates",
+        json={
+            "name": "E2E Test Candidate",
+            "email": email,
+            "skills": ["python", "testing"],
+        },
+        timeout=10.0,
+    )
+    assert r.status_code == 200, r.text
+    candidate = r.json()
+    candidate_id = candidate["candidate_id"]
+
+    r = httpx.get(f"{api_base_url}/candidates/{candidate_id}", timeout=5.0)
+    assert r.status_code == 200
+    assert r.json()["candidate_id"] == candidate_id
+
+    r = httpx.get(f"{api_base_url}/candidates/{candidate_id}/history", timeout=5.0)
+    assert r.status_code == 200
+    assert r.json()["candidate_id"] == candidate_id
+
+    # A non-existent candidate should 404, not 500.
+    r = httpx.get(f"{api_base_url}/candidates/does-not-exist", timeout=5.0)
+    assert r.status_code == 404
+
+
+def test_worker_lifecycle(api_base_url):
+    """End-to-end: register a worker, send a heartbeat, see it listed, then deregister it."""
+    _wait_for_api(api_base_url)
+    worker_id = f"e2e-worker-{uuid.uuid4().hex[:8]}"
+    headers = {"X-API-Token": "test-token"}
+
+    r = httpx.post(
+        f"{api_base_url}/register-worker",
+        json={"worker_id": worker_id, "capacity": 2},
+        headers=headers,
+        timeout=5.0,
+    )
+    assert r.status_code == 200, r.text
+
+    r = httpx.post(
+        f"{api_base_url}/worker/heartbeat",
+        json={"worker_id": worker_id, "active_tasks": 0},
+        headers=headers,
+        timeout=5.0,
+    )
+    assert r.status_code == 200, r.text
+
+    r = httpx.get(f"{api_base_url}/workers", timeout=5.0)
+    assert r.status_code == 200
+    worker_ids = {w.get("worker_id") for w in r.json().get("workers", [])}
+    assert worker_id in worker_ids
+
+    r = httpx.delete(
+        f"{api_base_url}/deregister-worker/{worker_id}",
+        headers=headers,
+        timeout=5.0,
+    )
+    assert r.status_code == 200, r.text
+
+
+def test_dead_letter_queue_reachable(api_base_url):
+    """The dead letter queue endpoint should always respond, even when empty."""
+    _wait_for_api(api_base_url)
+    r = httpx.get(f"{api_base_url}/dead-letter-queue", timeout=5.0)
+    assert r.status_code == 200
+    body = r.json()
+    assert "dead_letter_queue" in body
+    assert isinstance(body["dead_letter_queue"], list)

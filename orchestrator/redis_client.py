@@ -90,6 +90,11 @@ class CircuitBreaker:
 circuit_breaker = CircuitBreaker()
 
 
+def is_circuit_open() -> bool:
+    """Return True when the Redis circuit breaker is OPEN (reads will fail)."""
+    return circuit_breaker._state == _CircuitState.OPEN
+
+
 # ---------------------------------------------------------------------------
 # Shared Redis client
 # ---------------------------------------------------------------------------

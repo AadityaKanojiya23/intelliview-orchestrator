@@ -11,12 +11,13 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
+from urllib import request
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from orchestrator.redis_client import get_redis_client
+from orchestrator.cache_manager import CacheManager
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +47,15 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         path = request.url.path
-        if path in self.EXEMPT_PATHS or path.startswith("/docs"):
+        if (
+            path in self.EXEMPT_PATHS
+            or path.startswith("/docs")
+            or path == "/metrics/web-vitals"
+        ):
             return await call_next(request)
 
         client_key = self._client_key(request)
-        redis_client = get_redis_client()
+        redis_client = CacheManager()
 
         if redis_client is None:
             return await call_next(request)

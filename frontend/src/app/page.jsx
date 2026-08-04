@@ -1,4 +1,6 @@
 "use client";
+
+
 import { useEffect, useState, useMemo } from "react";
 import useSWR from "swr";
 import { Activity, AlertTriangle, CheckCircle2, Users, Zap, Shield, TrendingUp, Clock } from "lucide-react";
@@ -8,11 +10,16 @@ import { StatusBadge } from "@/components/Badge";
 import { Skeleton, ErrorState, EmptyState } from "@/components/States";
 import Sparkline from "@/components/Sparkline";
 import { formatPercent, formatRelative } from "@/lib/utils";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui";
+import React, { useState } from "react";
+import SortableHeader from "../components/SortableHeader";
 
 const MAX_SAMPLES = 20;
 
 export default function OverviewPage() {
+ 
   const health = useSWR("/system-health", { refreshInterval: 3000 });
+  const forceLoading = true;
   const workers = useSWR("/workers", { refreshInterval: 5000 });
   const stats = useSWR("/session-statistics", { refreshInterval: 5000 });
   const active = useSWR("/active-sessions", { refreshInterval: 3000 });
@@ -46,7 +53,8 @@ export default function OverviewPage() {
   }, [workers.data?.workers]);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <ErrorBoundary>
+      <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-50">Overview</h1>
@@ -59,7 +67,7 @@ export default function OverviewPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "0ms" }}>
+        <div className="glass-card p-4 animate-slide-in-up delay-0">
           <Stat
             label="System"
             value={health.data ? <StatusBadge status={health.data.overall_status} /> : <Skeleton className="h-7 w-20" />}
@@ -67,7 +75,7 @@ export default function OverviewPage() {
             icon={<Activity size={16} />}
           />
         </div>
-        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "50ms" }}>
+        <div className="glass-card p-4 animate-slide-in-up delay-[50ms]">
           <Stat
             label="Workers"
             value={
@@ -81,21 +89,21 @@ export default function OverviewPage() {
             icon={<Users size={16} />}
           />
         </div>
-        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "100ms" }}>
+        <div className="glass-card p-4 animate-slide-in-up delay-100">
           <Stat
             label="Completed"
-            value={stats.data ? stats.data.completed_sessions : <Skeleton className="h-7 w-12" />}
+           value={stats.data ? stats.data.completed_sessions : <Skeleton className="h-7 w-12" />}
             hint={stats.data ? `${stats.data.active_sessions} active · ${stats.data.failed_sessions} failed` : ""}
             icon={<CheckCircle2 size={16} />}
           />
         </div>
-        <div className="glass-card p-4 animate-slide-in-up" style={{ animationDelay: "150ms" }}>
+        <div className="glass-card p-4 animate-slide-in-up delay-150">
           <Stat
             label="Avg risk"
             value={
               stats.data ? (
                 stats.data.risk_score_stats.average_risk_score.toFixed(3)
-              ) : (
+              ) : (                        
                 <Skeleton className="h-7 w-16" />
               )
             }
@@ -183,6 +191,38 @@ export default function OverviewPage() {
         ) : workers.data.workers.length === 0 ? (
           <EmptyState title="No workers registered" description="Workers self-register via the worker_agent on startup." />
         ) : (
+          <Table>
+            <Thead>
+              <Tr>
+                <Th>Worker</Th>
+                <Th>Status</Th>
+                <Th>Load</Th>
+                <Th>Last heartbeat</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {workers.data.workers.map((w) => (
+                <Tr key={w.worker_id}>
+                  <Td className="font-mono text-xs text-zinc-200">{w.worker_id}</Td>
+                  <Td><StatusBadge status={w.health_status} /></Td>
+                  <Td>{w.active_tasks}/{w.capacity}</Td>
+                  <Td className="text-muted">{formatRelative(w.last_heartbeat)}</Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        )}
+      </Card>
+        <tbody>
+          {workers.map((worker) => (
+            <tr key={worker.id}>
+              <td>{worker.name}</td>
+              <td>{worker.role}</td>
+              <td>{worker.salary}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-muted">
@@ -211,6 +251,7 @@ export default function OverviewPage() {
           </div>
         )}
       </Card>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

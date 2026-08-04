@@ -1,0 +1,7 @@
+[
+  {"question_id": "q_001", "text": "Describe your experience with distributed systems.", "category": "technical", "difficulty": "medium", "usage_count": 12, "avg_score": 78.5},
+  {"question_id": "q_001", "text": "Describe your experience with distributed systems!", "category": "technical", "difficulty": "medium", "usage_count": 1, "avg_score": 60.0},
+  {"question_id": "q_003", "text": "Too short", "category": "tech", "difficulty": "hard", "usage_count": 3, "avg_score": 65.2},
+  {"question_id": "q_004", "text": "", "category": "situational", "difficulty": "extreme", "usage_count": -2, "avg_score": 150},
+  {"question_id": "q_005", "category": "technical", "difficulty": "medium", "usage_count": 4, "avg_score": 55}
+]

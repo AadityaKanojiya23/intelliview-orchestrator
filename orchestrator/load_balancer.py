@@ -9,9 +9,11 @@ Strategies:
 """
 
 import logging
+import time
 from enum import Enum
 from typing import Any
 
+from metrics.prometheus_metrics import SYSTEM_UTILIZATION
 from orchestrator.worker_registry import WorkerRegistry
 
 logger = logging.getLogger(__name__)
@@ -22,6 +24,7 @@ class BalancingStrategy(Enum):
 
     ROUND_ROBIN = "round_robin"
     LEAST_LOADED = "least_loaded"
+    WEIGHTED_LEAST_LOADED = "weighted_least_loaded"
     QUEUE_BASED = "queue_based"
 
 
@@ -40,6 +43,10 @@ class LoadBalancer:
         self.worker_registry = WorkerRegistry()
         self.strategy = strategy
         self.round_robin_index = 0
+        self._worker_cache = None
+        self._cache_timestamp = 0
+        self._cache_ttl = 5  # Cache valid for 5 seconds
+        self._registry_lookup_count = 0
         logger.info(f"Load Balancer initialized with strategy: {strategy.value}")
 
     def select_worker(self) -> dict[str, Any] | None:
@@ -53,6 +60,8 @@ class LoadBalancer:
             return self._select_round_robin()
         if self.strategy == BalancingStrategy.LEAST_LOADED:
             return self._select_least_loaded()
+        if self.strategy == BalancingStrategy.WEIGHTED_LEAST_LOADED:
+            return self._select_weighted_least_loaded()
         if self.strategy == BalancingStrategy.QUEUE_BASED:
             return self._select_queue_based()
         # Default to least loaded
@@ -68,14 +77,17 @@ class LoadBalancer:
         Returns:
             dict: Next worker in rotation or None if no workers available
         """
-        available = self.worker_registry.get_available_workers()
+        available = self._get_cached_workers()
 
         if not available:
             logger.warning("No workers available for Round Robin selection")
             return None
 
-        # Select using round robin index
-        worker = available[self.round_robin_index % len(available)]
+        # FIX: Sort by worker_id to ensure stable order independent of registry changes
+        available_sorted = sorted(available, key=lambda w: w["worker_id"])
+
+        # Select using round robin index on the sorted list
+        worker = available_sorted[self.round_robin_index % len(available_sorted)]
         self.round_robin_index += 1
 
         logger.debug(f"Round Robin selected worker: {worker['worker_id']}")
@@ -101,6 +113,35 @@ class LoadBalancer:
             f"Least Loaded selected worker: {worker['worker_id']} "
             f"(active: {worker['active_tasks']}/{worker['capacity']})"
         )
+        return worker
+
+    def _select_weighted_least_loaded(self) -> dict[str, Any] | None:
+        """
+        Weighted Least Loaded Strategy
+
+        Select worker based on:
+            active_tasks / weight
+
+        Lower score means the worker is less loaded relative
+        to its capability.
+        """
+
+        available = self.worker_registry.get_available_workers()
+
+        if not available:
+            logger.warning("No workers available for Weighted Least Loaded selection")
+            return None
+
+        worker = min(
+            available,
+            key=lambda w: w["active_tasks"] / max(w.get("weight", 1), 1),
+        )
+
+        logger.debug(
+            f"Weighted Least Loaded selected worker: {worker['worker_id']} "
+            f"(weight={worker.get('weight', 1)}, active={worker['active_tasks']})"
+        )
+
         return worker
 
     def _select_queue_based(self) -> dict[str, Any] | None:
@@ -132,24 +173,62 @@ class LoadBalancer:
         self.strategy = strategy
         logger.info(f"Switched to {strategy.value} strategy")
 
-    def get_best_worker_for_priority(self, priority: str) -> dict[str, Any] | None:
+    def _get_cached_workers(self) -> list[dict[str, Any]]:
         """
-        Select worker considering task priority
+        Return cached workers if cache is still valid.
+        """
+        current_time = time.time()
+
+        if self._worker_cache is None or current_time - self._cache_timestamp > self._cache_ttl:
+            self._registry_lookup_count += 1
+
+            logger.debug(f"Refreshing worker cache (Registry Lookup #{self._registry_lookup_count})")
+            self._worker_cache = self.worker_registry.get_available_workers()
+            self._cache_timestamp = current_time
+
+        return self._worker_cache
+
+    def get_best_worker_for_priority(self, priority: str) -> dict[str, Any] | None:
+        """Select worker considering task priority while respecting self.strategy.
+        How priority and strategy work together:
+        - Step 1 (Priority Filter): Narrow down the candidate worker pool based
+          on task priority level:
+           * high   → all available workers are candidates (no restriction)
+           * medium → exclude workers above 70% capacity utilization
+           * low    → only workers below 50% capacity utilization
+        - Step 2 (Strategy Selection): From the filtered candidate pool, apply
+          self.strategy (round_robin / least_loaded / queue_based) via
+          select_worker() to pick the final worker — exactly the same way a
+          normal task would be routed.
+
+        This ensures priority-aware routing stays consistent with the configured
+        strategy instead of running a separate, disconnected selection logic.
 
         Args:
-            priority: Task priority ("low", "medium", "high")
+           priority: Task priority — "high", "medium", or "low" (case-insensitive)
 
         Returns:
-            dict: Selected worker or None
+           dict: Selected worker or None if no workers available
         """
-        available = self.worker_registry.get_available_workers()
+        available = self._get_cached_workers()
 
-        if not available:
-            return None
+if not available:
+    return None
 
-        # For high priority, select least loaded
+available.sort(
+    key=lambda w: (
+        w["active_tasks"] /
+        self.worker_registry.get_worker_weight(w)
+    )
+)
+
+
+        # Normalize priority to lowercase so "High"/"high"/"HIGH" all work
+        priority = priority.lower()
+
+        # ── Step 1: Filter candidate pool by priority ─────────────────────────
         if priority == "high":
-            return min(available, key=lambda w: w["active_tasks"])
+        return available[0]
 
         # For medium priority, select from least loaded
         if priority == "medium":
@@ -188,12 +267,13 @@ class LoadBalancer:
     def get_load_status(self) -> dict[str, Any]:
         """Get current system load status"""
         stats = self.worker_registry.get_worker_statistics()
-        available_workers = len(self.worker_registry.get_available_workers())
+        available_workers = len(self._get_cached_workers())
 
         return {
             "strategy": self.strategy.value,
             "worker_stats": stats,
             "available_workers": available_workers,
+            "registry_lookups": self._registry_lookup_count,
             "system_overloaded": self.is_system_overloaded(),
             "timestamp": None,
         }

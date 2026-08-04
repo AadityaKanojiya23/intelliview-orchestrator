@@ -7,13 +7,26 @@ Responsibilities:
 - Track worker capacity and active tasks
 - Maintain worker health status
 - Provide worker availability queries
+- Real-time multi-instance sync via Redis Pub/Sub
 """
 
+import asyncio
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Any
 
+# Import Prometheus worker monitoring metrics
+from metrics.prometheus_metrics import (
+    CURRENT_WORKERS,
+    SYSTEM_UTILIZATION,
+    WORKER_ACTIVE_TASKS,
+    WORKER_CAPACITY,
+    WORKERS_HEALTHY,
+    WORKERS_REGISTERED,
+    WORKERS_UNHEALTHY,
+)
 from orchestrator.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
@@ -29,19 +42,43 @@ class WorkerRegistry:
     WORKER_SET_KEY = "workers:all"
     WORKER_HEARTBEAT_KEY = "worker:heartbeat:"
     HEARTBEAT_TIMEOUT = 60  # seconds
+    SYNC_CHANNEL = "worker_registry_sync"
 
     def __init__(self):
         """Initialize worker registry"""
         try:
-            self.redis_client = get_redis_client()
+            self.redis_client = self._create_redis_client()
             self.local_workers: dict[str, dict[str, Any]] = {}
             self.lock = Lock()
             self._hydrated = False
             self._hydrate_from_redis()
-            logger.info("Worker Registry initialized")
+
+            # Keep a strong reference to background tasks to prevent garbage collection
+            self.background_tasks: set[asyncio.Task[Any]] = set()
+
+            # Start background listener for real-time synchronization
+            if self.redis_client:
+                try:
+                    loop = asyncio.get_running_loop()
+                    task = loop.create_task(self._start_pubsub_listener())
+                    self.background_tasks.add(task)
+                    task.add_done_callback(self.background_tasks.discard)
+                    logger.info("Worker Registry initialized with Pub/Sub Sync")
+                except RuntimeError:
+                    # No running event loop (pytest/unit tests)
+                    logger.debug(
+                        "Skipping Pub/Sub listener because no event loop is running"
+                    )
+            else:
+                logger.warning("Worker Registry initialized WITHOUT Redis connection")
+
         except Exception as e:
             logger.error(f"Error initializing Worker Registry: {e!s}")
             self.redis_client = None
+
+    def _create_redis_client(self) -> Any:
+        """Create the shared Redis client used by the orchestrator."""
+        return get_redis_client()
 
     def _hydrate_from_redis(self) -> None:
         """Populate `local_workers` from Redis on first use so workers
@@ -60,6 +97,7 @@ class WorkerRegistry:
                     "status": raw.get("status", "healthy"),
                     "active_tasks": int(raw.get("active_tasks", 0)),
                     "capacity": int(raw.get("capacity", 4)),
+                    "tags": json.loads(raw.get("tags", "[]")),
                     "registered_at": raw.get("registered_at", ""),
                     "last_heartbeat": raw.get("last_heartbeat", ""),
                     "total_tasks_processed": int(raw.get("total_tasks_processed", 0)),
@@ -69,16 +107,141 @@ class WorkerRegistry:
         except Exception as exc:
             logger.warning("Could not hydrate worker registry from Redis: %s", exc)
 
-    def register_worker(self, worker_id: str, capacity: int = 4) -> bool:
+    def _get_native_redis_client(self) -> Any:
+        """Helper to safely extract the raw, native Redis client from CacheManager / wrappers"""
+        if not self.redis_client:
+            return None
+
+        client = self.redis_client
+        for _ in range(3):
+            if hasattr(client, "pubsub"):
+                return client
+            if hasattr(client, "_client"):
+                client = client._client
+            elif hasattr(client, "_redis"):
+                client = client._redis
+            elif hasattr(client, "redis"):
+                client = client.redis
+            elif hasattr(client, "client"):
+                client = client.client
+            else:
+                break
+        return client if hasattr(client, "pubsub") else None
+
+    async def _start_pubsub_listener(self) -> None:
+        """Background asynchronous loop listening for cache updates from other instances"""
+        native = self._get_native_redis_client()
+        if not native:
+            return
+
+        pubsub = None
+        try:
+            pubsub = native.pubsub()
+            pubsub.subscribe(self.SYNC_CHANNEL)
+            logger.info(f"Subscribed to Redis channel: {self.SYNC_CHANNEL}")
+
+            while True:
+                try:
+                    message = pubsub.get_message(
+                        ignore_subscribe_messages=True, timeout=1.0
+                    )
+                    if message:
+                        self._handle_pubsub_message(message)
+                except Exception as e:
+                    logger.error(f"Error processing message in Pub/Sub loop: {e!s}")
+
+                await asyncio.sleep(0.1)
+
+        except asyncio.CancelledError:
+            logger.info(
+                "Pub/Sub sync listener task cancellation triggered. Shutting down gracefully..."
+            )
+            raise
+        finally:
+            if pubsub:
+                try:
+                    pubsub.unsubscribe(self.SYNC_CHANNEL)
+                    pubsub.close()
+                    logger.info(
+                        "Successfully unsubscribed and closed Redis Pub/Sub connections."
+                    )
+                except Exception as close_err:
+                    logger.error(
+                        f"Error closing pubsub connection during shutdown: {close_err!s}"
+                    )
+
+    def _handle_pubsub_message(self, message: dict) -> None:
+        """Isolated handler to parse and process a single incoming Redis Pub/Sub message string"""
+        if not message or message.get("type") != "message":
+            return
+
+        try:
+            data = json.loads(message["data"])
+        except (json.JSONDecodeError, TypeError) as je:
+            logger.error(f"Malformed JSON payload received on sync channel: {je!s}")
+            return
+
+        worker_id = data.get("worker_id")
+        action = data.get("action")
+
+        if worker_id and action == "sync":
+            raw = self.redis_client.hgetall(f"{self.WORKER_KEY_PREFIX}{worker_id}")
+            if raw:
+                with self.lock:
+                    self.local_workers[worker_id] = {
+                        "worker_id": worker_id,
+                        "status": raw.get("status", "healthy"),
+                        "active_tasks": int(raw.get("active_tasks", 0)),
+                        "capacity": int(raw.get("capacity", 4)),
+                        "tags": json.loads(raw.get("tags", "[]")),
+                        "registered_at": raw.get("registered_at", ""),
+                        "last_heartbeat": raw.get("last_heartbeat", ""),
+                        "total_tasks_processed": int(
+                            raw.get("total_tasks_processed", 0)
+                        ),
+                        "failed_tasks": int(raw.get("failed_tasks", 0)),
+                    }
+                logger.debug(f"Synchronized worker {worker_id} map state locally.")
+        elif worker_id and action == "deregister":
+            with self.lock:
+                if worker_id in self.local_workers:
+                    del self.local_workers[worker_id]
+            logger.debug(f"Removed worker {worker_id} from local cache via sync alert.")
+
+    def _trigger_sync_broadcast(self, worker_id: str, action: str = "sync") -> None:
         """
-        Register a new worker node
+        Private helper to alert other cluster nodes to sync memory updates
 
         Args:
-            worker_id: Unique worker identifier
-            capacity: Maximum concurrent tasks this worker can handle
+            worker_id: Unique worker identifier to update
+            action: Sync event behavior type ("sync" or "deregister")
+        """
+        native = self._get_native_redis_client()
+        if native:
+            try:
+                native.publish(
+                    self.SYNC_CHANNEL,
+                    json.dumps({"worker_id": worker_id, "action": action}),
+                )
+            except Exception as e:
+                logger.error(f"Failed to publish sync broadcast: {e!s}")
+
+    def register_worker(
+        self,
+        worker_id: str,
+        capacity: int = 4,
+        tags: list[str] | None = None,
+    ) -> bool:
+        """
+        Register a new worker node.
+
+        Args:
+            worker_id: Unique worker identifier.
+            capacity: Maximum concurrent tasks this worker can handle.
+            tags: Optional worker capability tags.
 
         Returns:
-            bool: True if successful
+            bool: True if successful.
         """
         try:
             worker_data = {
@@ -86,10 +249,16 @@ class WorkerRegistry:
                 "status": "healthy",
                 "active_tasks": 0,
                 "capacity": capacity,
+                "tags": tags or [],
                 "registered_at": datetime.now(timezone.utc).isoformat(),
                 "last_heartbeat": datetime.now(timezone.utc).isoformat(),
                 "total_tasks_processed": 0,
                 "failed_tasks": 0,
+
+               # New fields
+              "failure_count": 0,
+              "penalty_weight": 1.0,
+              "penalty_until": None,
             }
 
             with self.lock:
@@ -98,27 +267,61 @@ class WorkerRegistry:
             # Store in Redis
             if self.redis_client:
                 key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
-                # hset expects native int/bool/str values; coerce ints explicitly.
+
+                # hset expects native int/str values.
+                # Store tags as a JSON string.
                 payload = {
                     k: (
                         int(v)
                         if isinstance(v, (int, float))
                         and k
                         in {
-                            "capacity",
-                            "active_tasks",
-                            "total_tasks_processed",
-                            "failed_tasks",
+                            in {
+                             "capacity",
+                             "active_tasks",
+                             "total_tasks_processed",
+                             "failed_tasks",
+                             "failure_count",
+}
                         }
                         else str(v)
                     )
                     for k, v in worker_data.items()
                 }
+
                 self.redis_client.hset(key, mapping=payload)
                 self.redis_client.sadd(self.WORKER_SET_KEY, worker_id)
-                self.redis_client.expire(key, int(timedelta(hours=24).total_seconds()))
+                self.redis_client.expire(
+                    key,
+                    int(timedelta(hours=24).total_seconds()),
+                )
 
-            logger.info(f"Registered worker: {worker_id} with capacity {capacity}")
+                # Broadcast modification to other running cluster instances
+                self._trigger_sync_broadcast(worker_id)
+
+            logger.info(f"Registered worker: {worker_id} " f"with capacity {capacity}")
+
+            # Update total registered workers metric
+            WORKERS_REGISTERED.set(len(self.local_workers))
+
+            # Update healthy worker count
+            WORKERS_HEALTHY.set(
+                sum(1 for w in self.local_workers.values() if w["status"] == "healthy")
+            )
+
+            # Update unhealthy worker count
+            WORKERS_UNHEALTHY.set(
+                sum(
+                    1 for w in self.local_workers.values() if w["status"] == "unhealthy"
+                )
+            )
+
+            # Store capacity allocated to this worker
+            WORKER_CAPACITY.labels(worker_id=worker_id).set(capacity)
+
+            # Initialize active task metric for the new worker
+            WORKER_ACTIVE_TASKS.labels(worker_id=worker_id).set(0)
+
             return True
 
         except Exception as e:
@@ -143,13 +346,20 @@ class WorkerRegistry:
                     return False
 
                 self.local_workers[worker_id]["status"] = status
-                self.local_workers[worker_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
+                self.local_workers[worker_id]["updated_at"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
 
             # Update in Redis
             if self.redis_client:
                 key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
                 self.redis_client.hset(key, "status", status)
-                self.redis_client.hset(key, "updated_at", datetime.now(timezone.utc).isoformat())
+                self.redis_client.hset(
+                    key, "updated_at", datetime.now(timezone.utc).isoformat()
+                )
+
+                # Broadcast modification to other running cluster instances
+                self._trigger_sync_broadcast(worker_id)
 
             logger.info(f"Updated worker {worker_id} status to {status}")
             return True
@@ -170,27 +380,63 @@ class WorkerRegistry:
             bool: True if successful
         """
         try:
+            has_changed = False
             with self.lock:
                 if worker_id not in self.local_workers:
-                    logger.warning(f"Received heartbeat from unknown worker: {worker_id}")
+                    logger.warning(
+                        f"Received heartbeat from unknown worker: {worker_id}"
+                    )
                     return False
 
+                old_worker = self.local_workers.get(worker_id)
+                if old_worker:
+                    if (
+                        old_worker.get("active_tasks") != active_tasks
+                        or old_worker.get("status") != "healthy"
+                    ):
+                        has_changed = True
+                else:
+                    has_changed = True
+
                 self.local_workers[worker_id]["active_tasks"] = active_tasks
-                self.local_workers[worker_id]["last_heartbeat"] = datetime.now(timezone.utc).isoformat()
+                self.local_workers[worker_id]["last_heartbeat"] = datetime.now(
+                    timezone.utc
+                ).isoformat()
                 self.local_workers[worker_id]["status"] = "healthy"
 
             # Update in Redis
             if self.redis_client:
                 key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
                 self.redis_client.hset(key, "active_tasks", active_tasks)
-                self.redis_client.hset(key, "last_heartbeat", datetime.now(timezone.utc).isoformat())
+                self.redis_client.hset(
+                    key, "last_heartbeat", datetime.now(timezone.utc).isoformat()
+                )
                 self.redis_client.hset(key, "status", "healthy")
 
                 # Also store heartbeat timestamp
                 hb_key = f"{self.WORKER_HEARTBEAT_KEY}{worker_id}"
                 self.redis_client.set(hb_key, "ok", ex=self.HEARTBEAT_TIMEOUT)
 
+                if has_changed:
+                    self._trigger_sync_broadcast(worker_id)
+
             logger.debug(f"Heartbeat from {worker_id}: {active_tasks} active tasks")
+
+            # Update worker active task count from heartbeat
+            WORKER_ACTIVE_TASKS.labels(worker_id=worker_id).set(active_tasks)
+
+            # Refresh healthy worker metric after heartbeat
+            WORKERS_HEALTHY.set(
+                sum(1 for w in self.local_workers.values() if w["status"] == "healthy")
+            )
+
+            # Refresh unhealthy worker metric after heartbeat
+            WORKERS_UNHEALTHY.set(
+                sum(
+                    1 for w in self.local_workers.values() if w["status"] == "unhealthy"
+                )
+            )
+
             return True
 
         except Exception as e:
@@ -208,6 +454,9 @@ class WorkerRegistry:
             if self.redis_client:
                 key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
                 self.redis_client.hincrby(key, "active_tasks", 1)
+
+                # Broadcast modification to other running cluster instances
+                self._trigger_sync_broadcast(worker_id)
 
             return True
         except Exception as e:
@@ -229,10 +478,92 @@ class WorkerRegistry:
                 self.redis_client.hincrby(key, "active_tasks", -1)
                 self.redis_client.hincrby(key, "total_tasks_processed", 1)
 
+                # Broadcast modification to other running cluster instances
+                self._trigger_sync_broadcast(worker_id)
+
             return True
         except Exception as e:
             logger.error(f"Error decrementing active tasks: {e!s}")
             return False
+        
+        def record_failure(self, worker_id: str) -> None:
+    """
+    Record a failed task and apply a temporary penalty.
+    """
+    with self.lock:
+        worker = self.local_workers.get(worker_id)
+        if not worker:
+            return
+
+        worker["failed_tasks"] += 1
+        worker["failure_count"] += 1
+
+        # Reduce scheduling weight
+        worker["penalty_weight"] = max(
+            0.2,
+            worker["penalty_weight"] - 0.2
+        )
+
+        # Penalty lasts for 60 seconds
+        worker["penalty_until"] = (
+            datetime.now(timezone.utc) + timedelta(seconds=60)
+        ).isoformat()
+
+    if self.redis_client:
+        key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
+        self.redis_client.hset(key, mapping={
+            "failed_tasks": worker["failed_tasks"],
+            "failure_count": worker["failure_count"],
+            "penalty_weight": worker["penalty_weight"],
+            "penalty_until": worker["penalty_until"],
+        })
+
+
+def record_success(self, worker_id: str) -> None:
+    """
+    Reset penalty after successful execution.
+    """
+    with self.lock:
+        worker = self.local_workers.get(worker_id)
+        if not worker:
+            return
+
+        worker["failure_count"] = 0
+        worker["penalty_weight"] = 1.0
+        worker["penalty_until"] = None
+
+    if self.redis_client:
+        key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
+        self.redis_client.hset(key, mapping={
+            "failure_count": 0,
+            "penalty_weight": 1.0,
+            "penalty_until": "",
+        })
+
+
+def get_worker_weight(self, worker: dict[str, Any]) -> float:
+    """
+    Return effective scheduling weight.
+    Penalized workers receive a lower weight.
+    """
+    penalty_until = worker.get("penalty_until")
+
+    if penalty_until:
+        try:
+            expiry = datetime.fromisoformat(penalty_until)
+
+            if expiry > datetime.now(timezone.utc):
+                return worker["penalty_weight"]
+
+            # Penalty expired
+            worker["penalty_weight"] = 1.0
+            worker["penalty_until"] = None
+
+        except Exception:
+            pass
+
+    return 1.0
+
 
     def get_worker(self, worker_id: str) -> dict[str, Any] | None:
         """Get worker details"""
@@ -254,7 +585,10 @@ class WorkerRegistry:
         available = []
         with self.lock:
             for worker in self.local_workers.values():
-                if worker["status"] == "healthy" and worker["active_tasks"] < worker["capacity"]:
+                if (
+                    worker["status"] == "healthy"
+                    and worker["active_tasks"] < worker["capacity"]
+                ):
                     available.append(worker)
 
         return available
@@ -277,26 +611,36 @@ class WorkerRegistry:
         """Get overall worker registry statistics"""
         with self.lock:
             total_workers = len(self.local_workers)
-            healthy_workers = sum(1 for w in self.local_workers.values() if w["status"] == "healthy")
+            healthy_workers = sum(
+                1 for w in self.local_workers.values() if w["status"] == "healthy"
+            )
             total_capacity = sum(w["capacity"] for w in self.local_workers.values())
-            total_active_tasks = sum(w["active_tasks"] for w in self.local_workers.values())
-            total_processed = sum(w.get("total_tasks_processed", 0) for w in self.local_workers.values())
-            idle_workers = sum(1 for w in self.local_workers.values() if w["active_tasks"] == 0)
+            total_active_tasks = sum(
+                w["active_tasks"] for w in self.local_workers.values()
+            )
+            total_processed = sum(
+                w.get("total_tasks_processed", 0) for w in self.local_workers.values()
+            )
+            idle_workers = sum(
+                1 for w in self.local_workers.values() if w["active_tasks"] == 0
+            )
             active_loads = [w["active_tasks"] for w in self.local_workers.values()]
             avg_active = (total_active_tasks / total_workers) if total_workers else 0
 
             worker_details = [
-                {
-                    "worker_id": wid,
-                    "capacity": w["capacity"],
-                    "active_tasks": w["active_tasks"],
-                    "status": w["status"],
-                    "last_heartbeat": w.get("last_heartbeat"),
-                    "total_tasks_processed": w.get("total_tasks_processed", 0),
-                    "failed_tasks": w.get("failed_tasks", 0),
-                }
-                for wid, w in self.local_workers.items()
-            ]
+    {
+        "worker_id": wid,
+        "capacity": w["capacity"],
+        "active_tasks": w["active_tasks"],
+        "status": w["status"],
+        "last_heartbeat": w.get("last_heartbeat"),
+        "total_tasks_processed": w.get("total_tasks_processed", 0),
+        "failed_tasks": w.get("failed_tasks", 0),
+        "failure_count": w.get("failure_count", 0),
+        "penalty_weight": w.get("penalty_weight", 1.0),
+    }
+    for wid, w in self.local_workers.items()
+]
 
             return {
                 "total_workers": total_workers,
@@ -305,7 +649,11 @@ class WorkerRegistry:
                 "total_capacity": total_capacity,
                 "total_active_tasks": total_active_tasks,
                 "capacity_utilization": round(
-                    (total_active_tasks / total_capacity * 100) if total_capacity > 0 else 0,
+                    (
+                        (total_active_tasks / total_capacity * 100)
+                        if total_capacity > 0
+                        else 0
+                    ),
                     2,
                 ),
                 "total_tasks_processed": total_processed,
@@ -340,7 +688,73 @@ class WorkerRegistry:
                     unhealthy.append(worker_id)
                     worker["status"] = "unhealthy"
 
+        # Broadcast if status changes to unhealthy
+        for wid in unhealthy:
+            self._trigger_sync_broadcast(wid)
+
         return unhealthy
+    
+    def record_worker_failure(self, worker_id: str):
+    worker = self.local_workers.get(worker_id)
+
+    if not worker:
+        return
+
+    worker["failure_count"] += 1
+
+    if worker["failure_count"] >= 3:
+        worker["penalty_weight"] = 0.5
+        worker["penalty_until"] = (
+            datetime.now(timezone.utc) + timedelta(minutes=5)
+        ).isoformat()
+
+        def clear_penalty(self, worker_id: str):
+
+    worker = self.local_workers.get(worker_id)
+
+    if not worker:
+        return
+
+    worker["failure_count"] = 0
+    worker["penalty_weight"] = 1.0
+    worker["penalty_until"] = None
+
+    def get_worker_weight(self, worker):
+
+    penalty_until = worker.get("penalty_until")
+
+    if penalty_until:
+
+        if datetime.now(timezone.utc) > datetime.fromisoformat(penalty_until):
+
+            worker["penalty_weight"] = 1.0
+            worker["failure_count"] = 0
+            worker["penalty_until"] = None
+
+    return worker.get("penalty_weight", 1.0)
+
+
+def record_failure(self, worker_id: str):
+    worker = self.local_workers.get(worker_id)
+    if not worker:
+        return
+
+    worker["failure_count"] += 1
+
+    if worker["failure_count"] >= 3:
+        worker["penalty_weight"] = 0.5
+
+    def record_success(self, worker_id: str):
+    worker = self.local_workers.get(worker_id)
+    if not worker:
+        return
+
+    worker["failure_count"] = 0
+    worker["penalty_weight"] = 1.0
+
+    def get_worker_weight(self, worker):
+    return worker.get("penalty_weight", 1.0)
+
 
     def deregister_worker(self, worker_id: str) -> bool:
         """Remove a worker from the registry"""
@@ -354,7 +768,25 @@ class WorkerRegistry:
                 self.redis_client.delete(key)
                 self.redis_client.srem(self.WORKER_SET_KEY, worker_id)
 
+                # Broadcast deregistration action
+                self._trigger_sync_broadcast(worker_id, action="deregister")
+
             logger.info(f"Deregistered worker: {worker_id}")
+
+            # Update Prometheus metrics
+            WORKERS_REGISTERED.set(len(self.local_workers))
+            CURRENT_WORKERS.set(len(self.local_workers))
+
+            WORKERS_HEALTHY.set(
+                sum(1 for w in self.local_workers.values() if w["status"] == "healthy")
+            )
+
+            WORKERS_UNHEALTHY.set(
+                sum(
+                    1 for w in self.local_workers.values() if w["status"] == "unhealthy"
+                )
+            )
+
             return True
         except Exception as e:
             logger.error(f"Error deregistering worker: {e!s}")

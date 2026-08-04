@@ -6,8 +6,10 @@ import Card from "@/components/Card";
 import Stat from "@/components/Stat";
 import { StatusBadge, Badge } from "@/components/Badge";
 import { Skeleton, ErrorState, EmptyState } from "@/components/States";
-import { SearchInput } from "@/components/SearchInput";
+import { SearchInput } from "@/components/ui";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui";
 import { formatPercent, formatRelative } from "@/lib/utils";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function WorkersPage() {
   const workers = useSWR("/workers", { refreshInterval: 4000 });
@@ -19,6 +21,32 @@ export default function WorkersPage() {
     if (!workers.data?.workers) return [];
     if (!search.trim()) return workers.data.workers;
     const q = search.toLowerCase();
+    return workers.data.workers.filter((w) =>
+      w.worker_id.toLowerCase().includes(q)
+    );
+  }, [workers.data?.workers, search]);
+     if (!workers.data?.workers) return [];
+     let data = workers.data.workers;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      data = data.filter((w) =>
+        w.worker_id.toLowerCase().includes(q)
+      );
+    }
+
+    if (sortConfig.key && sortConfig.order) {
+      data = [...data].sort((a, b) => {
+        const aVal = a[sortConfig.key];
+        const bVal = b[sortConfig.key];
+
+        if (aVal < bVal) return sortConfig.order === "asc" ? -1 : 1;
+        if (aVal > bVal) return sortConfig.order === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return data;
+  }, [workers.data?.workers, search, sortConfig]);
     return workers.data.workers.filter((w) => w.worker_id.toLowerCase().includes(q));
   }, [workers.data?.workers, search]);
 
@@ -59,8 +87,16 @@ export default function WorkersPage() {
         />
         <Stat
           label="Strategy"
-          value={scheduling.data?.current_strategy ?? <Skeleton className="h-7 w-24" />}
-          hint={scheduling.data?.can_accept_tasks ? "Accepting tasks" : "At capacity"}
+          value={
+            scheduling.data?.current_strategy ?? (
+              <Skeleton className="h-7 w-24" />
+            )
+          }
+          hint={
+            scheduling.data?.can_accept_tasks
+              ? "Accepting tasks"
+              : "At capacity"
+          }
         />
       </div>
 
@@ -81,10 +117,61 @@ export default function WorkersPage() {
         ) : !workers.data ? (
           <Skeleton className="h-32 w-full" />
         ) : workers.data.workers.length === 0 ? (
-          <EmptyState title="No workers" description="Workers register themselves on startup." />
+          <EmptyState
+            title="No workers"
+            description="Workers register themselves on startup."
+          />
         ) : filtered.length === 0 ? (
           <EmptyState title="No matches" description="Try a different filter." />
         ) : (
+          <Table>
+            <Thead>
+              <Tr>
+                <Th>Worker</Th>
+                <Th>Status</Th>
+                <Th>Active</Th>
+                <Th>Capacity</Th>
+                <Th>Utilization</Th>
+                <Th>Heartbeat</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {filtered.map((w) => {
+                const util = w.capacity
+                  ? (w.active_tasks / w.capacity) * 100
+                  : 0;
+                return (
+                  <Tr key={w.worker_id}>
+                    <Td className="font-mono text-xs text-zinc-200">
+                      {w.worker_id}
+                    </Td>
+                    <Td>
+                      <StatusBadge status={w.health_status} />
+                    </Td>
+                    <Td>{w.active_tasks}</Td>
+                    <Td>{w.capacity}</Td>
+                    <Td>
+                      <Badge
+                        variant={
+                          util > 90
+                            ? "danger"
+                            : util > 70
+                            ? "warn"
+                            : "success"
+                        }
+                      >
+                        {formatPercent(util)}
+                      </Badge>
+                    </Td>
+                    <Td className="text-muted">
+                      {formatRelative(w.last_heartbeat)}
+                    </Td>
+                  </Tr>
+                );
+              })}
+            </Tbody>
+          </Table>
+          <div className="overflow-x-auto"> 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-muted">

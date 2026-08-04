@@ -19,11 +19,14 @@ What gets seeded:
 from __future__ import annotations
 
 import argparse
+import logging
 import random
 import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Make the project root importable when run as a script.
 ROOT = Path(__file__).resolve().parent.parent
@@ -149,8 +152,12 @@ def seed_sessions(reset: bool = False) -> None:
         db.add_all(rows)
         db.commit()
         print(f"  + inserted {len(rows)} demo sessions")
+    except Exception:
+            db.rollback()
+            raise
     finally:
-        db.close()
+            db.close()
+
 
 
 def main() -> int:

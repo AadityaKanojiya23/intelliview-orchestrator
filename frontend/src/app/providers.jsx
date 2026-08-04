@@ -1,4 +1,5 @@
 "use client";
+import { initWebVitals } from "@/lib/webVitals";
 import { Suspense, lazy, useEffect, useState, useCallback } from "react";
 import { SWRConfig } from "swr";
 import { swrFetcher } from "@/lib/fetcher";
@@ -63,9 +64,10 @@ function ScreenLockWrapper() {
 
 export function ClientProviders({ children }) {
   useHydrateToken();
-  useEffect(() => {
-    hydrateTheme();
-  }, []);
+useEffect(() => {
+  hydrateTheme();
+  initWebVitals();
+}, []);
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -83,8 +85,18 @@ export function ClientProviders({ children }) {
         setPaletteOpen((o) => !o);
       }
     };
+    const onPalette = () => setPaletteOpen(true);
+    const onHelp = () => setHelpOpen(true);
+    
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    window.addEventListener("open-command-palette", onPalette);
+    window.addEventListener("open-shortcuts-help", onHelp);
+    
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("open-command-palette", onPalette);
+      window.removeEventListener("open-shortcuts-help", onHelp);
+    };
   }, []);
 
   useEffect(() => {

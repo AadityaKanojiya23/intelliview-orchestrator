@@ -15,13 +15,20 @@ thresholds exercise without external services.
 
 import json
 import logging
+import re
 from typing import Any
+from workers.prompts import (
+    QUALITY_EVALUATION_PROMPT,
+    TECHNICAL_ACCURACY_PROMPT,
+    COMMUNICATION_EVALUATION_PROMPT,
+)
+
 
 logger = logging.getLogger(__name__)
 
 
 from workers._stubs import _seeded_unit  # noqa: E402
-from workers.semantic_similarity import calculate_semantic_similarity
+from workers.prompt_categorization import categorize_prompt
 
 # ---------------------------------------------------------------------------
 # Real LLM-based evaluation helpers with fallback to seeded stubs
@@ -31,31 +38,40 @@ from workers.semantic_similarity import calculate_semantic_similarity
 def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
     """Use GPT-4o/Gemini/Grok to evaluate answer quality and relevance."""
     prompt = (
-        "You are an expert technical interviewer. Evaluate this candidate answer. "
-        "Return a JSON object with keys: overall_quality_score (0-100), "
-        "relevance (0-1), completeness (0-1), clarity (0-1), feedback (string)."
+        "Evaluate the candidate's answer. "
+        "Return JSON: overall_quality_score (0-100), relevance (0-1), completeness (0-1), clarity (0-1), feedback."
     )
+    prompt_category = categorize_prompt(prompt)
+    
     user_msg = f"Question: {question}\n\nAnswer: {answer}"
 
-    try:
+    try: 
         from workers.ai_client import HAS_OPENAI, chat_completion
 
         if HAS_OPENAI:
-            response = chat_completion(
+            response, usage = chat_completion(
                 [{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}],
                 model="gpt-4o",
                 temperature=0.3,
                 max_tokens=512,
             )
+            logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
             if response:
-                parsed = json.loads(response)
+                try:
+                    parsed = json.loads(response)
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON from LLM (openai, quality): %s", response)
+                return None
+            
                 return {
                     "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
                     "relevance": round(parsed.get("relevance", 0.5), 2),
                     "completeness": round(parsed.get("completeness", 0.5), 2),
                     "clarity": round(parsed.get("clarity", 0.5), 2),
                     "feedback": parsed.get("feedback", ""),
+                    "prompt_category": prompt_category,
                     "provider": "openai",
+                    "usage": usage,
                 }
     except Exception as exc:
         logger.debug("OpenAI quality evaluation failed: %s", exc)
@@ -64,16 +80,23 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
         from workers.ai_client import HAS_GEMINI, gemini_generate
 
         if HAS_GEMINI:
-            response = gemini_generate(f"{prompt}\n\n{user_msg}", temperature=0.3, max_output_tokens=512)
+            response, usage = gemini_generate(f"{prompt}\n\n{user_msg}", temperature=0.3, max_output_tokens=512)
+            logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
             if response:
-                parsed = json.loads(response)
-                return {
+                try:
+                    parsed = json.loads(response)
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON from LLM (openai, quality): %s", response)
+                return None
+            return {
                     "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
                     "relevance": round(parsed.get("relevance", 0.5), 2),
                     "completeness": round(parsed.get("completeness", 0.5), 2),
                     "clarity": round(parsed.get("clarity", 0.5), 2),
                     "feedback": parsed.get("feedback", ""),
+                    "prompt_category": prompt_category,
                     "provider": "gemini",
+                    "usage": usage,
                 }
     except Exception as exc:
         logger.debug("Gemini quality evaluation failed: %s", exc)
@@ -82,20 +105,27 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
         from workers.ai_client import HAS_GROK, grok_completion
 
         if HAS_GROK:
-            response = grok_completion(
+            response, usage = grok_completion(
                 [{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}],
                 temperature=0.3,
                 max_tokens=512,
             )
+            logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
             if response:
-                parsed = json.loads(response)
+                try:
+                    parsed = json.loads(response)
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON from LLM (gemini, quality): %s", response)
+                    return None
                 return {
                     "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
                     "relevance": round(parsed.get("relevance", 0.5), 2),
                     "completeness": round(parsed.get("completeness", 0.5), 2),
                     "clarity": round(parsed.get("clarity", 0.5), 2),
                     "feedback": parsed.get("feedback", ""),
+                    "prompt_category": prompt_category,
                     "provider": "grok",
+                    "usage": usage,
                 }
     except Exception as exc:
         logger.debug("Grok quality evaluation failed: %s", exc)
@@ -106,10 +136,8 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
 def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
     """Use GPT-4o/Gemini/Grok to evaluate technical accuracy."""
     prompt = (
-        "You are a technical interviewer evaluating a candidate's answer. "
-        "Return a JSON object with keys: accuracy_score (0-100), "
-        "correct_concepts_count (int), incorrect_concepts_count (int), "
-        "knowledge_gaps (list of strings)."
+        "Evaluate the answer. "
+        "Return JSON with keys: accuracy_score, correct_concepts_count, incorrect_concepts_count, knowledge_gaps."
     )
     user_msg = f"Question: {question}\n\nAnswer: {answer}"
 
@@ -117,20 +145,26 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
         from workers.ai_client import HAS_OPENAI, chat_completion
 
         if HAS_OPENAI:
-            response = chat_completion(
+            response, usage = chat_completion(
                 [{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}],
                 model="gpt-4o",
                 temperature=0.3,
                 max_tokens=512,
             )
+            logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
             if response:
-                parsed = json.loads(response)
+                try:
+                    parsed = json.loads(response)
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON from LLM (openai, accuracy): %s", response)
+                    return None
                 return {
                     "accuracy_score": round(parsed.get("accuracy_score", 50), 2),
                     "correct_concepts_count": parsed.get("correct_concepts_count", 0),
                     "incorrect_concepts_count": parsed.get("incorrect_concepts_count", 0),
                     "knowledge_gaps": parsed.get("knowledge_gaps", []),
                     "provider": "openai",
+                    "usage": usage,
                 }
     except Exception as exc:
         logger.debug("OpenAI accuracy evaluation failed: %s", exc)
@@ -139,15 +173,21 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
         from workers.ai_client import HAS_GEMINI, gemini_generate
 
         if HAS_GEMINI:
-            response = gemini_generate(f"{prompt}\n\n{user_msg}", temperature=0.3, max_output_tokens=512)
+            response, usage = gemini_generate(f"{prompt}\n\n{user_msg}", temperature=0.3, max_output_tokens=512)
+            logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
             if response:
-                parsed = json.loads(response)
+                try:
+                    parsed = json.loads(response)
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON from LLM (gemini, accuracy): %s", response)
+                    return None
                 return {
                     "accuracy_score": round(parsed.get("accuracy_score", 50), 2),
                     "correct_concepts_count": parsed.get("correct_concepts_count", 0),
                     "incorrect_concepts_count": parsed.get("incorrect_concepts_count", 0),
                     "knowledge_gaps": parsed.get("knowledge_gaps", []),
                     "provider": "gemini",
+                    "usage": usage,
                 }
     except Exception as exc:
         logger.debug("Gemini accuracy evaluation failed: %s", exc)
@@ -156,19 +196,25 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
         from workers.ai_client import HAS_GROK, grok_completion
 
         if HAS_GROK:
-            response = grok_completion(
+            response, usage = grok_completion(
                 [{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}],
                 temperature=0.3,
                 max_tokens=512,
             )
+            logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
             if response:
-                parsed = json.loads(response)
+                try:
+                    parsed = json.loads(response)
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON from LLM (grok, accuracy): %s", response)
+                    return None
                 return {
                     "accuracy_score": round(parsed.get("accuracy_score", 50), 2),
                     "correct_concepts_count": parsed.get("correct_concepts_count", 0),
                     "incorrect_concepts_count": parsed.get("incorrect_concepts_count", 0),
                     "knowledge_gaps": parsed.get("knowledge_gaps", []),
                     "provider": "grok",
+                    "usage": usage,
                 }
     except Exception as exc:
         logger.debug("Grok accuracy evaluation failed: %s", exc)
@@ -181,15 +227,13 @@ def _llm_evaluate_communication(session_id: str, question: str, answer: str) -> 
     try:
         from workers.ai_client import chat_completion
 
-        response = chat_completion(
+        response, usage = chat_completion(
             [
                 {
                     "role": "system",
                     "content": (
-                        "Evaluate the candidate's communication quality. "
-                        "Return a JSON object with keys: clarity_score (0-100), "
-                        "professionalism (0-100), confidence_level (0-1), "
-                        "pace_appropriateness (0-1)."
+                        "Evaluate communication. "
+                        "Return JSON with keys: clarity_score, professionalism, confidence_level, pace_appropriateness."
                     ),
                 },
                 {"role": "user", "content": f"Question: {question}\n\nAnswer: {answer}"},
@@ -198,14 +242,20 @@ def _llm_evaluate_communication(session_id: str, question: str, answer: str) -> 
             temperature=0.3,
             max_tokens=512,
         )
+        logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
         if response is None:
             return None
-        parsed = json.loads(response)
+        try:
+            parsed = json.loads(response)
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON from LLM (communication): %s", response)
+            return None
         return {
             "clarity_score": round(parsed.get("clarity_score", 50), 2),
             "professionalism": round(parsed.get("professionalism", 50), 2),
             "confidence_level": round(parsed.get("confidence_level", 0.5), 2),
             "pace_appropriateness": round(parsed.get("pace_appropriateness", 0.5), 2),
+            "usage": usage,
         }
     except Exception as exc:
         logger.debug("LLM communication evaluation unavailable: %s", exc)
@@ -217,16 +267,13 @@ def _llm_generate_feedback(session_id: str, question: str, answer: str) -> dict[
     try:
         from workers.ai_client import chat_completion
 
-        response = chat_completion(
+        response, usage = chat_completion(
             [
                 {
                     "role": "system",
                     "content": (
-                        "You are an experienced technical interviewer. Based on the "
-                        "question and answer, generate structured feedback. "
-                        "Return a JSON object with keys: strengths (list of strings), "
-                        "improvements (list of strings), detailed_feedback (string), "
-                        "recommendation (one of: strong_hire, hire, maybe, no_hire)."
+                        "Generate structured interview feedback. "
+                        "Return JSON: strengths, improvements, detailed_feedback, recommendation.(strong_hire|hire|maybe|no_hire)."
                     ),
                 },
                 {"role": "user", "content": f"Question: {question}\n\nAnswer: {answer}"},
@@ -235,9 +282,14 @@ def _llm_generate_feedback(session_id: str, question: str, answer: str) -> dict[
             temperature=0.5,
             max_tokens=1024,
         )
+        logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
         if response is None:
             return None
-        parsed = json.loads(response)
+        try:
+            parsed = json.loads(response)
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON from LLM (feedback): %s", response)
+            return None
         recommendation = parsed.get("recommendation", "progress")
         if recommendation == "hire":
             recommendation = "progress"
@@ -246,10 +298,80 @@ def _llm_generate_feedback(session_id: str, question: str, answer: str) -> dict[
             "improvements": parsed.get("improvements", []),
             "detailed_feedback": parsed.get("detailed_feedback", ""),
             "recommendation": recommendation,
+            "usage": usage,
         }
     except Exception as exc:
         logger.debug("LLM feedback generation unavailable: %s", exc)
         return None
+
+
+# ---------------------------------------------------------------------------
+# Question guardrail — no external dependencies
+# ---------------------------------------------------------------------------
+
+_BANNED_TOPIC_PATTERNS: list[re.Pattern[str]] | None = None
+
+
+def _get_banned_patterns() -> list[re.Pattern[str]]:
+    """Return pre-compiled banned-topic regex patterns (built once, cached)."""
+    global _BANNED_TOPIC_PATTERNS
+    if _BANNED_TOPIC_PATTERNS is None:
+        try:
+            from config import BANNED_TOPICS
+        except Exception:  # pragma: no cover — fallback if config is unavailable
+            BANNED_TOPICS = [
+                "age",
+                "how old",
+                "old are you",
+                "pregnant",
+                "children",
+                "family planning",
+                "religion",
+                "religious",
+                "citizenship",
+                "nationality",
+                "marital status",
+                "married",
+                "disability",
+                "disabled",
+                "medical condition",
+                "health condition",
+            ]
+        _BANNED_TOPIC_PATTERNS = [re.compile(r"\b" + kw + r"\b", re.IGNORECASE) for kw in BANNED_TOPICS]
+    return _BANNED_TOPIC_PATTERNS
+
+
+_YES_NO_RE = re.compile(
+    r"^(do|does|did|have|has|had|is|are|was|were|will|would|can|could|should|may|might)\s",
+    re.IGNORECASE,
+)
+
+
+_MIN_LENGTH = 20
+_MAX_LENGTH = 500
+
+
+def validate_generated_question(question: str) -> tuple[bool, list[str]]:
+    """Validate an LLM-generated interview question before it is used."""
+    reasons: list[str] = []
+
+    for pattern in _get_banned_patterns():
+        if pattern.search(question):
+            reasons.append(f"banned topic matched: '{pattern.pattern}'")
+
+    length = len(question)
+    if length < _MIN_LENGTH:
+        reasons.append(f"question too short ({length} chars, minimum {_MIN_LENGTH})")
+    elif length > _MAX_LENGTH:
+        reasons.append(f"question too long ({length} chars, maximum {_MAX_LENGTH})")
+
+    if not question.rstrip().endswith("?"):
+        reasons.append("question does not end with '?'")
+
+    if _YES_NO_RE.match(question.lstrip()):
+        reasons.append("question appears to be a simple yes/no question")
+
+    return (len(reasons) == 0, reasons)
 
 
 def _llm_generate_question(session_id: str, topic: str = "systems_design") -> str | None:
@@ -257,13 +379,13 @@ def _llm_generate_question(session_id: str, topic: str = "systems_design") -> st
     try:
         from workers.ai_client import chat_completion
 
-        response = chat_completion(
+        response, usage = chat_completion(
             [
                 {
                     "role": "system",
                     "content": (
-                        "Generate a single challenging technical interview question "
-                        f"about {topic}. Return only the question text, nothing else."
+                        f"Generate one challenging {topic} interview question. "
+                        "Return only the question."
                     ),
                 },
                 {"role": "user", "content": "Generate one question."},
@@ -272,9 +394,76 @@ def _llm_generate_question(session_id: str, topic: str = "systems_design") -> st
             temperature=0.8,
             max_tokens=256,
         )
-        return response.strip() if response else None
+        logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
+        if not response:
+            return None
+
+        question = response.strip()
+        is_valid, reasons = validate_generated_question(question)
+        if not is_valid:
+            logger.warning(
+                "LLM-generated question rejected for session %s. Reasons: %s",
+                session_id,
+                "; ".join(reasons),
+            )
+            return None
+
+        return question
     except Exception:
         return None
+
+
+# ---------------------------------------------------------------------------
+# Hallucination detection — semantic similarity + NLI entailment,
+# with a seeded stub fallback matching the pattern used above.
+# ---------------------------------------------------------------------------
+
+_hallucination_detector = None
+_hallucination_detector_unavailable = False
+
+
+def _get_hallucination_detector():
+    """Lazily load the hallucination detector's models (expensive — load once)."""
+    global _hallucination_detector, _hallucination_detector_unavailable
+    if _hallucination_detector_unavailable:
+        return None
+    if _hallucination_detector is None:
+        try:
+            from orchestrator.hallucination_detector import HallucinationDetector
+
+            _hallucination_detector = HallucinationDetector()
+        except Exception as exc:
+            logger.warning(f"Hallucination detector models unavailable, using stub: {exc}")
+            _hallucination_detector_unavailable = True
+            return None
+    return _hallucination_detector
+
+
+def evaluate_hallucination(
+    session_id: str, question: str, answer: str, source_context: str | None = None
+) -> dict[str, Any]:
+    """Evaluate whether the candidate's answer contains hallucinated
+    (fabricated / unsupported / contradictory) claims — real model with
+    seeded stub fallback."""
+    logger.info(f"Evaluating hallucination risk for session {session_id}")
+
+    detector = _get_hallucination_detector()
+    if detector is not None:
+        try:
+            reference = source_context or question
+            result = detector.evaluate(reference, answer)
+            return result.to_dict()
+        except Exception as exc:
+            logger.debug(f"Hallucination model evaluation failed, falling back to stub: {exc}")
+
+    base = 0.15 + _seeded_unit(session_id, "hallucination") * 0.3
+    risk_level = "low" if base < 0.3 else "medium" if base < 0.6 else "high"
+    return {
+        "hallucination_score": round(base, 3),
+        "is_hallucination": base >= 0.5,
+        "risk_level": risk_level,
+        "explanation": "Stub evaluation (models unavailable): deterministic seeded signal.",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -289,6 +478,11 @@ def evaluate_answers(session_id: str) -> dict[str, Any]:
     quality = evaluate_answer_quality(session_id)
     accuracy = evaluate_technical_accuracy(session_id)
     clarity = evaluate_communication(session_id)
+    hallucination = evaluate_hallucination(
+        session_id,
+        "Describe your experience with distributed systems.",
+        "I have five years of experience building distributed systems in Python and Go.",
+    )
     feedback = generate_feedback(session_id)
 
     results = {
@@ -296,6 +490,7 @@ def evaluate_answers(session_id: str) -> dict[str, Any]:
         "answer_quality_score": quality,
         "technical_accuracy": accuracy,
         "communication_clarity": clarity,
+        "hallucination_check": hallucination,
         "feedback": feedback,
         "risk_score": 0.0,
     }
@@ -409,10 +604,12 @@ def calculate_evaluation_risk_score(results: dict[str, Any]) -> float:
     quality = results.get("answer_quality_score", {}).get("overall_quality_score", 50) / 100.0
     accuracy = results.get("technical_accuracy", {}).get("accuracy_score", 50) / 100.0
     clarity = results.get("communication_clarity", {}).get("clarity_score", 50) / 100.0
+    hallucination_score = results.get("hallucination_check", {}).get("hallucination_score", 0.0)
 
     quality_risk = (1 - quality) * RiskScoringEngine.EVALUATION_FACTORS["low_quality_answers"]
     accuracy_risk = (1 - accuracy) * RiskScoringEngine.EVALUATION_FACTORS["low_accuracy"]
     clarity_risk = (1 - clarity) * RiskScoringEngine.EVALUATION_FACTORS["poor_communication"]
+    hallucination_risk = hallucination_score * RiskScoringEngine.EVALUATION_FACTORS["hallucination"]
 
-    score = quality_risk + accuracy_risk + clarity_risk
+    score = quality_risk + accuracy_risk + clarity_risk + hallucination_risk
     return round(min(score, 1.0), 3)

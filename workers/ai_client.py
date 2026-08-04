@@ -2,11 +2,12 @@
 AI Client Module
 Provides pluggable clients for OpenAI, Whisper, and MediaPipe/OpenCV
 with automatic fallback to mocks when API keys or libraries are absent.
+Includes token usage tracking for OpenAI, Gemini, and Grok calls.
 """
 
 import logging
 import os
-from typing import Any
+from typing import Any, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,31 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
+# Helper function to construct standard usage dictionary
+# ---------------------------------------------------------------------------
+
+
+def _build_usage_dict(
+    provider: str,
+    model: str,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    total_tokens: int = 0,
+) -> dict[str, Any]:
+    """Helper to structure token usage and estimated cost metadata."""
+    if not total_tokens:
+        total_tokens = prompt_tokens + completion_tokens
+
+    return {
+        "provider": provider,
+        "model": model,
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+    }
+
+
+# ---------------------------------------------------------------------------
 # OpenAI helpers
 # ---------------------------------------------------------------------------
 
@@ -104,10 +130,13 @@ def chat_completion(
     model: str = "gpt-4o",
     temperature: float = 0.7,
     max_tokens: int = 1024,
-) -> str | None:
-    """Send a chat completion request; returns the assistant text or None."""
+) -> Tuple[str | None, dict[str, Any]]:
+    """
+    Send a chat completion request to OpenAI.
+    Returns a tuple: (content_text or None, usage_dict).
+    """
     if not HAS_OPENAI:
-        return None
+        return None, _build_usage_dict("openai", model)
     try:
         resp = openai_client.chat.completions.create(
             model=model,
@@ -115,10 +144,29 @@ def chat_completion(
             temperature=temperature,
             max_tokens=max_tokens,
         )
-        return resp.choices[0].message.content
+        content = resp.choices[0].message.content
+
+        usage = _build_usage_dict("openai", model)
+        if getattr(resp, "usage", None):
+            usage = _build_usage_dict(
+                provider="openai",
+                model=model,
+                prompt_tokens=getattr(resp.usage, "prompt_tokens", 0),
+                completion_tokens=getattr(resp.usage, "completion_tokens", 0),
+                total_tokens=getattr(resp.usage, "total_tokens", 0),
+            )
+
+        logger.info(
+            "OpenAI call finished [%s] — Tokens: Prompt=%d, Completion=%d, Total=%d",
+            model,
+            usage["prompt_tokens"],
+            usage["completion_tokens"],
+            usage["total_tokens"],
+        )
+        return content, usage
     except Exception as exc:
         logger.warning("OpenAI chat completion failed: %s", exc)
-        return None
+        return None, _build_usage_dict("openai", model)
 
 
 # ---------------------------------------------------------------------------
@@ -131,10 +179,14 @@ def gemini_generate(
     *,
     temperature: float = 0.7,
     max_output_tokens: int = 1024,
-) -> str | None:
-    """Generate text using Gemini; returns the text or None."""
+) -> Tuple[str | None, dict[str, Any]]:
+    """
+    Generate text using Gemini.
+    Returns a tuple: (content_text or None, usage_dict).
+    """
+    model_name = "gemini-2.0-flash"
     if not HAS_GEMINI:
-        return None
+        return None, _build_usage_dict("google", model_name)
     try:
         response = gemini_model.generate_content(
             prompt,
@@ -143,10 +195,36 @@ def gemini_generate(
                 max_output_tokens=max_output_tokens,
             ),
         )
-        return response.text
+        content = response.text
+
+        prompt_tokens = 0
+        completion_tokens = 0
+        total_tokens = 0
+
+        if hasattr(response, "usage_metadata") and response.usage_metadata:
+            prompt_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
+            completion_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
+            total_tokens = getattr(response.usage_metadata, "total_token_count", 0)
+
+        usage = _build_usage_dict(
+            provider="google",
+            model=model_name,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+        )
+
+        logger.info(
+            "Gemini generation finished [%s] — Tokens: Prompt=%d, Completion=%d, Total=%d",
+            model_name,
+            usage["prompt_tokens"],
+            usage["completion_tokens"],
+            usage["total_tokens"],
+        )
+        return content, usage
     except Exception as exc:
         logger.warning("Gemini generation failed: %s", exc)
-        return None
+        return None, _build_usage_dict("google", model_name)
 
 
 def gemini_chat(
@@ -154,21 +232,53 @@ def gemini_chat(
     *,
     temperature: float = 0.7,
     max_output_tokens: int = 1024,
-) -> str | None:
-    """Multi-turn chat with Gemini; returns the response text or None."""
+) -> Tuple[str | None, dict[str, Any]]:
+    """
+    Multi-turn chat with Gemini.
+    Returns a tuple: (response_text or None, usage_dict).
+    """
+    model_name = "gemini-2.0-flash"
     if not HAS_GEMINI:
-        return None
+        return None, _build_usage_dict("google", model_name)
     try:
         chat = gemini_model.start_chat(history=[])
+        response = None
         for msg in messages:
             if msg["role"] == "user":
-                chat.send_message(msg["content"])
+                response = chat.send_message(msg["content"])
             elif msg["role"] == "assistant":
                 pass
-        return chat.last.text if chat.last else None
+
+        content = chat.last.text if chat.last else None
+
+        prompt_tokens = 0
+        completion_tokens = 0
+        total_tokens = 0
+
+        if response and hasattr(response, "usage_metadata") and response.usage_metadata:
+            prompt_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
+            completion_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
+            total_tokens = getattr(response.usage_metadata, "total_token_count", 0)
+
+        usage = _build_usage_dict(
+            provider="google",
+            model=model_name,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+        )
+
+        logger.info(
+            "Gemini chat finished [%s] — Tokens: Prompt=%d, Completion=%d, Total=%d",
+            model_name,
+            usage["prompt_tokens"],
+            usage["completion_tokens"],
+            usage["total_tokens"],
+        )
+        return content, usage
     except Exception as exc:
         logger.warning("Gemini chat failed: %s", exc)
-        return None
+        return None, _build_usage_dict("google", model_name)
 
 
 # ---------------------------------------------------------------------------
@@ -182,10 +292,13 @@ def grok_completion(
     model: str = "grok-2-1212",
     temperature: float = 0.7,
     max_tokens: int = 1024,
-) -> str | None:
-    """Send a chat completion request to Grok; returns the assistant text or None."""
+) -> Tuple[str | None, dict[str, Any]]:
+    """
+    Send a chat completion request to Grok.
+    Returns a tuple: (content_text or None, usage_dict).
+    """
     if not HAS_GROK:
-        return None
+        return None, _build_usage_dict("grok", model)
     try:
         resp = grok_client.chat.completions.create(
             model=model,
@@ -193,10 +306,29 @@ def grok_completion(
             temperature=temperature,
             max_tokens=max_tokens,
         )
-        return resp.choices[0].message.content
+        content = resp.choices[0].message.content
+
+        usage = _build_usage_dict("grok", model)
+        if getattr(resp, "usage", None):
+            usage = _build_usage_dict(
+                provider="grok",
+                model=model,
+                prompt_tokens=getattr(resp.usage, "prompt_tokens", 0),
+                completion_tokens=getattr(resp.usage, "completion_tokens", 0),
+                total_tokens=getattr(resp.usage, "total_tokens", 0),
+            )
+
+        logger.info(
+            "Grok completion finished [%s] — Tokens: Prompt=%d, Completion=%d, Total=%d",
+            model,
+            usage["prompt_tokens"],
+            usage["completion_tokens"],
+            usage["total_tokens"],
+        )
+        return content, usage
     except Exception as exc:
         logger.warning("Grok completion failed: %s", exc)
-        return None
+        return None, _build_usage_dict("grok", model)
 
 
 # ---------------------------------------------------------------------------
@@ -204,12 +336,97 @@ def grok_completion(
 # ---------------------------------------------------------------------------
 
 
-def transcribe_audio_file(audio_path: str) -> dict[str, Any] | None:
-    """Transcribe an audio file using local Whisper; returns dict or None."""
+def transcribe_audio_file(
+    audio_path: str,
+    vad_config: Any | None = None,
+    speech_segments: list[Any] | None = None,
+    raw_audio: bool = False,
+) -> dict[str, Any] | None:
+    """Transcribe an audio file using VAD pre-filtering and local Whisper.
+
+    Executes VAD pre-filtering and sends ONLY extracted speech segments to Whisper:
+    - Silent or near-silent audio files skip Whisper execution completely to conserve compute.
+    - Mid-file silence is trimmed out; only speech chunk arrays are passed to Whisper.
+    - Preserves timestamps aligned with the original recording.
+    """
     if not HAS_WHISPER:
         return None
     try:
-        result = whisper_model.transcribe(audio_path)
+        from workers.vad import VoiceActivityDetector
+
+        # Run VAD ONCE if speech_segments not provided
+        detector = VoiceActivityDetector(vad_config)
+
+        if raw_audio:
+            result = whisper_model.transcribe(audio_path)
+
+            return {
+                "text": result.get("text", "").strip(),
+                "language": result.get("language", "en"),
+                "segments": result.get("segments", []),
+                "silence_only": False,
+                "vad_segments": [],
+                "total_speech_duration": 0.0,
+            }
+
+        if speech_segments is None:
+            speech_segments = detector.process_audio(audio_path)
+
+        # Skip transcription completely if audio is silent
+        if len(speech_segments) == 0:
+            logger.info("VAD detected silence only in %s — skipping Whisper transcription.", audio_path)
+            return {
+                "text": "",
+                "language": "en",
+                "segments": [],
+                "silence_only": True,
+                "vad_segments": [],
+                "total_speech_duration": 0.0,
+            }
+
+        # Transcribe ONLY the extracted speech segments to trim out mid-file silence
+        all_texts = []
+        aligned_whisper_segments = []
+        detected_language = "en"
+
+        for seg in speech_segments:
+            samples = getattr(seg, "audio_samples", None)
+            if samples is None and os.path.exists(audio_path):
+                raw_samples, sr = detector._load_samples(audio_path, detector.config.sample_rate)
+                if len(raw_samples) > 0:
+                    start_sec = getattr(seg, "start", seg.get("start", 0.0) if isinstance(seg, dict) else 0.0)
+                    end_sec = getattr(seg, "end", seg.get("end", 0.0) if isinstance(seg, dict) else 0.0)
+                    start_idx = int(start_sec * sr)
+                    end_idx = min(len(raw_samples), int(end_sec * sr))
+                    samples = raw_samples[start_idx:end_idx]
+
+            if samples is None or len(samples) == 0:
+                continue
+
+            seg_result = whisper_model.transcribe(samples)
+            if seg_result is None:
+                continue
+
+            seg_text = seg_result.get("text", "").strip()
+            if seg_text:
+                all_texts.append(seg_text)
+
+            detected_language = seg_result.get("language", detected_language)
+            seg_start = getattr(seg, "start", seg.get("start", 0.0) if isinstance(seg, dict) else 0.0)
+
+            for w_seg in seg_result.get("segments", []):
+                aligned_w_seg = dict(w_seg)
+                aligned_w_seg["start"] = round(seg_start + w_seg.get("start", 0.0), 3)
+                aligned_w_seg["end"] = round(seg_start + w_seg.get("end", 0.0), 3)
+                aligned_whisper_segments.append(aligned_w_seg)
+
+        combined_text = " ".join(all_texts).strip()
+        vad_summary = [s.to_dict() if hasattr(s, "to_dict") else s for s in speech_segments]
+        speech_duration = sum(
+            getattr(s, "duration", s.get("duration", 0.0) if isinstance(s, dict) else 0.0)
+            for s in speech_segments
+        )
+
         return {
             "text": result.get("text", ""),
             "language": result.get("language", "en"),

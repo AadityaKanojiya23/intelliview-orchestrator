@@ -34,6 +34,9 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - Documentation: `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`,
   `CHANGELOG.md`.
 
+- Hallucination detection module using semantic similarity + NLI entailment,
+  integrated into the evaluation pipeline and risk scoring engine (#67)
+
 ### Changed
 - Removed dead `workers/worker.py` (replaced by `worker_entrypoint.py`).
 - Removed duplicate `logging.basicConfig` that appended a handler on

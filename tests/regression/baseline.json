@@ -1,0 +1,14 @@
+[
+    {
+        "prompt": "What is AI?",
+        "expected": "Artificial Intelligence is the simulation of human intelligence in machines."
+    },
+    {
+        "prompt": "What is Machine Learning?",
+        "expected": "Machine Learning is a subset of AI that enables systems to learn from data."
+    },
+    {
+        "prompt": "Explain Python.",
+        "expected": "Python is a high-level programming language."
+    }
+]
