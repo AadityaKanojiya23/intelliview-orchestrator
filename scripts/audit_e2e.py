@@ -143,14 +143,10 @@ def backend() -> None:
             f"final status={body.get('status') if isinstance(body, dict) else 'n/a'}",
         )
 
-    s, _, _ = request(
-        "POST", f"{API}/switch-strategy?strategy=QUEUE_BASED", headers=hdr
-    )
+    s, _, _ = request("POST", f"{API}/switch-strategy?strategy=QUEUE_BASED", headers=hdr)
     check("POST /switch-strategy", s == 200, f"HTTP {s}")
 
-    s, _, _ = request(
-        "POST", f"{API}/switch-strategy?strategy=LEAST_LOADED", headers=hdr
-    )
+    s, _, _ = request("POST", f"{API}/switch-strategy?strategy=LEAST_LOADED", headers=hdr)
     check("POST /switch-strategy reset", s == 200, f"HTTP {s}")
 
     s, _, _ = request("POST", f"{API}/detect-failures", headers=hdr)
@@ -180,9 +176,7 @@ def backend() -> None:
 
     section("Backend — validation")
     # Missing candidate_id → 422
-    s, _, _ = request(
-        "POST", f"{API}/start-interview", headers=hdr, body={"priority": "medium"}
-    )
+    s, _, _ = request("POST", f"{API}/start-interview", headers=hdr, body={"priority": "medium"})
     check("POST /start-interview missing candidate_id", s == 422, f"HTTP {s}")
 
     # Invalid candidate_id (bad chars) → 422

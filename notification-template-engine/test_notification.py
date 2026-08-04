@@ -5,7 +5,6 @@ from users import User
 
 
 class TestNotificationSystem(unittest.TestCase):
-
     def setUp(self):
 
         self.data = {"date": "10 July", "time": "5 PM"}
@@ -73,7 +72,6 @@ class TestNotificationSystem(unittest.TestCase):
         user = User("Vaishnavi", "vaish@gmail.com", "en")
 
         with self.assertRaises(ValueError):
-
             send_notification(user, "random_event", self.data)
 
     # Missing Date
@@ -83,7 +81,6 @@ class TestNotificationSystem(unittest.TestCase):
         user = User("Vaishnavi", "vaish@gmail.com", "en")
 
         with self.assertRaises(ValueError):
-
             send_notification(user, "interview_scheduled", {"time": "5 PM"})
 
     # Missing Time
@@ -93,7 +90,6 @@ class TestNotificationSystem(unittest.TestCase):
         user = User("Vaishnavi", "vaish@gmail.com", "en")
 
         with self.assertRaises(ValueError):
-
             send_notification(user, "interview_scheduled", {"date": "10 July"})
 
     # Invalid User
@@ -101,7 +97,6 @@ class TestNotificationSystem(unittest.TestCase):
     def test_invalid_user(self):
 
         with self.assertRaises(ValueError):
-
             User("", "abc@gmail.com", "en")
 
     # Invalid Email
@@ -109,7 +104,6 @@ class TestNotificationSystem(unittest.TestCase):
     def test_invalid_email(self):
 
         with self.assertRaises(ValueError):
-
             User("Vaishnavi", "wrongemail", "en")
 
     # Unicode Handling
@@ -129,7 +123,6 @@ class TestNotificationSystem(unittest.TestCase):
         user = User("Vaishnavi", "abc@gmail.com", "en")
 
         for event in self.events:
-
             message = send_notification(user, event, self.data)
 
             self.assertIsInstance(message, str)
@@ -139,7 +132,6 @@ class TestNotificationSystem(unittest.TestCase):
     def test_none_user(self):
 
         with self.assertRaises(ValueError):
-
             send_notification(None, "interview_scheduled", self.data)
 
     def test_unsupported_locale_defaults_to_english_at_user_level(self):
@@ -149,10 +141,7 @@ class TestNotificationSystem(unittest.TestCase):
 
         self.assertEqual(user.locale, "en")
         self.assertTrue(
-            any(
-                "Unsupported locale 'fr'. Falling back to English." in message
-                for message in logs.output
-            )
+            any("Unsupported locale 'fr'. Falling back to English." in message for message in logs.output)
         )
 
 

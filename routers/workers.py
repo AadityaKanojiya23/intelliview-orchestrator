@@ -33,9 +33,7 @@ class WorkerHeartbeatRequest(BaseModel):
     active_tasks: int
 
 
-def create_worker_routes(
-    worker_registry, load_balancer, scheduler, session_tracker
-) -> APIRouter:
+def create_worker_routes(worker_registry, load_balancer, scheduler, session_tracker) -> APIRouter:
     """Create worker registration, heartbeat, and load/scheduling status routes.
 
     Args:
@@ -64,13 +62,9 @@ def create_worker_routes(
             dict: Registration confirmation
         """
         try:
-            logger.info(
-                f"Registering worker: {request.worker_id} with capacity {request.capacity}"
-            )
+            logger.info(f"Registering worker: {request.worker_id} with capacity {request.capacity}")
 
-            worker_registry.register_worker(
-                worker_id=request.worker_id, capacity=request.capacity
-            )
+            worker_registry.register_worker(worker_id=request.worker_id, capacity=request.capacity)
 
             logger.info(f"Worker registered successfully: {request.worker_id}")
             WORKERS_REGISTERED.inc()
@@ -85,9 +79,7 @@ def create_worker_routes(
             }
         except Exception as e:
             logger.error(f"Error registering worker: {e!s}")
-            raise HTTPException(
-                status_code=500, detail=f"Error registering worker: {e!s}"
-            )
+            raise HTTPException(status_code=500, detail=f"Error registering worker: {e!s}")
 
     @router.post("/worker/heartbeat", dependencies=[Depends(require_token)])
     async def worker_heartbeat(request: WorkerHeartbeatRequest):
@@ -104,33 +96,23 @@ def create_worker_routes(
             dict: Heartbeat confirmation
         """
         try:
-            logger.debug(
-                f"Heartbeat from worker: {request.worker_id} (active_tasks: {request.active_tasks})"
-            )
+            logger.debug(f"Heartbeat from worker: {request.worker_id} (active_tasks: {request.active_tasks})")
 
-            worker_registry.heartbeat(
-                worker_id=request.worker_id, active_tasks=request.active_tasks
-            )
+            worker_registry.heartbeat(worker_id=request.worker_id, active_tasks=request.active_tasks)
             WORKER_HEARTBEAT_AGE_SECONDS.labels(worker_id=request.worker_id).set(0)
 
-            WORKER_ACTIVE_TASKS.labels(worker_id=request.worker_id).set(
-                request.active_tasks
-            )
+            WORKER_ACTIVE_TASKS.labels(worker_id=request.worker_id).set(request.active_tasks)
 
             worker_status = worker_registry.get_worker(request.worker_id)
             if worker_status:
-                WORKER_CAPACITY.labels(worker_id=request.worker_id).set(
-                    worker_status.get("capacity", 0)
-                )
+                WORKER_CAPACITY.labels(worker_id=request.worker_id).set(worker_status.get("capacity", 0))
 
             # Invalidate the workers + load caches so the next dashboard poll is fresh.
             http_cache.invalidate("workers", "worker-statistics", "load-status")
 
             worker_status = worker_registry.get_worker(request.worker_id)
             health_status = (
-                "healthy"
-                if worker_status and worker_status.get("health_status") == "healthy"
-                else "unknown"
+                "healthy" if worker_status and worker_status.get("health_status") == "healthy" else "unknown"
             )
 
             return {
@@ -143,9 +125,7 @@ def create_worker_routes(
             }
         except Exception as e:
             logger.error(f"Error processing heartbeat: {e!s}")
-            raise HTTPException(
-                status_code=500, detail=f"Error processing heartbeat: {e!s}"
-            )
+            raise HTTPException(status_code=500, detail=f"Error processing heartbeat: {e!s}")
 
     @router.get("/workers")
     @http_cache.cached("workers", ttl=2)
@@ -188,9 +168,7 @@ def create_worker_routes(
             }
         except Exception as e:
             logger.error(f"Error fetching worker list: {e!s}")
-            raise HTTPException(
-                status_code=500, detail=f"Error fetching worker list: {e!s}"
-            )
+            raise HTTPException(status_code=500, detail=f"Error fetching worker list: {e!s}")
 
     @router.get("/worker-statistics")
     @http_cache.cached("worker-statistics", ttl=2)
@@ -208,9 +186,7 @@ def create_worker_routes(
 
             total_capacity = stats.get("total_capacity", 0)
             total_active = stats.get("total_active_tasks", 0)
-            utilization = (
-                (total_active / total_capacity * 100) if total_capacity > 0 else 0
-            )
+            utilization = (total_active / total_capacity * 100) if total_capacity > 0 else 0
 
             return {
                 "total_workers": stats.get("total_workers", 0),
@@ -226,9 +202,7 @@ def create_worker_routes(
             }
         except Exception as e:
             logger.error(f"Error generating worker statistics: {e!s}")
-            raise HTTPException(
-                status_code=500, detail=f"Error generating worker statistics: {e!s}"
-            )
+            raise HTTPException(status_code=500, detail=f"Error generating worker statistics: {e!s}")
 
     @router.get("/load-status")
     async def get_load_status():
@@ -257,16 +231,12 @@ def create_worker_routes(
                 "idle_workers": load_status.get("idle_workers", 0),
                 "system_at_capacity": load_status.get("system_at_capacity", False),
                 "system_overloaded": load_status.get("system_overloaded", False),
-                "recommended_strategy": load_status.get(
-                    "recommended_strategy", "LEAST_LOADED"
-                ),
+                "recommended_strategy": load_status.get("recommended_strategy", "LEAST_LOADED"),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         except Exception as e:
             logger.error(f"Error fetching load status: {e!s}")
-            raise HTTPException(
-                status_code=500, detail=f"Error fetching load status: {e!s}"
-            )
+            raise HTTPException(status_code=500, detail=f"Error fetching load status: {e!s}")
 
     @router.get("/scheduling-status")
     async def get_scheduling_status():
@@ -292,13 +262,9 @@ def create_worker_routes(
             }
         except Exception as e:
             logger.error(f"Error fetching scheduling status: {e!s}")
-            raise HTTPException(
-                status_code=500, detail=f"Error fetching scheduling status: {e!s}"
-            )
+            raise HTTPException(status_code=500, detail=f"Error fetching scheduling status: {e!s}")
 
-    @router.delete(
-        "/deregister-worker/{worker_id}", dependencies=[Depends(require_token)]
-    )
+    @router.delete("/deregister-worker/{worker_id}", dependencies=[Depends(require_token)])
     async def deregister_worker(worker_id: str):
         """
         Deregister a worker node (remove from active pool)
@@ -326,9 +292,7 @@ def create_worker_routes(
             }
         except Exception as e:
             logger.error(f"Error deregistering worker: {e!s}")
-            raise HTTPException(
-                status_code=500, detail=f"Error deregistering worker: {e!s}"
-            )
+            raise HTTPException(status_code=500, detail=f"Error deregistering worker: {e!s}")
 
     @router.get("/worker-distribution")
     async def get_worker_distribution():
@@ -343,8 +307,6 @@ def create_worker_routes(
             return {"workers": distribution, "total_active": sum(distribution.values())}
         except Exception as e:
             logger.error(f"Error fetching worker distribution: {e!s}")
-            raise HTTPException(
-                status_code=500, detail="Error fetching worker distribution"
-            )
+            raise HTTPException(status_code=500, detail="Error fetching worker distribution")
 
     return router

@@ -59,19 +59,11 @@ def client():
 
 
 def _request_log_records(caplog):
-    return [
-        r
-        for r in caplog.records
-        if r.name == main_logger.name and r.getMessage() == "request"
-    ]
+    return [r for r in caplog.records if r.name == main_logger.name and r.getMessage() == "request"]
 
 
 def _error_log_records(caplog):
-    return [
-        r
-        for r in caplog.records
-        if r.name == main_logger.name and r.getMessage() == "unhandled_error"
-    ]
+    return [r for r in caplog.records if r.name == main_logger.name and r.getMessage() == "unhandled_error"]
 
 
 def test_successful_request_emits_structured_request_log(client, caplog):
@@ -112,11 +104,7 @@ def test_health_path_is_logged_at_debug_not_info(client, caplog):
     # At DEBUG, /health is logged like any other request.
     with caplog.at_level(logging.DEBUG, logger=main_logger.name):
         client.get("/health")
-    debug_records = [
-        r
-        for r in caplog.records
-        if r.name == main_logger.name and r.getMessage() == "request"
-    ]
+    debug_records = [r for r in caplog.records if r.name == main_logger.name and r.getMessage() == "request"]
     assert len(debug_records) == 1
     assert debug_records[0].path == "/health"
     assert debug_records[0].levelname == "DEBUG"
@@ -166,9 +154,7 @@ def test_request_log_survives_real_json_serialization():
         main_logger.removeHandler(handler)
         main_logger.setLevel(previous_level)
 
-    payloads = [
-        json.loads(line) for line in buf.getvalue().splitlines() if line.strip()
-    ]
+    payloads = [json.loads(line) for line in buf.getvalue().splitlines() if line.strip()]
     request_payloads = [p for p in payloads if p.get("message") == "request"]
     assert len(request_payloads) == 1
 

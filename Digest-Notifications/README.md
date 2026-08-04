@@ -231,7 +231,7 @@ recipient = DigestRecipient(
     user_id="user-456",
     email="recipient@example.com",
     display_name="Sarah Connor",
-    frequency=DigestFrequency.DAILY
+    frequency=DigestFrequency.DAILY,
 )
 
 # 2. Package events
@@ -241,7 +241,7 @@ interviews = [
         candidate_name="Alex Rivera",
         role_title="Backend Engineer",
         interviewer_name="Thomas Anderson",
-        scheduled_at=datetime.datetime(2026, 7, 1, 10, 0)
+        scheduled_at=datetime.datetime(2026, 7, 1, 10, 0),
     )
 ]
 
@@ -259,17 +259,19 @@ To send digests via a real provider in your host project, implement the `EmailSe
 ```python
 from sender import EmailSenderProtocol, send_digest_for_recipient
 
+
 class MySendGridAdapter(EmailSenderProtocol):
     def send_html_email(self, to_email: str, subject: str, html_body: str) -> dict:
         # Plug in your SendGrid client library code here
         return {"status": "sent", "provider": "sendgrid"}
+
 
 # Dispatch
 result = send_digest_for_recipient(
     recipient=recipient,
     interviews=interviews,
     email_sender=MySendGridAdapter(),
-    unsubscribe_base_url="https://example.com"
+    unsubscribe_base_url="https://example.com",
 )
 ```
 

@@ -33,9 +33,4 @@ class User:
             self.locale = locale
 
     def __str__(self):
-        return (
-            f"User("
-            f"name='{self.name}', "
-            f"email='{self.email}', "
-            f"locale='{self.locale}')"
-        )
+        return f"User(name='{self.name}', email='{self.email}', locale='{self.locale}')"

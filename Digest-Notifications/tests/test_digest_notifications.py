@@ -60,7 +60,6 @@ def _make_event(
 
 
 class TestDigestNotifications(unittest.TestCase):
-
     # ── 1. Model Tests ──
     def test_event_date_key_and_display(self):
         ev = _make_event(dt=datetime.datetime(2026, 7, 4, 14, 30))
@@ -183,9 +182,7 @@ class TestDigestNotifications(unittest.TestCase):
         import sqlite3
 
         # Keep init_conn open so the in-memory DB persists for the duration of this test
-        init_conn = sqlite3.connect(
-            "file:scoping_db?mode=memory&cache=shared", uri=True
-        )
+        init_conn = sqlite3.connect("file:scoping_db?mode=memory&cache=shared", uri=True)
         init_conn.row_factory = sqlite3.Row
         init_conn.execute(
             "CREATE TABLE interviews (id TEXT, candidate_name TEXT, role TEXT, interviewer_name TEXT, date TEXT, time TEXT, status TEXT, meeting_link TEXT, location TEXT)"
@@ -216,21 +213,13 @@ class TestDigestNotifications(unittest.TestCase):
             # Daily digest at day_1 (2026-07-02) should include only the day_1 interview
             daily_payload = _build_payload("daily", day_1)
             self.assertEqual(daily_payload.total_count, 1)
-            flat_daily = [
-                ev
-                for events in daily_payload.grouped_interviews.values()
-                for ev in events
-            ]
+            flat_daily = [ev for events in daily_payload.grouped_interviews.values() for ev in events]
             self.assertEqual(flat_daily[0].interview_id, "int-1")
 
             # Weekly digest at ref_date (2026-07-01) should include day_1 and day_3, but not day_10
             weekly_payload = _build_payload("weekly", ref_date.isoformat())
             self.assertEqual(weekly_payload.total_count, 2)
-            flat_weekly = [
-                ev
-                for events in weekly_payload.grouped_interviews.values()
-                for ev in events
-            ]
+            flat_weekly = [ev for events in weekly_payload.grouped_interviews.values() for ev in events]
             self.assertEqual(flat_weekly[0].interview_id, "int-1")
             self.assertEqual(flat_weekly[1].interview_id, "int-2")
 
@@ -297,9 +286,7 @@ class TestDigestNotifications(unittest.TestCase):
         ).encode("utf-8")
         handler.rfile.read.return_value = body_data
 
-        mock_send = unittest.mock.MagicMock(
-            return_value={"status": "sent_simulated", "provider": "none"}
-        )
+        mock_send = unittest.mock.MagicMock(return_value={"status": "sent_simulated", "provider": "none"})
 
         import sqlite3
 
@@ -311,12 +298,8 @@ class TestDigestNotifications(unittest.TestCase):
         db_conn_send_mock.commit()
 
         with unittest.mock.patch("digest.send_digest_for_recipient", mock_send):
-            with unittest.mock.patch(
-                "digest.get_upcoming_interviews", return_value=([], 0)
-            ):
-                with unittest.mock.patch(
-                    "digest.get_db_conn", return_value=db_conn_send_mock
-                ):
+            with unittest.mock.patch("digest.get_upcoming_interviews", return_value=([], 0)):
+                with unittest.mock.patch("digest.get_db_conn", return_value=db_conn_send_mock):
                     handler.do_POST()
 
         mock_send.assert_called_once()
@@ -369,9 +352,7 @@ class TestDigestNotifications(unittest.TestCase):
                         "time": "10:00",
                     }
                 ).encode("utf-8")
-                req = urllib.request.Request(
-                    f"http://127.0.0.1:{port}/api/interviews", data=payload
-                )
+                req = urllib.request.Request(f"http://127.0.0.1:{port}/api/interviews", data=payload)
                 req.add_header("X-API-Token", "api123")
                 req.add_header("Content-Type", "application/json")
                 try:
@@ -454,23 +435,17 @@ class TestDigestNotifications(unittest.TestCase):
                 return True
 
         handler = FakeHandler()
-        body_data = json.dumps({"type": "daily", "ref_date": "2026-06-27"}).encode(
-            "utf-8"
-        )
+        body_data = json.dumps({"type": "daily", "ref_date": "2026-06-27"}).encode("utf-8")
         handler.rfile.read.return_value = body_data
 
-        mock_gen = unittest.mock.MagicMock(
-            side_effect=ValueError("CRITICAL DATABASE CORRUPTION EXCEPTION")
-        )
+        mock_gen = unittest.mock.MagicMock(side_effect=ValueError("CRITICAL DATABASE CORRUPTION EXCEPTION"))
 
         with unittest.mock.patch("digest.generate_all_outputs", mock_gen):
             handler.do_POST()
 
         self.assertEqual(handler.status_code, 500)
         self.assertEqual(handler.json_sent["status"], "error")
-        self.assertNotIn(
-            "CRITICAL DATABASE CORRUPTION EXCEPTION", handler.json_sent["message"]
-        )
+        self.assertNotIn("CRITICAL DATABASE CORRUPTION EXCEPTION", handler.json_sent["message"])
         self.assertNotIn("ValueError", handler.json_sent["message"])
         self.assertIn("internal server error occurred", handler.json_sent["message"])
         self.assertIn("Error ID:", handler.json_sent["message"])
@@ -743,9 +718,7 @@ class TestDigestNotifications(unittest.TestCase):
 
         from digest import dispatch_digest
 
-        mock_send = unittest.mock.MagicMock(
-            return_value={"status": "sent_simulated", "provider": "none"}
-        )
+        mock_send = unittest.mock.MagicMock(return_value={"status": "sent_simulated", "provider": "none"})
 
         init_conn = sqlite3.connect("file:cron_db?mode=memory&cache=shared", uri=True)
         init_conn.row_factory = sqlite3.Row

@@ -23,16 +23,13 @@ def main():
     notifier = ConsoleNotifier()
 
     for event in events:
-
         print("\n")
         print("=" * 60)
         print(f"EVENT : {event.upper()}")
         print("=" * 60)
 
         for user in users:
-
             try:
-
                 message = send_notification(user, event, data)
 
                 print("\n")
@@ -43,8 +40,7 @@ def main():
                 print("-" * 40)
 
             except Exception as e:
-
-                print(f"Error sending notification " f"to {user.name}: {e}")
+                print(f"Error sending notification to {user.name}: {e}")
 
 
 if __name__ == "__main__":

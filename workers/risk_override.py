@@ -44,9 +44,7 @@ class MultiplePersonsRule(OverrideRule):
         evaluation_result: dict[str, Any],
     ) -> str | None:
 
-        if video_result.get("multiple_persons", {}).get(
-            "multiple_persons_detected", False
-        ):
+        if video_result.get("multiple_persons", {}).get("multiple_persons_detected", False):
             return "CRITICAL"
 
         return None

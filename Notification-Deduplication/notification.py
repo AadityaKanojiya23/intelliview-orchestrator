@@ -6,7 +6,6 @@ from storage import get_timestamp, notification_exists, save_notification
 print("===== Notification Deduplication System =====")
 
 while True:
-
     # Event Name Validation
     event = input("\nEnter Event Name: ").strip()
     if not event:
@@ -30,7 +29,6 @@ while True:
 
     # Check for Duplicate Notification
     if notification_exists(key):
-
         print("\nNotification Skipped")
 
         print(
@@ -42,7 +40,6 @@ while True:
         )
 
     else:
-
         save_notification(key, timestamp)
 
         print("\nNotification Sent Successfully")
