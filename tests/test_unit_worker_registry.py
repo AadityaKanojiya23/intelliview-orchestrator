@@ -1,4 +1,4 @@
-"""Unit tests for WorkerRegistry — register, heartbeat, capacity, deregister."""
+﻿"""Unit tests for WorkerRegistry - register, heartbeat, capacity, deregister."""
 
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
@@ -33,7 +33,6 @@ def _new_registry():
         mock_redis.hgetall.return_value = {}
 
         mock_get_redis.return_value = mock_redis
-
         return WorkerRegistry()
 
 
