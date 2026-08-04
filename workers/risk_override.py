@@ -44,9 +44,8 @@ class MultiplePersonsRule(OverrideRule):
         evaluation_result: dict[str, Any],
     ) -> str | None:
 
-        if (
-            video_result.get("multiple_persons", {})
-            .get("multiple_persons_detected", False)
+        if video_result.get("multiple_persons", {}).get(
+            "multiple_persons_detected", False
         ):
             return "CRITICAL"
 
@@ -70,10 +69,7 @@ class FaceAbsentRule(OverrideRule):
         evaluation_result: dict[str, Any],
     ) -> str | None:
 
-        if not (
-            video_result.get("face_detected", {})
-            .get("faces_found", True)
-        ):
+        if not (video_result.get("face_detected", {}).get("faces_found", True)):
             return "HIGH"
 
         return None

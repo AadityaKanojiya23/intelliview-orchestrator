@@ -14,9 +14,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 # Only guard endpoints that actually dispatch work to a worker.
 # Read-only/status endpoints must stay reachable even when saturated,
 # so operators/dashboards can still see what's going on.
-GUARDED_PATH_PREFIXES = (
-    "/start-interview",
-)
+GUARDED_PATH_PREFIXES = ("/start-interview",)
 
 RETRY_AFTER_SECONDS = 5
 

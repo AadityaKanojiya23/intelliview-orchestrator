@@ -62,6 +62,8 @@ SessionLocal = sessionmaker(
 
 
 Base = declarative_base()
+
+
 def get_db():
     """
     FastAPI dependency that provides a database session.

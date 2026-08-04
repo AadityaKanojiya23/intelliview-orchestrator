@@ -24,10 +24,7 @@ class EmailSenderProtocol(Protocol):
     Matches output shape: {"status": "sent", "provider": "...", ...}
     """
 
-    def send_html_email(
-        self, to_email: str, subject: str, html_body: str
-    ) -> dict:
-        ...
+    def send_html_email(self, to_email: str, subject: str, html_body: str) -> dict: ...
 
 
 def build_unsubscribe_url(base_url: str, user_id: str) -> str:

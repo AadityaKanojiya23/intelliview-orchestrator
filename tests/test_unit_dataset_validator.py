@@ -2,7 +2,10 @@
 
 import pytest
 
-from scripts.dataset_validation.schemas import EVALUATION_DATASET_SCHEMA, QUESTION_BANK_SCHEMA
+from scripts.dataset_validation.schemas import (
+    EVALUATION_DATASET_SCHEMA,
+    QUESTION_BANK_SCHEMA,
+)
 from scripts.dataset_validation.validator import DatasetValidator
 
 
@@ -78,8 +81,12 @@ class TestQuestionBankValidator:
             question_id="q_099",
             text="Describe your experience with distributed systems!!",
         )
-        report = DatasetValidator(QUESTION_BANK_SCHEMA).validate([*valid_questions, near_dupe])
-        dup_result = next(r for r in report.results if r.rule_name == "no_near_duplicates")
+        report = DatasetValidator(QUESTION_BANK_SCHEMA).validate(
+            [*valid_questions, near_dupe]
+        )
+        dup_result = next(
+            r for r in report.results if r.rule_name == "no_near_duplicates"
+        )
         assert dup_result.severity == "warning"
         assert not dup_result.passed
         # warnings alone should not flip overall validity
@@ -89,7 +96,9 @@ class TestQuestionBankValidator:
         skewed = [dict(valid_questions[0], question_id=f"q_{i}") for i in range(20)]
         skewed.append(valid_questions[1])  # 1 behavioral vs 20 technical
         report = DatasetValidator(QUESTION_BANK_SCHEMA).validate(skewed)
-        balance_result = next(r for r in report.results if r.rule_name == "class_balance")
+        balance_result = next(
+            r for r in report.results if r.rule_name == "class_balance"
+        )
         assert not balance_result.passed
 
 

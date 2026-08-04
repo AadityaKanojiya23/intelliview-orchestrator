@@ -12,7 +12,11 @@ class FakeRegistry:
         self._workers = workers
 
     def get_available_workers(self):
-        return [w for w in self._workers if w["status"] == "healthy" and w["active_tasks"] < w["capacity"]]
+        return [
+            w
+            for w in self._workers
+            if w["status"] == "healthy" and w["active_tasks"] < w["capacity"]
+        ]
 
     def get_least_loaded_worker(self):
         available = self.get_available_workers()
@@ -103,9 +107,27 @@ def test_full_capacity_workers_excluded():
 def _make_weighted_workers():
     """Workers with weights 5, 1, 1 — A should get 5/7 of tasks."""
     return [
-        {"worker_id": "A", "capacity": 10, "weight": 5, "active_tasks": 0, "status": "healthy"},
-        {"worker_id": "B", "capacity": 10, "weight": 1, "active_tasks": 0, "status": "healthy"},
-        {"worker_id": "C", "capacity": 10, "weight": 1, "active_tasks": 0, "status": "healthy"},
+        {
+            "worker_id": "A",
+            "capacity": 10,
+            "weight": 5,
+            "active_tasks": 0,
+            "status": "healthy",
+        },
+        {
+            "worker_id": "B",
+            "capacity": 10,
+            "weight": 1,
+            "active_tasks": 0,
+            "status": "healthy",
+        },
+        {
+            "worker_id": "C",
+            "capacity": 10,
+            "weight": 1,
+            "active_tasks": 0,
+            "status": "healthy",
+        },
     ]
 
 
@@ -141,9 +163,27 @@ def test_wrr_smooth_interleaving():
 def test_wrr_equal_weights_round_robins():
     """Equal weights should distribute evenly like plain round robin."""
     workers = [
-        {"worker_id": "X", "capacity": 4, "weight": 1, "active_tasks": 0, "status": "healthy"},
-        {"worker_id": "Y", "capacity": 4, "weight": 1, "active_tasks": 0, "status": "healthy"},
-        {"worker_id": "Z", "capacity": 4, "weight": 1, "active_tasks": 0, "status": "healthy"},
+        {
+            "worker_id": "X",
+            "capacity": 4,
+            "weight": 1,
+            "active_tasks": 0,
+            "status": "healthy",
+        },
+        {
+            "worker_id": "Y",
+            "capacity": 4,
+            "weight": 1,
+            "active_tasks": 0,
+            "status": "healthy",
+        },
+        {
+            "worker_id": "Z",
+            "capacity": 4,
+            "weight": 1,
+            "active_tasks": 0,
+            "status": "healthy",
+        },
     ]
     lb = LoadBalancer(strategy=BalancingStrategy.WEIGHTED_ROUND_ROBIN)
     lb.worker_registry = FakeRegistry(workers)
@@ -159,7 +199,13 @@ def test_wrr_equal_weights_round_robins():
 def test_wrr_single_worker():
     """Single worker should always be selected."""
     workers = [
-        {"worker_id": "solo", "capacity": 4, "weight": 5, "active_tasks": 0, "status": "healthy"},
+        {
+            "worker_id": "solo",
+            "capacity": 4,
+            "weight": 5,
+            "active_tasks": 0,
+            "status": "healthy",
+        },
     ]
     lb = LoadBalancer(strategy=BalancingStrategy.WEIGHTED_ROUND_ROBIN)
     lb.worker_registry = FakeRegistry(workers)
@@ -210,8 +256,20 @@ def test_wrr_respects_weight_field():
     Over 4 calls: Y should get 3, X should get 1.
     """
     workers = [
-        {"worker_id": "X", "capacity": 10, "weight": 1, "active_tasks": 0, "status": "healthy"},
-        {"worker_id": "Y", "capacity": 10, "weight": 3, "active_tasks": 0, "status": "healthy"},
+        {
+            "worker_id": "X",
+            "capacity": 10,
+            "weight": 1,
+            "active_tasks": 0,
+            "status": "healthy",
+        },
+        {
+            "worker_id": "Y",
+            "capacity": 10,
+            "weight": 3,
+            "active_tasks": 0,
+            "status": "healthy",
+        },
     ]
     lb = LoadBalancer(strategy=BalancingStrategy.WEIGHTED_ROUND_ROBIN)
     lb.worker_registry = FakeRegistry(workers)

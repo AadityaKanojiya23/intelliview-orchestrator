@@ -179,4 +179,3 @@ def test_register_worker_default_weight_equals_capacity():
     assert w is not None
     assert w["weight"] == 8  # defaults to capacity
     assert w["capacity"] == 8
-

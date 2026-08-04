@@ -6,5 +6,5 @@ documents = [
     "Large Language Models generate human-like text.",
     "Embeddings convert text into numerical vectors.",
     "Vector databases improve semantic search.",
-    "Retrieval Augmented Generation combines search with LLMs."
+    "Retrieval Augmented Generation combines search with LLMs.",
 ]

@@ -83,14 +83,12 @@ class ABTestingFramework:
         """
 
         score_difference = round(
-            experimental["final_risk_score"]
-            - production["final_risk_score"],
+            experimental["final_risk_score"] - production["final_risk_score"],
             3,
         )
 
         classification_changed = (
-            production["risk_classification"]
-            != experimental["risk_classification"]
+            production["risk_classification"] != experimental["risk_classification"]
         )
 
         return {

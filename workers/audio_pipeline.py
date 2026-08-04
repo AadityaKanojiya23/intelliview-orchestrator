@@ -15,7 +15,7 @@ deterministic per-session signals so end-to-end risk scoring and the
 HIGH/CRITICAL thresholds fire correctly without GPU dependencies.
 """
 
-import logging                 
+import logging
 import os
 import shutil
 import tempfile

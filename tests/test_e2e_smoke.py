@@ -126,7 +126,10 @@ def test_full_pipeline_completes(api_base_url):
             break
         time.sleep(1.0)
     assert last is not None
-    assert last["status"] in {"COMPLETED", "FAILED"}, f"Session stuck in {last['status']}"
+    assert last["status"] in {
+        "COMPLETED",
+        "FAILED",
+    }, f"Session stuck in {last['status']}"
 
 
 def test_candidate_lifecycle(api_base_url):

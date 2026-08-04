@@ -4,7 +4,7 @@ documents = [
     "Python is a programming language.",
     "Machine Learning uses data.",
     "Transformers are deep learning models.",
-    "Football is a sport."
+    "Football is a sport.",
 ]
 
 build_index(documents)

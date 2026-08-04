@@ -96,7 +96,11 @@ class ValidationReport:
             "|---|---|---|---|",
         ]
         for r in self.results:
-            status = "✅ pass" if r.passed else ("❌ fail" if r.severity == "error" else "⚠️ warn")
+            status = (
+                "✅ pass"
+                if r.passed
+                else ("❌ fail" if r.severity == "error" else "⚠️ warn")
+            )
             lines.append(f"| {r.rule_name} | {r.severity} | {status} | {r.message} |")
         return "\n".join(lines)
 
@@ -122,7 +126,9 @@ class DatasetValidator:
     def __init__(self, schema: dict[str, Any]):
         self.schema = schema
 
-    def validate(self, records: list[dict[str, Any]], dataset_name: str = "dataset") -> ValidationReport:
+    def validate(
+        self, records: list[dict[str, Any]], dataset_name: str = "dataset"
+    ) -> ValidationReport:
         report = ValidationReport(dataset_name=dataset_name, total_records=len(records))
 
         report.results.append(self._check_non_empty(records))
@@ -160,15 +166,23 @@ class DatasetValidator:
         for i, rec in enumerate(records):
             missing = [f for f in required if rec.get(f) in (None, "", [])]
             if missing:
-                offenders.append({"index": i, "id": rec.get(self.schema.get("id_field")), "missing": missing})
+                offenders.append(
+                    {
+                        "index": i,
+                        "id": rec.get(self.schema.get("id_field")),
+                        "missing": missing,
+                    }
+                )
         passed = len(offenders) == 0
         return RuleResult(
             "required_fields_present",
             "error",
             passed,
-            "All required fields present."
-            if passed
-            else f"{len(offenders)} record(s) missing required fields.",
+            (
+                "All required fields present."
+                if passed
+                else f"{len(offenders)} record(s) missing required fields."
+            ),
             offenders,
         )
 
@@ -177,7 +191,11 @@ class DatasetValidator:
         offenders = []
         for i, rec in enumerate(records):
             for f_name, f_type in type_map.items():
-                if f_name in rec and rec[f_name] is not None and not isinstance(rec[f_name], f_type):
+                if (
+                    f_name in rec
+                    and rec[f_name] is not None
+                    and not isinstance(rec[f_name], f_type)
+                ):
                     offenders.append(
                         {
                             "index": i,
@@ -192,7 +210,11 @@ class DatasetValidator:
             "field_types_correct",
             "error",
             passed,
-            "All fields match expected types." if passed else f"{len(offenders)} type mismatch(es) found.",
+            (
+                "All fields match expected types."
+                if passed
+                else f"{len(offenders)} type mismatch(es) found."
+            ),
             offenders,
         )
 
@@ -217,9 +239,11 @@ class DatasetValidator:
             "enum_values_valid",
             "error",
             passed,
-            "All categorical fields use allowed values."
-            if passed
-            else f"{len(offenders)} invalid categorical value(s).",
+            (
+                "All categorical fields use allowed values."
+                if passed
+                else f"{len(offenders)} invalid categorical value(s)."
+            ),
             offenders,
         )
 
@@ -229,7 +253,11 @@ class DatasetValidator:
         for i, rec in enumerate(records):
             for f_name, (lo, hi) in ranges.items():
                 val = rec.get(f_name)
-                if val is not None and isinstance(val, (int, float)) and not (lo <= val <= hi):
+                if (
+                    val is not None
+                    and isinstance(val, (int, float))
+                    and not (lo <= val <= hi)
+                ):
                     offenders.append(
                         {
                             "index": i,
@@ -244,9 +272,11 @@ class DatasetValidator:
             "numeric_ranges_valid",
             "error",
             passed,
-            "All numeric fields within expected range."
-            if passed
-            else f"{len(offenders)} out-of-range value(s).",
+            (
+                "All numeric fields within expected range."
+                if passed
+                else f"{len(offenders)} out-of-range value(s)."
+            ),
             offenders,
         )
 
@@ -256,7 +286,9 @@ class DatasetValidator:
         for i, rec in enumerate(records):
             for f_name, (min_len, max_len) in text_rules.items():
                 val = rec.get(f_name)
-                if isinstance(val, str) and not (min_len <= len(val.strip()) <= max_len):
+                if isinstance(val, str) and not (
+                    min_len <= len(val.strip()) <= max_len
+                ):
                     offenders.append(
                         {
                             "index": i,
@@ -271,9 +303,11 @@ class DatasetValidator:
             "text_length_valid",
             "warning",
             passed,
-            "All text fields within expected length bounds."
-            if passed
-            else f"{len(offenders)} field(s) outside length bounds.",
+            (
+                "All text fields within expected length bounds."
+                if passed
+                else f"{len(offenders)} field(s) outside length bounds."
+            ),
             offenders,
         )
 
@@ -287,7 +321,11 @@ class DatasetValidator:
             "unique_ids",
             "error",
             passed,
-            "All record IDs are unique." if passed else f"{len(dupes)} duplicate ID(s) found.",
+            (
+                "All record IDs are unique."
+                if passed
+                else f"{len(dupes)} duplicate ID(s) found."
+            ),
             dupes,
         )
 
@@ -304,7 +342,11 @@ class DatasetValidator:
             norm = re.sub(r"\s+", " ", norm).strip()
             if norm in seen:
                 offenders.append(
-                    {"index": i, "id": rec.get(self.schema.get("id_field")), "duplicate_of_index": seen[norm]}
+                    {
+                        "index": i,
+                        "id": rec.get(self.schema.get("id_field")),
+                        "duplicate_of_index": seen[norm],
+                    }
                 )
             else:
                 seen[norm] = i
@@ -313,18 +355,26 @@ class DatasetValidator:
             "no_near_duplicates",
             "warning",
             passed,
-            "No near-duplicate records detected."
-            if passed
-            else f"{len(offenders)} near-duplicate record(s) found.",
+            (
+                "No near-duplicate records detected."
+                if passed
+                else f"{len(offenders)} near-duplicate record(s) found."
+            ),
             offenders,
         )
 
     def _check_class_balance(self, records: list[dict[str, Any]]) -> RuleResult:
         balance_field = self.schema["balance_field"]
         max_ratio = self.schema.get("balance_max_ratio", 5.0)
-        counts = Counter(rec.get(balance_field) for rec in records if rec.get(balance_field) is not None)
+        counts = Counter(
+            rec.get(balance_field)
+            for rec in records
+            if rec.get(balance_field) is not None
+        )
         if not counts:
-            return RuleResult("class_balance", "warning", True, "No values to check balance for.")
+            return RuleResult(
+                "class_balance", "warning", True, "No values to check balance for."
+            )
         most, least = max(counts.values()), min(counts.values())
         ratio = most / least if least else float("inf")
         passed = ratio <= max_ratio
@@ -361,10 +411,16 @@ def load_records(path: str) -> list[dict[str, Any]]:
 def main() -> None:
     from scripts.dataset_validation.schemas import SCHEMAS
 
-    parser = argparse.ArgumentParser(description="Validate an AI training/evaluation dataset.")
-    parser.add_argument("--input", required=True, help="Path to .json or .csv dataset file")
+    parser = argparse.ArgumentParser(
+        description="Validate an AI training/evaluation dataset."
+    )
+    parser.add_argument(
+        "--input", required=True, help="Path to .json or .csv dataset file"
+    )
     parser.add_argument("--schema", required=True, choices=list(SCHEMAS.keys()))
-    parser.add_argument("--output", default=None, help="Optional path to write JSON report")
+    parser.add_argument(
+        "--output", default=None, help="Optional path to write JSON report"
+    )
     args = parser.parse_args()
 
     records = load_records(args.input)

@@ -64,7 +64,9 @@ def create_admin_routes(state_sync, load_balancer) -> APIRouter:
             return auditor.analyze_scoring_consistency(evaluations, "gender")
         except Exception as exc:
             logger.error("Fairness audit endpoint failed: %s", exc)
-            raise HTTPException(status_code=500, detail="Fairness audit unavailable") from exc
+            raise HTTPException(
+                status_code=500, detail="Fairness audit unavailable"
+            ) from exc
 
     # ========== Cache Management Endpoints ==========
 
@@ -98,8 +100,13 @@ def create_admin_routes(state_sync, load_balancer) -> APIRouter:
                 session_data = state_sync.get_session_state(session_id)
                 if session_data:
                     state_sync.sync_state_to_db(session_id, session_data)
-                    return {"message": f"Synced session {session_id}", "status": "success"}
-                raise HTTPException(status_code=404, detail="Session not found in cache")
+                    return {
+                        "message": f"Synced session {session_id}",
+                        "status": "success",
+                    }
+                raise HTTPException(
+                    status_code=404, detail="Session not found in cache"
+                )
             active_sessions = state_sync.get_active_sessions()
             for sid in active_sessions:
                 session_data = state_sync.get_session_state(sid)
@@ -130,7 +137,10 @@ def create_admin_routes(state_sync, load_balancer) -> APIRouter:
         try:
             logger.warning("Clearing all session cache from Redis")
             result = state_sync.clear_cache()
-            return {"message": "Cache cleared", "status": "success" if result else "failed"}
+            return {
+                "message": "Cache cleared",
+                "status": "success" if result else "failed",
+            }
         except Exception as e:
             logger.error(f"Error clearing cache: {e!s}")
             raise HTTPException(status_code=500, detail="Error clearing cache")
@@ -182,12 +192,16 @@ def create_admin_routes(state_sync, load_balancer) -> APIRouter:
             raise
         except Exception as e:
             logger.error(f"Error switching strategy: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error switching strategy: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error switching strategy: {e!s}"
+            )
 
     # ========== Moment Tracking Endpoints ==========
 
     @router.post("/moments/track")
-    async def track_moment(session_id: str, moment_type: str, metadata: dict | None = None):
+    async def track_moment(
+        session_id: str, moment_type: str, metadata: dict | None = None
+    ):
         """Track a real-time moment during an interview session."""
         from orchestrator.moment_tracker import moment_tracker
 
@@ -200,7 +214,9 @@ def create_admin_routes(state_sync, load_balancer) -> APIRouter:
             raise HTTPException(status_code=500, detail=f"Error tracking moment: {e!s}")
 
     @router.get("/moments/{session_id}")
-    async def get_session_moments(session_id: str, moment_type: str | None = None, limit: int = 100):
+    async def get_session_moments(
+        session_id: str, moment_type: str | None = None, limit: int = 100
+    ):
         """Get all tracked moments for a session."""
         from orchestrator.moment_tracker import moment_tracker
 
@@ -209,7 +225,9 @@ def create_admin_routes(state_sync, load_balancer) -> APIRouter:
             return {"session_id": session_id, "count": len(moments), "moments": moments}
         except Exception as e:
             logger.error(f"Error fetching moments: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error fetching moments: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error fetching moments: {e!s}"
+            )
 
     @router.get("/moments/{session_id}/timeline")
     async def get_session_timeline(session_id: str):
@@ -218,10 +236,16 @@ def create_admin_routes(state_sync, load_balancer) -> APIRouter:
 
         try:
             timeline = moment_tracker.get_timeline(session_id)
-            return {"session_id": session_id, "count": len(timeline), "timeline": timeline}
+            return {
+                "session_id": session_id,
+                "count": len(timeline),
+                "timeline": timeline,
+            }
         except Exception as e:
             logger.error(f"Error fetching timeline: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error fetching timeline: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error fetching timeline: {e!s}"
+            )
 
     @router.get("/moments/{session_id}/summary")
     async def get_session_moment_summary(session_id: str):
@@ -233,7 +257,9 @@ def create_admin_routes(state_sync, load_balancer) -> APIRouter:
             return summary
         except Exception as e:
             logger.error(f"Error fetching moment summary: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error fetching moment summary: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error fetching moment summary: {e!s}"
+            )
 
     @router.get("/moments/analytics")
     async def get_moment_analytics(time_range_hours: int = 24):
@@ -245,7 +271,9 @@ def create_admin_routes(state_sync, load_balancer) -> APIRouter:
             return analytics
         except Exception as e:
             logger.error(f"Error fetching moment analytics: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error fetching moment analytics: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error fetching moment analytics: {e!s}"
+            )
 
     # ========== Dashboard HTML Endpoint ==========
 
@@ -258,7 +286,9 @@ def create_admin_routes(state_sync, load_balancer) -> APIRouter:
             HTML content of the dashboard
         """
         try:
-            dashboard_path = os.path.join(os.path.dirname(__file__), "..", "monitoring", "dashboard.html")
+            dashboard_path = os.path.join(
+                os.path.dirname(__file__), "..", "monitoring", "dashboard.html"
+            )
 
             if os.path.exists(dashboard_path):
                 with open(dashboard_path, encoding="utf-8") as f:
@@ -272,6 +302,8 @@ def create_admin_routes(state_sync, load_balancer) -> APIRouter:
             raise
         except Exception as e:
             logger.error(f"Error serving dashboard: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error serving dashboard: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error serving dashboard: {e!s}"
+            )
 
     return router

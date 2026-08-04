@@ -78,8 +78,14 @@ class BiasAuditor:
                 "count": len(scores),
             }
 
-        average_scores = [summary["average_score"] for summary in group_details.values()]
-        fairness_gap = round(max(average_scores) - min(average_scores), 3) if len(average_scores) > 1 else 0.0
+        average_scores = [
+            summary["average_score"] for summary in group_details.values()
+        ]
+        fairness_gap = (
+            round(max(average_scores) - min(average_scores), 3)
+            if len(average_scores) > 1
+            else 0.0
+        )
 
         recommendations: list[str] = []
         if len(group_details) >= 2 and fairness_gap > self.ALERT_THRESHOLD:
@@ -88,7 +94,9 @@ class BiasAuditor:
             )
             status = "ALERT"
         elif len(group_details) >= 2 and fairness_gap > self.REVIEW_THRESHOLD:
-            recommendations.append("Review scoring dispersion across demographic groups for potential bias.")
+            recommendations.append(
+                "Review scoring dispersion across demographic groups for potential bias."
+            )
             status = "REVIEW"
         else:
             status = "PASS"
@@ -113,7 +121,9 @@ class BiasAuditor:
             "sample_size": sum(summary["count"] for summary in group_details.values()),
         }
 
-    def _resolve_group_value(self, evaluation: dict[str, Any], demographic_attribute: str) -> Any:
+    def _resolve_group_value(
+        self, evaluation: dict[str, Any], demographic_attribute: str
+    ) -> Any:
         direct_value = evaluation.get(demographic_attribute)
         if direct_value is not None:
             return direct_value
@@ -127,7 +137,11 @@ class BiasAuditor:
                 select(Candidate).where(Candidate.candidate_id == str(candidate_id))
             ).scalar_one_or_none()
         except Exception as exc:  # pragma: no cover - defensive logging path
-            logger.debug("Unable to resolve demographic attribute for candidate %s: %s", candidate_id, exc)
+            logger.debug(
+                "Unable to resolve demographic attribute for candidate %s: %s",
+                candidate_id,
+                exc,
+            )
             return None
 
         if candidate is None:

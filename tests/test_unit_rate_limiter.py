@@ -3,10 +3,10 @@ from fastapi.testclient import TestClient
 
 from orchestrator.rate_limiter import RateLimiterMiddleware
 
-
 # -------------------------
 # Fake Redis implementation
 # -------------------------
+
 
 class FakePipeline:
     def __init__(self, count):
@@ -45,6 +45,7 @@ class FakeRedisClient:
 # Helper
 # -------------------------
 
+
 def create_app(monkeypatch, request_count):
     from orchestrator import rate_limiter
 
@@ -76,6 +77,7 @@ def create_app(monkeypatch, request_count):
 # -------------------------
 # Tests
 # -------------------------
+
 
 def test_request_allowed(monkeypatch):
     client = create_app(monkeypatch, request_count=3)

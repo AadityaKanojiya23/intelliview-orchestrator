@@ -43,7 +43,9 @@ class Scheduler:
         Args:
             load_balancer: Optional custom LoadBalancer instance
         """
-        self.load_balancer = load_balancer or LoadBalancer(strategy=BalancingStrategy.LEAST_LOADED)
+        self.load_balancer = load_balancer or LoadBalancer(
+            strategy=BalancingStrategy.LEAST_LOADED
+        )
         self.worker_registry = WorkerRegistry()
         self.session_manager = SessionManager()
         logger.info("Scheduler initialized with Least Loaded strategy")
@@ -74,7 +76,9 @@ class Scheduler:
         """
         logger.info("===== schedule_task() called for session %s =====", session_id)
         try:
-            logger.info(f"Scheduling task for session {session_id} (priority: {priority.name})")
+            logger.info(
+                f"Scheduling task for session {session_id} (priority: {priority.name})"
+            )
 
             # Verify session exists
             session_data = self.session_manager.get_session(session_id)
@@ -83,10 +87,14 @@ class Scheduler:
                 return False
 
             # Select worker
-            worker = self.load_balancer.get_best_worker_for_priority(priority.name.lower())
+            worker = self.load_balancer.get_best_worker_for_priority(
+                priority.name.lower()
+            )
 
             if not worker:
-                logger.warning(f"No worker available for session {session_id} - queueing task")
+                logger.warning(
+                    f"No worker available for session {session_id} - queueing task"
+                )
                 # Queue task directly to Redis, it will be picked up by any available worker
                 return self._queue_task(session_id, delay_seconds)
 
@@ -104,7 +112,9 @@ class Scheduler:
             try:
                 logger.info("===== About to dispatch Celery task =====")
                 if delay_seconds > 0:
-                    task = process_interview_session.apply_async(args=[session_id], countdown=delay_seconds)
+                    task = process_interview_session.apply_async(
+                        args=[session_id], countdown=delay_seconds
+                    )
                     # logger.info(f"Task queued with {delay_seconds}s delay: {task.id}")
                 else:
                     task = process_interview_session.delay(session_id)
@@ -113,7 +123,9 @@ class Scheduler:
                 logger.info("===== Celery Task ID: %s =====", task.id)
 
             except Exception as dispatch_err:
-                logger.error(f"Failed to enqueue task for session {session_id}: {dispatch_err}")
+                logger.error(
+                    f"Failed to enqueue task for session {session_id}: {dispatch_err}"
+                )
                 self.worker_registry.decrement_active_tasks(worker["worker_id"])
                 raise
 
@@ -121,7 +133,9 @@ class Scheduler:
 
         except Exception as e:
             logger.error(f"Error scheduling task: {e!s}")
-            self.session_manager.mark_session_failed(session_id, f"Scheduling error: {e!s}")
+            self.session_manager.mark_session_failed(
+                session_id, f"Scheduling error: {e!s}"
+            )
             return False
 
     def _queue_task(self, session_id: str, delay_seconds: int = 0) -> bool:
@@ -138,11 +152,15 @@ class Scheduler:
         try:
             # Ensure status is marked so workers and API pollers know it is dispatched
             self.session_manager.update_session_status(
-                session_id, self.session_manager.QUEUED, {"queued_at": datetime.now(timezone.utc).isoformat()}
+                session_id,
+                self.session_manager.QUEUED,
+                {"queued_at": datetime.now(timezone.utc).isoformat()},
             )
 
             if delay_seconds > 0:
-                task = process_interview_session.apply_async(args=[session_id], countdown=delay_seconds)
+                task = process_interview_session.apply_async(
+                    args=[session_id], countdown=delay_seconds
+                )
             else:
                 task = process_interview_session.delay(session_id)
 
@@ -151,7 +169,9 @@ class Scheduler:
 
         except Exception as e:
             logger.error(f"Error queuing task: {e!s}")
-            self.session_manager.mark_session_failed(session_id, f"Queueing error: {e!s}")
+            self.session_manager.mark_session_failed(
+                session_id, f"Queueing error: {e!s}"
+            )
             return False
 
     def get_scheduling_status(self) -> dict[str, Any]:
@@ -163,8 +183,13 @@ class Scheduler:
 
         # Recommend strategy switch if needed
         recommendation = None
-        if is_overloaded and self.load_balancer.strategy != BalancingStrategy.LEAST_LOADED:
-            recommendation = "Switch to LEAST_LOADED strategy to optimize load distribution"
+        if (
+            is_overloaded
+            and self.load_balancer.strategy != BalancingStrategy.LEAST_LOADED
+        ):
+            recommendation = (
+                "Switch to LEAST_LOADED strategy to optimize load distribution"
+            )
 
         return {
             "load_balancer_strategy": self.load_balancer.strategy.value,
@@ -185,7 +210,9 @@ class Scheduler:
         available = self.worker_registry.get_available_workers()
         return len(available) > 0
 
-    def get_estimated_wait_time(self, priority: TaskPriority = TaskPriority.MEDIUM) -> int:
+    def get_estimated_wait_time(
+        self, priority: TaskPriority = TaskPriority.MEDIUM
+    ) -> int:
         """
         Estimate wait time for a task with given priority
 

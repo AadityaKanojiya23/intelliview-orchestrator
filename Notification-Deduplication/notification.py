@@ -33,11 +33,13 @@ while True:
 
         print("\nNotification Skipped")
 
-        print({
-            "idempotency_key": key,
-            "status": "skipped_duplicate",
-            "original_sent_at": get_timestamp(key)
-        })
+        print(
+            {
+                "idempotency_key": key,
+                "status": "skipped_duplicate",
+                "original_sent_at": get_timestamp(key),
+            }
+        )
 
     else:
 
@@ -45,15 +47,11 @@ while True:
 
         print("\nNotification Sent Successfully")
 
-        print({
-            "idempotency_key": key,
-            "status": "sent",
-            "sent_at": timestamp
-        })
+        print({"idempotency_key": key, "status": "sent", "sent_at": timestamp})
 
     # Continue or Exit
     choice = input("\nSend another notification? (y/n): ").strip().lower()
 
-    if choice != 'y':
+    if choice != "y":
         print("\nExiting Notification Deduplication System.")
         break

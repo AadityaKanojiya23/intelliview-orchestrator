@@ -79,7 +79,6 @@ def _update_infra_health(healthy: bool = True):
 # ---------------------------------------------------------------------------
 
 
-
 @celery_app.task(bind=True, max_retries=3, name="workers.tasks._run_video")
 def _run_video(self, session_id: str) -> dict:
     from workers.video_pipeline import run_video_analysis

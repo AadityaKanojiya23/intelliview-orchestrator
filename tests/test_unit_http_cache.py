@@ -11,7 +11,11 @@ def test_get_returns_none_when_redis_unavailable():
 
 
 def test_set_swallows_redis_errors():
-    fake = type("FakeRedis", (), {"set": lambda self, *a, **kw: (_ for _ in ()).throw(Exception("boom"))})()
+    fake = type(
+        "FakeRedis",
+        (),
+        {"set": lambda self, *a, **kw: (_ for _ in ()).throw(Exception("boom"))},
+    )()
     with patch("orchestrator.http_cache._client", return_value=fake):
         # Must not raise
         http_cache.set("k", {"v": 1})

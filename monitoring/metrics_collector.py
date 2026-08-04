@@ -84,7 +84,10 @@ class MetricsCollector:
 
             # Determine system health
             health_status = "healthy"
-            if session_metrics.get("failed_count", 0) > session_metrics.get("completed_count", 0) * 0.1:
+            if (
+                session_metrics.get("failed_count", 0)
+                > session_metrics.get("completed_count", 0) * 0.1
+            ):
                 health_status = "degraded"
 
             payload = {
@@ -114,7 +117,9 @@ class MetricsCollector:
 
             cursor = 0
             while True:
-                cursor, keys = self.redis_client.scan(cursor, match="session:*", count=100)
+                cursor, keys = self.redis_client.scan(
+                    cursor, match="session:*", count=100
+                )
 
                 for key in keys:
                     try:
@@ -142,12 +147,16 @@ class MetricsCollector:
                 "completed": completed_count,
                 "failed": failed_count,
                 "total": total,
-                "completion_rate": (completed_count / (total - active_count) * 100)
-                if (total - active_count) > 0
-                else 0,
-                "failure_rate": (failed_count / (total - active_count) * 100)
-                if (total - active_count) > 0
-                else 0,
+                "completion_rate": (
+                    (completed_count / (total - active_count) * 100)
+                    if (total - active_count) > 0
+                    else 0
+                ),
+                "failure_rate": (
+                    (failed_count / (total - active_count) * 100)
+                    if (total - active_count) > 0
+                    else 0
+                ),
             }
 
         except Exception as e:
@@ -167,7 +176,9 @@ class MetricsCollector:
 
             cursor = 0
             while True:
-                cursor, keys = self.redis_client.scan(cursor, match="worker:*", count=100)
+                cursor, keys = self.redis_client.scan(
+                    cursor, match="worker:*", count=100
+                )
 
                 for key in keys:
                     try:
@@ -187,7 +198,9 @@ class MetricsCollector:
                 if cursor == 0:
                     break
 
-            utilization = (active_tasks / total_capacity * 100) if total_capacity > 0 else 0
+            utilization = (
+                (active_tasks / total_capacity * 100) if total_capacity > 0 else 0
+            )
 
             return {
                 "total_workers": total_workers,
@@ -197,7 +210,9 @@ class MetricsCollector:
                 "active_tasks": active_tasks,
                 "available_slots": total_capacity - active_tasks,
                 "utilization_percent": round(utilization, 2),
-                "health_percent": (healthy_workers / total_workers * 100) if total_workers > 0 else 0,
+                "health_percent": (
+                    (healthy_workers / total_workers * 100) if total_workers > 0 else 0
+                ),
             }
 
         except Exception as e:
@@ -210,13 +225,17 @@ class MetricsCollector:
             if not self.redis_client:
                 return {}
 
-            queue_length = self.redis_client.llen("celery_queue") if self.redis_client else 0
+            queue_length = (
+                self.redis_client.llen("celery_queue") if self.redis_client else 0
+            )
 
             return {
                 "queue_length": queue_length,
                 "pending_tasks": queue_length,
                 "threshold": 1000,
-                "backlog_percent": (queue_length / 1000 * 100) if queue_length > 0 else 0,
+                "backlog_percent": (
+                    (queue_length / 1000 * 100) if queue_length > 0 else 0
+                ),
             }
 
         except Exception as e:
@@ -243,9 +262,12 @@ class MetricsCollector:
                         "worker_id": worker_id,
                         "capacity": worker_data.get("capacity", 0),
                         "active_tasks": worker_data.get("active_tasks", 0),
-                        "available": worker_data.get("capacity", 0) - worker_data.get("active_tasks", 0),
+                        "available": worker_data.get("capacity", 0)
+                        - worker_data.get("active_tasks", 0),
                         "utilization": (
-                            worker_data.get("active_tasks", 0) / worker_data.get("capacity", 1) * 100
+                            worker_data.get("active_tasks", 0)
+                            / worker_data.get("capacity", 1)
+                            * 100
                         ),
                         "last_heartbeat": worker_data.get("last_heartbeat"),
                         "joined_at": worker_data.get("joined_at"),
@@ -331,7 +353,9 @@ class MetricsCollector:
             retry_stats = retry_manager.get_retry_statistics()
 
             return {
-                "total_scheduled_retries": retry_stats.get("total_scheduled_retries", 0),
+                "total_scheduled_retries": retry_stats.get(
+                    "total_scheduled_retries", 0
+                ),
                 "retry_strategy": retry_stats.get("retry_strategy", "unknown"),
                 "max_retries": retry_stats.get("max_retries", 0),
                 "recent_retries": retry_stats.get("scheduled_retries", [])[:5],
@@ -357,7 +381,8 @@ class MetricsCollector:
 
             return {
                 "avg_processing_time_seconds": stats.get("avg_processing_time", 0),
-                "total_sessions": stats.get("active_count", 0) + stats.get("completed_count", 0),
+                "total_sessions": stats.get("active_count", 0)
+                + stats.get("completed_count", 0),
                 "throughput_per_minute": self._calculate_throughput(),
                 "peak_concurrent_sessions": stats.get("peak_concurrent", 0),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -374,12 +399,16 @@ class MetricsCollector:
                 return 0.0
 
             # Get completed sessions from last minute
-            one_minute_ago = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+            one_minute_ago = (
+                datetime.now(timezone.utc) - timedelta(minutes=1)
+            ).isoformat()
 
             count = 0
             cursor = 0
             while True:
-                cursor, keys = self.redis_client.scan(cursor, match="session:*", count=100)
+                cursor, keys = self.redis_client.scan(
+                    cursor, match="session:*", count=100
+                )
 
                 for key in keys:
                     try:

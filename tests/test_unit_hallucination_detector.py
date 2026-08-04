@@ -20,12 +20,18 @@ class _StubbedDetector(HallucinationDetector):
     """Bypasses __init__ (which loads real ML models) so scoring logic
     can be tested in isolation, offline."""
 
-    def __init__(self, similarity: float, entailment: float, contradiction: float, neutral: float):
+    def __init__(
+        self, similarity: float, entailment: float, contradiction: float, neutral: float
+    ):
         self.w_similarity = 0.3
         self.w_nli = 0.7
         self.threshold = 0.5
         self._similarity = similarity
-        self._nli = {"entailment": entailment, "contradiction": contradiction, "neutral": neutral}
+        self._nli = {
+            "entailment": entailment,
+            "contradiction": contradiction,
+            "neutral": neutral,
+        }
 
     def _semantic_similarity(self, source, response):
         return self._similarity
@@ -36,7 +42,9 @@ class _StubbedDetector(HallucinationDetector):
 
 class TestHallucinationDetectorScoring:
     def test_grounded_response_is_not_flagged(self):
-        detector = _StubbedDetector(similarity=0.85, entailment=0.9, contradiction=0.03, neutral=0.07)
+        detector = _StubbedDetector(
+            similarity=0.85, entailment=0.9, contradiction=0.03, neutral=0.07
+        )
         result = detector.evaluate("source", "response")
 
         assert result.is_hallucination is False
@@ -44,7 +52,9 @@ class TestHallucinationDetectorScoring:
         assert result.hallucination_score < 0.3
 
     def test_contradictory_response_is_flagged_high_risk(self):
-        detector = _StubbedDetector(similarity=0.7, entailment=0.1, contradiction=0.75, neutral=0.15)
+        detector = _StubbedDetector(
+            similarity=0.7, entailment=0.1, contradiction=0.75, neutral=0.15
+        )
         result = detector.evaluate("source", "response")
 
         assert result.is_hallucination is True
@@ -52,14 +62,18 @@ class TestHallucinationDetectorScoring:
         assert "contradicts" in result.explanation
 
     def test_off_topic_fabricated_response_is_flagged(self):
-        detector = _StubbedDetector(similarity=0.2, entailment=0.05, contradiction=0.1, neutral=0.85)
+        detector = _StubbedDetector(
+            similarity=0.2, entailment=0.05, contradiction=0.1, neutral=0.85
+        )
         result = detector.evaluate("source", "response")
 
         assert result.is_hallucination is True
         assert result.hallucination_score >= 0.5
 
     def test_result_serializes_to_dict(self):
-        detector = _StubbedDetector(similarity=0.85, entailment=0.9, contradiction=0.03, neutral=0.07)
+        detector = _StubbedDetector(
+            similarity=0.85, entailment=0.9, contradiction=0.03, neutral=0.07
+        )
         result = detector.evaluate("source", "response")
         as_dict = result.to_dict()
 
@@ -70,9 +84,9 @@ class TestHallucinationDetectorScoring:
     @pytest.mark.parametrize(
         "similarity,entailment,contradiction,expected_flag",
         [
-            (0.9, 0.95, 0.02, False),   # clearly grounded
-            (0.1, 0.05, 0.05, True),    # clearly off-topic
-            (0.6, 0.1, 0.8, True),      # clearly contradictory
+            (0.9, 0.95, 0.02, False),  # clearly grounded
+            (0.1, 0.05, 0.05, True),  # clearly off-topic
+            (0.6, 0.1, 0.8, True),  # clearly contradictory
         ],
     )
     def test_boundary_cases(self, similarity, entailment, contradiction, expected_flag):

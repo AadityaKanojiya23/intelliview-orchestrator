@@ -4,11 +4,12 @@ Run: pytest tests/test_api.py -v
 """
 
 import sys
+
 sys.path.insert(0, "../src")
 
 import pytest
-from fastapi.testclient import TestClient
 import store
+from fastapi.testclient import TestClient
 from main import app
 
 client = TestClient(app)
@@ -24,11 +25,13 @@ def reset_store():
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+
 def make_config(job_position="Software Engineer", weights=None):
     return {
         "job_position": job_position,
         "description": "Test config",
-        "weights": weights or {
+        "weights": weights
+        or {
             "tab_switching": 2.0,
             "browser_activity": 3.0,
             "audio_interruptions": 1.0,
@@ -36,11 +39,12 @@ def make_config(job_position="Software Engineer", weights=None):
             "candidate_absence": 1.5,
             "gaze_deviation": 1.0,
             "background_noise": 0.5,
-        }
+        },
     }
 
 
 # ── POST /risk-configs ─────────────────────────────────────────────────────────
+
 
 class TestCreate:
     def test_create_returns_201(self):
@@ -73,23 +77,35 @@ class TestCreate:
         assert r.status_code == 422
 
     def test_create_negative_weight_returns_422(self):
-        payload = make_config(weights={
-            "tab_switching": -1.0,
-            "browser_activity": 1.0,
-            "audio_interruptions": 1.0,
-            "multiple_persons": 1.0,
-            "candidate_absence": 1.0,
-            "gaze_deviation": 1.0,
-            "background_noise": 1.0,
-        })
+        payload = make_config(
+            weights={
+                "tab_switching": -1.0,
+                "browser_activity": 1.0,
+                "audio_interruptions": 1.0,
+                "multiple_persons": 1.0,
+                "candidate_absence": 1.0,
+                "gaze_deviation": 1.0,
+                "background_noise": 1.0,
+            }
+        )
         r = client.post("/risk-configs/", json=payload)
         assert r.status_code == 422
 
     def test_create_all_zero_weights_returns_422(self):
-        payload = make_config(weights={k: 0.0 for k in [
-            "tab_switching", "browser_activity", "audio_interruptions",
-            "multiple_persons", "candidate_absence", "gaze_deviation", "background_noise"
-        ]})
+        payload = make_config(
+            weights={
+                k: 0.0
+                for k in [
+                    "tab_switching",
+                    "browser_activity",
+                    "audio_interruptions",
+                    "multiple_persons",
+                    "candidate_absence",
+                    "gaze_deviation",
+                    "background_noise",
+                ]
+            }
+        )
         r = client.post("/risk-configs/", json=payload)
         assert r.status_code == 422
 
@@ -102,6 +118,7 @@ class TestCreate:
 
 
 # ── GET /risk-configs ──────────────────────────────────────────────────────────
+
 
 class TestList:
     def test_list_empty(self):
@@ -118,6 +135,7 @@ class TestList:
 
 # ── GET /risk-configs/{id} ─────────────────────────────────────────────────────
 
+
 class TestGetById:
     def test_get_existing(self):
         created = client.post("/risk-configs/", json=make_config()).json()
@@ -131,6 +149,7 @@ class TestGetById:
 
 
 # ── GET /risk-configs/by-position/{job_position} ──────────────────────────────
+
 
 class TestGetByPosition:
     def test_get_by_position(self):
@@ -151,26 +170,32 @@ class TestGetByPosition:
 
 # ── PUT /risk-configs/{id} ─────────────────────────────────────────────────────
 
+
 class TestUpdate:
     def test_update_weights(self):
         created = client.post("/risk-configs/", json=make_config()).json()
-        r = client.put(f"/risk-configs/{created['id']}", json={
-            "weights": {
-                "tab_switching": 9.0,
-                "browser_activity": 1.0,
-                "audio_interruptions": 1.0,
-                "multiple_persons": 1.0,
-                "candidate_absence": 1.0,
-                "gaze_deviation": 1.0,
-                "background_noise": 1.0,
-            }
-        })
+        r = client.put(
+            f"/risk-configs/{created['id']}",
+            json={
+                "weights": {
+                    "tab_switching": 9.0,
+                    "browser_activity": 1.0,
+                    "audio_interruptions": 1.0,
+                    "multiple_persons": 1.0,
+                    "candidate_absence": 1.0,
+                    "gaze_deviation": 1.0,
+                    "background_noise": 1.0,
+                }
+            },
+        )
         assert r.status_code == 200
         assert r.json()["weights"]["tab_switching"] == 9.0
 
     def test_update_description_only(self):
         created = client.post("/risk-configs/", json=make_config()).json()
-        r = client.put(f"/risk-configs/{created['id']}", json={"description": "Updated desc"})
+        r = client.put(
+            f"/risk-configs/{created['id']}", json={"description": "Updated desc"}
+        )
         assert r.status_code == 200
         assert r.json()["description"] == "Updated desc"
 
@@ -186,6 +211,7 @@ class TestUpdate:
 
 
 # ── DELETE /risk-configs/{id} ──────────────────────────────────────────────────
+
 
 class TestDelete:
     def test_delete_existing(self):
@@ -205,6 +231,7 @@ class TestDelete:
 
 
 # ── Risk Engine Integration ────────────────────────────────────────────────────
+
 
 class TestRiskEngineIntegration:
     def test_known_position_returns_custom_weights(self):

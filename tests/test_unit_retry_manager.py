@@ -2,10 +2,10 @@ import pytest
 
 from orchestrator.retry_manager import RetryManager, RetryStrategy
 
-
 # ----------------------------
 # Fake Redis Client
 # ----------------------------
+
 
 class FakeRedis:
     def __init__(self):
@@ -33,6 +33,7 @@ class FakeRedis:
 # Fixtures
 # ----------------------------
 
+
 @pytest.fixture
 def retry_manager(monkeypatch):
     fake = FakeRedis()
@@ -52,6 +53,7 @@ def retry_manager(monkeypatch):
 # ----------------------------
 # Delay Calculation
 # ----------------------------
+
 
 def test_exponential_backoff(retry_manager):
     assert retry_manager._calculate_delay(1) == 2
@@ -92,6 +94,7 @@ def test_immediate_backoff(monkeypatch):
 # Retry Count
 # ----------------------------
 
+
 def test_increment_retry(retry_manager):
     count = retry_manager.increment_retry("session1")
 
@@ -111,6 +114,7 @@ def test_get_retry_count(retry_manager):
 # ----------------------------
 # Retry Permission
 # ----------------------------
+
 
 def test_can_retry_true(retry_manager):
     assert retry_manager.can_retry("new_session") is True

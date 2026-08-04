@@ -25,6 +25,7 @@ class InterviewEvent:
     (events_catalog.yaml) would emit for an 'interview.booked' /
     'interview.reminder' event.
     """
+
     interview_id: str
     candidate_name: str
     role_title: str
@@ -50,6 +51,7 @@ class InterviewEvent:
 @dataclass
 class DigestRecipient:
     """Minimal recipient info needed to render and send a digest."""
+
     user_id: str
     email: str
     display_name: str
@@ -60,6 +62,7 @@ class DigestRecipient:
 @dataclass
 class DigestPayload:
     """The fully assembled digest, ready for template rendering."""
+
     recipient: DigestRecipient
     generated_at: datetime
     grouped_interviews: "dict[str, list[InterviewEvent]]" = field(default_factory=dict)

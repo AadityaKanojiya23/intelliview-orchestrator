@@ -12,14 +12,8 @@ def calculate_semantic_similarity(reference: str, candidate: str) -> float:
     if not reference or not candidate:
         return 0.0
 
-    embeddings = _model.encode(
-        [reference, candidate],
-        convert_to_numpy=True
-    )
+    embeddings = _model.encode([reference, candidate], convert_to_numpy=True)
 
-    similarity = cosine_similarity(
-        [embeddings[0]],
-        [embeddings[1]]
-    )[0][0]
+    similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
 
     return round(float(similarity), 4)

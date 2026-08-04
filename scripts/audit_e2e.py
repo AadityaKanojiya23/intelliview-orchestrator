@@ -143,10 +143,14 @@ def backend() -> None:
             f"final status={body.get('status') if isinstance(body, dict) else 'n/a'}",
         )
 
-    s, _, _ = request("POST", f"{API}/switch-strategy?strategy=QUEUE_BASED", headers=hdr)
+    s, _, _ = request(
+        "POST", f"{API}/switch-strategy?strategy=QUEUE_BASED", headers=hdr
+    )
     check("POST /switch-strategy", s == 200, f"HTTP {s}")
 
-    s, _, _ = request("POST", f"{API}/switch-strategy?strategy=LEAST_LOADED", headers=hdr)
+    s, _, _ = request(
+        "POST", f"{API}/switch-strategy?strategy=LEAST_LOADED", headers=hdr
+    )
     check("POST /switch-strategy reset", s == 200, f"HTTP {s}")
 
     s, _, _ = request("POST", f"{API}/detect-failures", headers=hdr)
@@ -156,12 +160,18 @@ def backend() -> None:
     check("POST /sync-to-database", s == 200, f"HTTP {s}")
 
     s, _, _ = request(
-        "POST", f"{API}/register-worker", headers=hdr, body={"worker_id": "audit-w", "capacity": 2}
+        "POST",
+        f"{API}/register-worker",
+        headers=hdr,
+        body={"worker_id": "audit-w", "capacity": 2},
     )
     check("POST /register-worker", s == 200, f"HTTP {s}")
 
     s, _, _ = request(
-        "POST", f"{API}/worker/heartbeat", headers=hdr, body={"worker_id": "audit-w", "active_tasks": 0}
+        "POST",
+        f"{API}/worker/heartbeat",
+        headers=hdr,
+        body={"worker_id": "audit-w", "active_tasks": 0},
     )
     check("POST /worker/heartbeat", s == 200, f"HTTP {s}")
 
@@ -170,7 +180,9 @@ def backend() -> None:
 
     section("Backend — validation")
     # Missing candidate_id → 422
-    s, _, _ = request("POST", f"{API}/start-interview", headers=hdr, body={"priority": "medium"})
+    s, _, _ = request(
+        "POST", f"{API}/start-interview", headers=hdr, body={"priority": "medium"}
+    )
     check("POST /start-interview missing candidate_id", s == 422, f"HTTP {s}")
 
     # Invalid candidate_id (bad chars) → 422
@@ -277,9 +289,15 @@ def websocket() -> None:
                 except asyncio.TimeoutError:
                     pass
                 check("WS connects", True, "")
-                check("WS receives hello", any(m.get("type") == "hello" for m in msgs), f"{len(msgs)} msgs")
                 check(
-                    "WS receives metrics", any(m.get("type") == "metrics" for m in msgs), f"{len(msgs)} msgs"
+                    "WS receives hello",
+                    any(m.get("type") == "hello" for m in msgs),
+                    f"{len(msgs)} msgs",
+                )
+                check(
+                    "WS receives metrics",
+                    any(m.get("type") == "metrics" for m in msgs),
+                    f"{len(msgs)} msgs",
                 )
         except Exception as exc:
             check("WS connects", False, str(exc))

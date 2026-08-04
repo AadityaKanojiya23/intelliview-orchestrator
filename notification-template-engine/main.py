@@ -1,47 +1,25 @@
+from notification_service import send_notification
 from notifier import ConsoleNotifier
 from users import User
-from notification_service import send_notification
 
 
 def main():
 
     users = [
-
-        User(
-            "Vaishnavi",
-            "vaish@gmail.com",
-            "en"
-        ),
-
-        User(
-            "Jaya",
-            "jaya@gmail.com",
-            "hi"
-        ),
-
-        User(
-            "Anushka",
-            "anushka@gmail.com",
-            "te"
-        )
+        User("Vaishnavi", "vaish@gmail.com", "en"),
+        User("Jaya", "jaya@gmail.com", "hi"),
+        User("Anushka", "anushka@gmail.com", "te"),
     ]
 
     # Different notification events
     events = [
-
         "interview_scheduled",
         "interview_reminder",
         "interview_cancelled",
-        "interview_completed"
-
+        "interview_completed",
     ]
 
-    data = {
-
-        "date": "10 July",
-        "time": "5 PM"
-
-    }
+    data = {"date": "10 July", "time": "5 PM"}
     notifier = ConsoleNotifier()
 
     for event in events:
@@ -55,28 +33,18 @@ def main():
 
             try:
 
-                message = send_notification(
-                    user,
-                    event,
-                    data
-                )
+                message = send_notification(user, event, data)
 
                 print("\n")
                 print("-" * 40)
 
-                notifier.deliver(
-                    user.email,
-                    message
-                )
+                notifier.deliver(user.email, message)
 
                 print("-" * 40)
 
             except Exception as e:
 
-                print(
-                    f"Error sending notification "
-                    f"to {user.name}: {e}"
-                )
+                print(f"Error sending notification " f"to {user.name}: {e}")
 
 
 if __name__ == "__main__":

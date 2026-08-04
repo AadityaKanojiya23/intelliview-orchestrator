@@ -106,7 +106,9 @@ class WorkerRegistry:
         except Exception as exc:
             logger.warning("Could not hydrate worker registry from Redis: %s", exc)
 
-    def register_worker(self, worker_id: str, capacity: int = 4, weight: int | None = None) -> bool:
+    def register_worker(
+        self, worker_id: str, capacity: int = 4, weight: int | None = None
+    ) -> bool:
         """
         Private helper to alert other cluster nodes to sync memory updates
 
@@ -130,11 +132,10 @@ class WorkerRegistry:
                 "last_heartbeat": datetime.now(timezone.utc).isoformat(),
                 "total_tasks_processed": 0,
                 "failed_tasks": 0,
-
-               # New fields
-              "failure_count": 0,
-              "penalty_weight": 1.0,
-              "penalty_until": None,
+                # New fields
+                "failure_count": 0,
+                "penalty_weight": 1.0,
+                "penalty_until": None,
             }
 
             with self.lock:
@@ -152,13 +153,11 @@ class WorkerRegistry:
                         if isinstance(v, (int, float))
                         and k
                         in {
-                            in {
-                             "capacity",
-                             "active_tasks",
-                             "total_tasks_processed",
-                             "failed_tasks",
-                             "failure_count",
-}
+                            "capacity",
+                            "active_tasks",
+                            "total_tasks_processed",
+                            "failed_tasks",
+                            "failure_count",
                         }
                         else str(v)
                     )
@@ -198,7 +197,9 @@ class WorkerRegistry:
             # Initialize active task metric for the new worker
             WORKER_ACTIVE_TASKS.labels(worker_id=worker_id).set(0)
 
-            logger.info(f"Registered worker: {worker_id} with capacity {capacity}, weight {effective_weight}")
+            logger.info(
+                f"Registered worker: {worker_id} with capacity {capacity}, weight {effective_weight}"
+            )
             return True
 
         except Exception as e:
@@ -362,13 +363,14 @@ class WorkerRegistry:
         except Exception as e:
             logger.error(f"Error decrementing active tasks: {e!s}")
             return False
-        
+
         def record_failure(self, worker_id: str) -> None:
-    """
-    Record a failed task and apply a temporary penalty.
-    """
-    with self.lock:
-        worker = self.local_workers.get(worker_id)
+            """
+            Record a failed task and apply a temporary penalty.
+            """
+            with self.lock:
+                worker = self.local_workers.get(worker_id)
+
         if not worker:
             return None
 
@@ -376,10 +378,7 @@ class WorkerRegistry:
         worker["failure_count"] += 1
 
         # Reduce scheduling weight
-        worker["penalty_weight"] = max(
-            0.2,
-            worker["penalty_weight"] - 0.2
-        )
+        worker["penalty_weight"] = max(0.2, worker["penalty_weight"] - 0.2)
 
         # Penalty lasts for 60 seconds
         worker["penalty_until"] = (
@@ -388,12 +387,15 @@ class WorkerRegistry:
 
     if self.redis_client:
         key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
-        self.redis_client.hset(key, mapping={
-            "failed_tasks": worker["failed_tasks"],
-            "failure_count": worker["failure_count"],
-            "penalty_weight": worker["penalty_weight"],
-            "penalty_until": worker["penalty_until"],
-        })
+        self.redis_client.hset(
+            key,
+            mapping={
+                "failed_tasks": worker["failed_tasks"],
+                "failure_count": worker["failure_count"],
+                "penalty_weight": worker["penalty_weight"],
+                "penalty_until": worker["penalty_until"],
+            },
+        )
 
 
 def record_success(self, worker_id: str) -> None:
@@ -411,11 +413,14 @@ def record_success(self, worker_id: str) -> None:
 
     if self.redis_client:
         key = f"{self.WORKER_KEY_PREFIX}{worker_id}"
-        self.redis_client.hset(key, mapping={
-            "failure_count": 0,
-            "penalty_weight": 1.0,
-            "penalty_until": "",
-        })
+        self.redis_client.hset(
+            key,
+            mapping={
+                "failure_count": 0,
+                "penalty_weight": 1.0,
+                "penalty_until": "",
+            },
+        )
 
 
 def get_worker_weight(self, worker: dict[str, Any]) -> float:
@@ -440,7 +445,6 @@ def get_worker_weight(self, worker: dict[str, Any]) -> float:
             pass
 
     return 1.0
-
 
     def get_worker(self, worker_id: str) -> dict[str, Any] | None:
         """Get worker details"""
@@ -505,19 +509,19 @@ def get_worker_weight(self, worker: dict[str, Any]) -> float:
             avg_active = (total_active_tasks / total_workers) if total_workers else 0
 
             worker_details = [
-    {
-        "worker_id": wid,
-        "capacity": w["capacity"],
-        "active_tasks": w["active_tasks"],
-        "status": w["status"],
-        "last_heartbeat": w.get("last_heartbeat"),
-        "total_tasks_processed": w.get("total_tasks_processed", 0),
-        "failed_tasks": w.get("failed_tasks", 0),
-        "failure_count": w.get("failure_count", 0),
-        "penalty_weight": w.get("penalty_weight", 1.0),
-    }
-    for wid, w in self.local_workers.items()
-]
+                {
+                    "worker_id": wid,
+                    "capacity": w["capacity"],
+                    "active_tasks": w["active_tasks"],
+                    "status": w["status"],
+                    "last_heartbeat": w.get("last_heartbeat"),
+                    "total_tasks_processed": w.get("total_tasks_processed", 0),
+                    "failed_tasks": w.get("failed_tasks", 0),
+                    "failure_count": w.get("failure_count", 0),
+                    "penalty_weight": w.get("penalty_weight", 1.0),
+                }
+                for wid, w in self.local_workers.items()
+            ]
 
             return {
                 "total_workers": total_workers,
@@ -570,9 +574,9 @@ def get_worker_weight(self, worker: dict[str, Any]) -> float:
             self._trigger_sync_broadcast(wid)
 
         return unhealthy
-    
+
     def record_worker_failure(self, worker_id: str):
-    worker = self.local_workers.get(worker_id)
+        worker = self.local_workers.get(worker_id)
 
     if not worker:
         return None
@@ -585,20 +589,19 @@ def get_worker_weight(self, worker: dict[str, Any]) -> float:
             datetime.now(timezone.utc) + timedelta(minutes=5)
         ).isoformat()
 
-        def clear_penalty(self, worker_id: str):
+    def clear_penalty(self, worker_id: str):
+        worker = self.local_workers.get(worker_id)
 
-    worker = self.local_workers.get(worker_id)
+        if not worker:
+            return None
 
-    if not worker:
-        return None
-
-    worker["failure_count"] = 0
-    worker["penalty_weight"] = 1.0
-    worker["penalty_until"] = None
+        worker["failure_count"] = 0
+        worker["penalty_weight"] = 1.0
+        worker["penalty_until"] = None
 
     def get_worker_weight(self, worker):
 
-    penalty_until = worker.get("penalty_until")
+        penalty_until = worker.get("penalty_until")
 
     if penalty_until:
 
@@ -622,16 +625,15 @@ def record_failure(self, worker_id: str):
         worker["penalty_weight"] = 0.5
 
     def record_success(self, worker_id: str):
-    worker = self.local_workers.get(worker_id)
-    if not worker:
-        return
+        worker = self.local_workers.get(worker_id)
+        if not worker:
+            return
 
-    worker["failure_count"] = 0
-    worker["penalty_weight"] = 1.0
+        worker["failure_count"] = 0
+        worker["penalty_weight"] = 1.0
 
     def get_worker_weight(self, worker):
-    return worker.get("penalty_weight", 1.0)
-
+        return worker.get("penalty_weight", 1.0)
 
     def deregister_worker(self, worker_id: str) -> bool:
         """Remove a worker from the registry"""

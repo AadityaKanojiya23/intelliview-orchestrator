@@ -12,7 +12,6 @@ import pytest
 
 from orchestrator.redis_client import _CircuitState, circuit_breaker
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

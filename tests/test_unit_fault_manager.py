@@ -36,7 +36,9 @@ def _manager():
     # Expose the mock so tests can inspect calls made after construction.
     fm.redis_client = mock_redis.return_value
     return fm
-        return FaultManager()
+
+
+# Removed duplicate return FaultManager()
 
 
 def test_log_failure_appends_to_log_key():
@@ -68,8 +70,9 @@ def test_get_failure_log_decodes_json_entries():
     log = fm.get_failure_log(limit=10)
     assert all(entry["session_id"] == "s1" for entry in log)
     assert all(entry["failure_type"] == "task_exception" for entry in log)
-    assert log[0]["worker_id"] == "w1"  
-    
+    assert log[0]["worker_id"] == "w1"
+
+
 def test_handle_worker_failure_reassigns_tasks_and_logs():
     fm = _manager()
     with (

@@ -16,4 +16,4 @@ COMMUNICATION_EVALUATION_PROMPT = (
     "Return a JSON object with keys: clarity_score (0-100), "
     "professionalism (0-100), confidence_level (0-1), "
     "pace_appropriateness (0-1)."
-)  
+)

@@ -63,9 +63,7 @@ def list_configs() -> list[RiskConfigResponse]:
     return [_to_response(r) for r in _store.values()]
 
 
-def update_config(
-    config_id: str, data: RiskConfigUpdate
-) -> RiskConfigResponse | None:
+def update_config(config_id: str, data: RiskConfigUpdate) -> RiskConfigResponse | None:
     record = _store.get(config_id)
     if not record:
         return None

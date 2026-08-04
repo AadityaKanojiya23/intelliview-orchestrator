@@ -17,7 +17,6 @@ import logging
 import re
 import time
 import time as _time
-from database.subscriber_store import create_table, list_subscribers
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
@@ -30,7 +29,6 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
-from workers.evaluation_pipeline import _llm_generate_question
 
 from config import (
     API_TOKEN,
@@ -40,6 +38,7 @@ from config import (
 )
 from database.db import engine
 from database.models import Base
+from database.subscriber_store import create_table, list_subscribers
 from metrics.prometheus_metrics import REQUEST_COUNT, REQUEST_DURATION
 from monitoring.dashboard_api import create_dashboard_routes
 from monitoring.metrics_collector import MetricsCollector
@@ -71,6 +70,7 @@ from routers.sessions import (  # noqa: F401 (re-exported for tests)
 )
 from routers.templates import create_template_routes
 from routers.workers import create_worker_routes
+from workers.evaluation_pipeline import _llm_generate_question
 
 # Configure logging after imports so startup messages are structured.
 configure_logging()
@@ -92,14 +92,11 @@ async def lifespan(app: FastAPI):
     settings.validate_configuration()
     Base.metadata.create_all(bind=engine)
 
-        # Initialize webhook subscriber store
+    # Initialize webhook subscriber store
     create_table()
 
     subscribers = list_subscribers()
-    logger.info(
-        "Loaded %d webhook subscribers",
-        len(subscribers)
-    )
+    logger.info("Loaded %d webhook subscribers", len(subscribers))
     if API_TOKEN == "dev-token-change-me":
         raise RuntimeError(
             "CRITICAL SECURITY ERROR: Default API_TOKEN detected! "
@@ -163,7 +160,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-logging.getLogger("opentelemetry.exporter.otlp.proto.grpc.exporter").setLevel(logging.DEBUG)
+logging.getLogger("opentelemetry.exporter.otlp.proto.grpc.exporter").setLevel(
+    logging.DEBUG
+)
 logging.basicConfig(level=logging.DEBUG)
 
 trace.set_tracer_provider(TracerProvider())
@@ -319,7 +318,9 @@ app.include_router(
 )
 app.include_router(create_candidate_routes(candidate_manager=candidate_manager))
 app.include_router(create_question_routes(question_bank=question_bank))
-app.include_router(create_template_routes(interview_template_manager=interview_template_manager))
+app.include_router(
+    create_template_routes(interview_template_manager=interview_template_manager)
+)
 app.include_router(
     create_worker_routes(
         worker_registry=worker_registry,
@@ -328,9 +329,12 @@ app.include_router(
         session_tracker=session_tracker,
     )
 )
-app.include_router(create_admin_routes(state_sync=state_sync, load_balancer=load_balancer))
+app.include_router(
+    create_admin_routes(state_sync=state_sync, load_balancer=load_balancer)
+)
 
 from fastapi import Request
+
 
 @app.post("/metrics/web-vitals")
 async def receive_web_vitals(request: Request):
@@ -338,16 +342,14 @@ async def receive_web_vitals(request: Request):
     try:
         metric = await request.json()
         logger.info(f"Web Vitals: {metric}")
-        return {
-            "status": "success",
-            "message": "Web Vitals received"
-        }
+        return {"status": "success", "message": "Web Vitals received"}
     except Exception as e:
         logger.error(f"Error receiving Web Vitals: {e!s}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Error receiving Web Vitals: {e!s}"
+            status_code=500, detail=f"Error receiving Web Vitals: {e!s}"
         )
+
+
 if __name__ == "__main__":
     import uvicorn
 

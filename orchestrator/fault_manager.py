@@ -86,7 +86,9 @@ class FaultManager:
             # Scan for sessions stuck in PROCESSING
             cursor = 0
             while True:
-                cursor, keys = self.redis_client.scan(cursor, match="session:*", count=100)
+                cursor, keys = self.redis_client.scan(
+                    cursor, match="session:*", count=100
+                )
 
                 for key in keys:
                     try:
@@ -101,7 +103,9 @@ class FaultManager:
                             start_time = session.get("start_time")
                             if start_time:
                                 start_dt = datetime.fromisoformat(start_time)
-                                elapsed = (datetime.now(timezone.utc) - start_dt).total_seconds()
+                                elapsed = (
+                                    datetime.now(timezone.utc) - start_dt
+                                ).total_seconds()
 
                                 if elapsed > timeout_seconds:
                                     failed_sessions.append(session.get("session_id"))
@@ -122,7 +126,9 @@ class FaultManager:
             logger.error(f"Error detecting failed sessions: {e!s}")
             return []
 
-    def handle_worker_failure(self, worker_id: str, failure_reason: str = "unknown") -> bool:
+    def handle_worker_failure(
+        self, worker_id: str, failure_reason: str = "unknown"
+    ) -> bool:
         """
         Handle failure of a worker node
 
@@ -152,7 +158,9 @@ class FaultManager:
             # Get tasks assigned to this worker (from session tracker)
             tasks_to_reassign = self._get_worker_tasks(worker_id)
 
-            logger.info(f"Found {len(tasks_to_reassign)} tasks to reassign from failed worker {worker_id}")
+            logger.info(
+                f"Found {len(tasks_to_reassign)} tasks to reassign from failed worker {worker_id}"
+            )
 
             # Reassign each task
             reassigned_count = 0
@@ -160,7 +168,9 @@ class FaultManager:
                 if self.reassign_task(session_id, original_worker=worker_id):
                     reassigned_count += 1
 
-            logger.info(f"Successfully reassigned {reassigned_count}/{len(tasks_to_reassign)} tasks")
+            logger.info(
+                f"Successfully reassigned {reassigned_count}/{len(tasks_to_reassign)} tasks"
+            )
 
             return True
 
@@ -168,7 +178,9 @@ class FaultManager:
             logger.error(f"Error handling worker failure: {e!s}")
             return False
 
-    def reassign_task(self, session_id: str, original_worker: str | None = None) -> bool:
+    def reassign_task(
+        self, session_id: str, original_worker: str | None = None
+    ) -> bool:
         """
         Reassign a failed task to another healthy worker
 
@@ -181,7 +193,8 @@ class FaultManager:
         """
         try:
             logger.info(
-                f"Reassigning task {session_id}" + (f" from {original_worker}" if original_worker else "")
+                f"Reassigning task {session_id}"
+                + (f" from {original_worker}" if original_worker else "")
             )
 
             # Add to recovery queue for retry
@@ -218,7 +231,9 @@ class FaultManager:
             cursor = 0
 
             while True:
-                cursor, keys = self.redis_client.scan(cursor, match="session:*", count=100)
+                cursor, keys = self.redis_client.scan(
+                    cursor, match="session:*", count=100
+                )
 
                 for key in keys:
                     try:
@@ -316,7 +331,9 @@ class FaultManager:
             if self.redis_client:
                 self.redis_client.lpush(self.dead_letter_queue, json.dumps(dlq_entry))
                 self.redis_client.expire(self.dead_letter_queue, 604800)
-                logger.warning(f"Session {session_id} moved to dead letter queue: {reason}")
+                logger.warning(
+                    f"Session {session_id} moved to dead letter queue: {reason}"
+                )
 
             return True
 

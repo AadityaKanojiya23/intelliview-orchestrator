@@ -5,12 +5,15 @@ Settings are loaded from environment variables (or a `.env` file in dev)
 via `pydantic-settings`. All values have sensible local defaults but
 should be overridden in production.
 """
+
 import json
 import os
 from functools import lru_cache
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
 @lru_cache(maxsize=1)
 def get_aws_secrets(secret_name: str, region_name: str = "us-east-1") -> dict:
     """Fetches and caches JSON secrets from AWS Secrets Manager."""
@@ -129,8 +132,6 @@ class Settings(BaseSettings):
 
         return value
 
-
-        
     def __init__(self, **values):
         super().__init__(**values)
         if self.environment.lower() == "production":

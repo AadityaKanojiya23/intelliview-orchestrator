@@ -38,9 +38,19 @@ from database.models import InterviewSession  # noqa: E402
 from orchestrator.worker_registry import WorkerRegistry  # noqa: E402
 
 WORKER_FIXTURES = [
-    {"worker_id": "worker-alpha", "capacity": 4, "active_tasks": 2, "status": "healthy"},
+    {
+        "worker_id": "worker-alpha",
+        "capacity": 4,
+        "active_tasks": 2,
+        "status": "healthy",
+    },
     {"worker_id": "worker-beta", "capacity": 8, "active_tasks": 1, "status": "healthy"},
-    {"worker_id": "worker-gamma", "capacity": 2, "active_tasks": 0, "status": "healthy"},
+    {
+        "worker_id": "worker-gamma",
+        "capacity": 2,
+        "active_tasks": 0,
+        "status": "healthy",
+    },
 ]
 
 
@@ -70,7 +80,9 @@ def seed_sessions(reset: bool = False) -> None:
             db.commit()
             print(f"  - deleted {deleted} existing sessions")
 
-        existing_ids = {row.session_id for row in db.query(InterviewSession.session_id).all()}
+        existing_ids = {
+            row.session_id for row in db.query(InterviewSession.session_id).all()
+        }
         if existing_ids:
             print(f"  = {len(existing_ids)} sessions already present; skipping insert")
             return
@@ -97,10 +109,22 @@ def seed_sessions(reset: bool = False) -> None:
                     updated_at=end,
                     video_analysis={
                         "candidate_name": rng.choice(
-                            ["Ava Patel", "Liam Chen", "Noah Kim", "Mia Rossi", "Yuki Sato", "Omar Hassan"]
+                            [
+                                "Ava Patel",
+                                "Liam Chen",
+                                "Noah Kim",
+                                "Mia Rossi",
+                                "Yuki Sato",
+                                "Omar Hassan",
+                            ]
                         ),
                         "position": rng.choice(
-                            ["Senior Backend Engineer", "ML Engineer", "Frontend Engineer", "DevOps Lead"]
+                            [
+                                "Senior Backend Engineer",
+                                "ML Engineer",
+                                "Frontend Engineer",
+                                "DevOps Lead",
+                            ]
                         ),
                         "face_detected": True,
                         "multiple_persons_detected": False,
@@ -127,7 +151,11 @@ def seed_sessions(reset: bool = False) -> None:
                     candidate_id=f"cand-{rng.randint(1000, 9999)}",
                     status=status,
                     assigned_node=rng.choice([w["worker_id"] for w in WORKER_FIXTURES]),
-                    start_time=now - timedelta(seconds=rng.randint(20, 600)) if status != "QUEUED" else None,
+                    start_time=(
+                        now - timedelta(seconds=rng.randint(20, 600))
+                        if status != "QUEUED"
+                        else None
+                    ),
                     end_time=None,
                     created_at=now - timedelta(seconds=rng.randint(20, 1200)),
                     updated_at=now - timedelta(seconds=rng.randint(5, 60)),
@@ -153,11 +181,10 @@ def seed_sessions(reset: bool = False) -> None:
         db.commit()
         print(f"  + inserted {len(rows)} demo sessions")
     except Exception:
-            db.rollback()
-            raise
+        db.rollback()
+        raise
     finally:
-            db.close()
-
+        db.close()
 
 
 def main() -> int:

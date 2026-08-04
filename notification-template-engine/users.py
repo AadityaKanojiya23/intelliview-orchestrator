@@ -1,6 +1,5 @@
 import logging
 
-
 SUPPORTED_LOCALES = {"en", "hi", "te"}
 
 logger = logging.getLogger(__name__)
@@ -28,10 +27,7 @@ class User:
         locale = locale.strip()
 
         if locale not in SUPPORTED_LOCALES:
-            logger.warning(
-                "Unsupported locale '%s'. Falling back to English.",
-                locale
-            )
+            logger.warning("Unsupported locale '%s'. Falling back to English.", locale)
             self.locale = "en"
         else:
             self.locale = locale

@@ -99,9 +99,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         ip = (
             forwarded.split(",")[0].strip()
             if forwarded
-            else request.client.host
-            if request.client
-            else "unknown"
+            else request.client.host if request.client else "unknown"
         )
         token = request.headers.get("x-api-token", "")
         return f"{ip}:{token}"

@@ -170,7 +170,9 @@ class HealthMonitor:
 
         return results
 
-    def _evaluate_redis_fragmentation(self, info: dict[str, Any], context: str) -> dict[str, Any]:
+    def _evaluate_redis_fragmentation(
+        self, info: dict[str, Any], context: str
+    ) -> dict[str, Any]:
         """Extract and evaluate Redis memory fragmentation ratio from an INFO payload.
 
         Returns a small dict with the ratio and derived status, and logs a
@@ -215,7 +217,11 @@ class HealthMonitor:
                 )
 
         return {
-            "fragmentation_ratio": round(fragmentation_ratio, 3) if fragmentation_ratio is not None else None,
+            "fragmentation_ratio": (
+                round(fragmentation_ratio, 3)
+                if fragmentation_ratio is not None
+                else None
+            ),
             "fragmentation_status": fragmentation_status,
             "warn_threshold": self.redis_fragmentation_warn_threshold,
             "critical_threshold": self.redis_fragmentation_critical_threshold,
@@ -236,7 +242,9 @@ class HealthMonitor:
             dep.healthy = True
 
             info = self.redis_client.info()
-            fragmentation_info = self._evaluate_redis_fragmentation(info, context="deep_check")
+            fragmentation_info = self._evaluate_redis_fragmentation(
+                info, context="deep_check"
+            )
             dep.metadata = {
                 "connected_clients": info.get("connected_clients", 0),
                 "used_memory_human": info.get("used_memory_human", "unknown"),
@@ -316,7 +324,9 @@ class HealthMonitor:
     # Existing health methods (unchanged API)
     # ------------------------------------------------------------------
 
-    def check_system_health(self, worker_registry=None, session_manager=None) -> dict[str, Any]:
+    def check_system_health(
+        self, worker_registry=None, session_manager=None
+    ) -> dict[str, Any]:
         """Perform comprehensive system health check."""
         try:
             logger.debug("Performing comprehensive system health check")
@@ -347,7 +357,8 @@ class HealthMonitor:
                 worker_status = self.check_worker_health(worker_registry)
                 health_status["components"]["workers"] = worker_status
                 if (
-                    worker_status["status"] in [HealthStatus.CRITICAL, HealthStatus.UNHEALTHY]
+                    worker_status["status"]
+                    in [HealthStatus.CRITICAL, HealthStatus.UNHEALTHY]
                     and health_status["overall_status"] != HealthStatus.CRITICAL
                 ):
                     health_status["overall_status"] = worker_status["status"]
@@ -356,7 +367,8 @@ class HealthMonitor:
                 session_status = self.check_session_health(session_manager)
                 health_status["components"]["sessions"] = session_status
                 if (
-                    session_status["status"] in [HealthStatus.CRITICAL, HealthStatus.DEGRADED]
+                    session_status["status"]
+                    in [HealthStatus.CRITICAL, HealthStatus.DEGRADED]
                     and health_status["overall_status"] == HealthStatus.HEALTHY
                 ):
                     health_status["overall_status"] = session_status["status"]
@@ -370,10 +382,16 @@ class HealthMonitor:
                     health_status["overall_status"] = HealthStatus.DEGRADED
 
             if self.redis_client:
-                self.redis_client.set(self.health_status_key, json.dumps(health_status), ex=300)
-                self.redis_client.set(self.last_check_key, datetime.now(timezone.utc).isoformat(), ex=300)
+                self.redis_client.set(
+                    self.health_status_key, json.dumps(health_status), ex=300
+                )
+                self.redis_client.set(
+                    self.last_check_key, datetime.now(timezone.utc).isoformat(), ex=300
+                )
 
-            logger.info("System health check complete: %s", health_status["overall_status"])
+            logger.info(
+                "System health check complete: %s", health_status["overall_status"]
+            )
             return health_status
 
         except Exception as e:
@@ -432,10 +450,15 @@ class HealthMonitor:
                     if start_time:
                         try:
                             start_dt = datetime.fromisoformat(start_time)
-                            elapsed = (datetime.now(timezone.utc) - start_dt).total_seconds()
+                            elapsed = (
+                                datetime.now(timezone.utc) - start_dt
+                            ).total_seconds()
                             if elapsed > self.session_timeout:
                                 stuck_sessions.append(
-                                    {"session_id": session.get("session_id"), "elapsed_seconds": elapsed}
+                                    {
+                                        "session_id": session.get("session_id"),
+                                        "elapsed_seconds": elapsed,
+                                    }
                                 )
                         except Exception:
                             pass
@@ -451,7 +474,9 @@ class HealthMonitor:
                 "total_active": len(active_sessions),
                 "stuck_sessions": len(stuck_sessions),
                 "stuck_list": stuck_sessions[:5],
-                "max_processing_time": max([s.get("elapsed_seconds", 0) for s in stuck_sessions], default=0),
+                "max_processing_time": max(
+                    [s.get("elapsed_seconds", 0) for s in stuck_sessions], default=0
+                ),
             }
 
         except Exception as e:
@@ -464,9 +489,14 @@ class HealthMonitor:
             logger.debug("Checking queue health")
 
             if not self.redis_client:
-                return {"status": HealthStatus.UNHEALTHY, "error": "Redis not available"}
+                return {
+                    "status": HealthStatus.UNHEALTHY,
+                    "error": "Redis not available",
+                }
 
-            queue_length = self.redis_client.llen("celery_queue") if self.redis_client else 0
+            queue_length = (
+                self.redis_client.llen("celery_queue") if self.redis_client else 0
+            )
 
             # Update current Celery queue depth
             QUEUE_DEPTH.set(queue_length)
@@ -480,9 +510,11 @@ class HealthMonitor:
                 "status": status,
                 "queue_length": queue_length,
                 "threshold": self.queue_threshold,
-                "backlog_percent": (queue_length / self.queue_threshold * 100)
-                if self.queue_threshold > 0
-                else 0,
+                "backlog_percent": (
+                    (queue_length / self.queue_threshold * 100)
+                    if self.queue_threshold > 0
+                    else 0
+                ),
             }
 
         except Exception as e:
@@ -493,7 +525,10 @@ class HealthMonitor:
         """Check Redis connectivity and responsiveness."""
         try:
             if not self.redis_client:
-                return {"status": HealthStatus.UNHEALTHY, "error": "Redis client not initialized"}
+                return {
+                    "status": HealthStatus.UNHEALTHY,
+                    "error": "Redis client not initialized",
+                }
 
             self.redis_client.ping()
 
@@ -509,7 +544,9 @@ class HealthMonitor:
             fragmentation = info.get("mem_fragmentation_ratio", 0)
             connected_clients = info.get("connected_clients", 0)
             used_memory = info.get("used_memory_human", "unknown")
-            fragmentation_info = self._evaluate_redis_fragmentation(info, context="basic_check")
+            fragmentation_info = self._evaluate_redis_fragmentation(
+                info, context="basic_check"
+            )
 
             status = HealthStatus.HEALTHY
             if fragmentation_info["fragmentation_status"] == HealthStatus.CRITICAL:
@@ -535,7 +572,11 @@ class HealthMonitor:
             logger.debug("Detecting worker failures")
             failed_workers = worker_registry.detect_unhealthy_workers()
             if failed_workers:
-                logger.warning("Detected %d failed workers: %s", len(failed_workers), failed_workers)
+                logger.warning(
+                    "Detected %d failed workers: %s",
+                    len(failed_workers),
+                    failed_workers,
+                )
             return failed_workers
 
         except Exception as e:
@@ -560,7 +601,9 @@ class HealthMonitor:
                     if start_time:
                         try:
                             start_dt = datetime.fromisoformat(start_time)
-                            elapsed = (datetime.now(timezone.utc) - start_dt).total_seconds()
+                            elapsed = (
+                                datetime.now(timezone.utc) - start_dt
+                            ).total_seconds()
                             if elapsed > self.session_timeout:
                                 stuck_sessions.append(session.get("session_id"))
                                 logger.warning(

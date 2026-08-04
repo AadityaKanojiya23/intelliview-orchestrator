@@ -1,4 +1,5 @@
 import json
+
 from compare import similarity
 
 
@@ -9,14 +10,9 @@ def get_current_response(prompt):
     """
 
     responses = {
-        "What is AI?":
-            "Artificial Intelligence is the simulation of human intelligence in machines.",
-
-        "What is Machine Learning?":
-            "Machine Learning is a subset of AI that enables computers to learn from data.",
-
-        "Explain Python.":
-            "Python is a high-level programming language."
+        "What is AI?": "Artificial Intelligence is the simulation of human intelligence in machines.",
+        "What is Machine Learning?": "Machine Learning is a subset of AI that enables computers to learn from data.",
+        "Explain Python.": "Python is a high-level programming language.",
     }
 
     return responses.get(prompt, "")
@@ -33,10 +29,7 @@ for test in tests:
 
     current = get_current_response(test["prompt"])
 
-    score = similarity(
-        test["expected"],
-        current
-    )
+    score = similarity(test["expected"], current)
 
     status = "PASS"
 

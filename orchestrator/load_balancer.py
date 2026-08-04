@@ -230,7 +230,9 @@ class LoadBalancer:
                 )
 
             # Step 2: select worker with the highest current_weight
-            best = max(available, key=lambda w: self._wrr_current_weights[w["worker_id"]])
+            best = max(
+                available, key=lambda w: self._wrr_current_weights[w["worker_id"]]
+            )
 
             # Step 3: reduce selected worker's current_weight by total weight
             total_weight = sum(w.get("weight", w["capacity"]) for w in available)
@@ -248,10 +250,15 @@ class LoadBalancer:
         """
         current_time = time.time()
 
-        if self._worker_cache is None or current_time - self._cache_timestamp > self._cache_ttl:
+        if (
+            self._worker_cache is None
+            or current_time - self._cache_timestamp > self._cache_ttl
+        ):
             self._registry_lookup_count += 1
 
-            logger.debug(f"Refreshing worker cache (Registry Lookup #{self._registry_lookup_count})")
+            logger.debug(
+                f"Refreshing worker cache (Registry Lookup #{self._registry_lookup_count})"
+            )
             self._worker_cache = self.worker_registry.get_available_workers()
             self._cache_timestamp = current_time
 
@@ -281,28 +288,28 @@ class LoadBalancer:
         """
         available = self._get_cached_workers()
 
-if not available:
-    return None
+        if not available:
+            return None
 
-available.sort(
-    key=lambda w: (
-        w["active_tasks"] /
-        self.worker_registry.get_worker_weight(w)
-    )
-)
-
+        available.sort(
+            key=lambda w: (
+                w["active_tasks"] / self.worker_registry.get_worker_weight(w)
+            )
+        )
 
         # Normalize priority to lowercase so "High"/"high"/"HIGH" all work
         priority = priority.lower()
 
         # ── Step 1: Filter candidate pool by priority ─────────────────────────
         if priority == "high":
-        return available[0]
+            return available[0]
 
         # For medium priority, select from least loaded
         if priority == "medium":
             # Select a worker that's not overloaded
-            underutilized = [w for w in available if w["active_tasks"] < w["capacity"] * 0.7]
+            underutilized = [
+                w for w in available if w["active_tasks"] < w["capacity"] * 0.7
+            ]
             if underutilized:
                 return underutilized[0]
             return available[0]

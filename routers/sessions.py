@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 class StartInterviewRequest(BaseModel):
     """Request model for starting an interview"""
 
-    candidate_id: str = Field(min_length=1, max_length=128, description="Unique candidate identifier")
+    candidate_id: str = Field(
+        min_length=1, max_length=128, description="Unique candidate identifier"
+    )
     candidate_name: str | None = Field(default=None, max_length=200)
     position: str | None = Field(default=None, max_length=120)
     priority: str = Field(default="medium", description="One of: low, medium, high")
@@ -33,7 +35,9 @@ class StartInterviewRequest(BaseModel):
     def _candidate_id_format(cls, v: str) -> str:
         v = v.strip()
         if not re.match(r"^[A-Za-z0-9._-]+$", v):
-            raise ValueError("candidate_id may only contain letters, digits, '.', '_', '-'")
+            raise ValueError(
+                "candidate_id may only contain letters, digits, '.', '_', '-'"
+            )
         return v
 
     @field_validator("priority")
@@ -209,7 +213,9 @@ def _build_risk_report_pdf(report: dict) -> Response:
     return Response(
         content=buffer.read(),
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=risk_report_{report['session_id']}.pdf"},
+        headers={
+            "Content-Disposition": f"attachment; filename=risk_report_{report['session_id']}.pdf"
+        },
     )
 
 
@@ -272,7 +278,9 @@ def create_session_routes(
             HTTPException: On creation failure
         """
         try:
-            logger.info(f"API: Creating interview session for candidate {request.candidate_id}")
+            logger.info(
+                f"API: Creating interview session for candidate {request.candidate_id}"
+            )
 
             priority_map = {
                 "low": TaskPriority.LOW,
@@ -294,7 +302,9 @@ def create_session_routes(
 
             logger.info(f"Session created: {session_id}")
 
-            session_manager.update_session_status(session_id, session_manager.QUEUED, {"priority": priority.name})
+            session_manager.update_session_status(
+                session_id, session_manager.QUEUED, {"priority": priority.name}
+            )
 
             if not scheduler.can_accept_task():
                 logger.warning(f"System at capacity, queuing task: {session_id}")
@@ -305,7 +315,9 @@ def create_session_routes(
 
             # Invalidate the read caches so the next poll reflects the new
             # session immediately instead of waiting for the TTL.
-            http_cache.invalidate("active-sessions", "session-statistics", "workers", "worker-statistics")
+            http_cache.invalidate(
+                "active-sessions", "session-statistics", "workers", "worker-statistics"
+            )
 
             session_data = session_manager.get_session(session_id)
 
@@ -320,7 +332,9 @@ def create_session_routes(
 
         except Exception as e:
             logger.error(f"Error starting interview session: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error starting interview: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error starting interview: {e!s}"
+            )
 
     @router.get("/session-status/{session_id}", response_model=SessionStatusResponse)
     async def get_session_status(
@@ -369,9 +383,13 @@ def create_session_routes(
             raise
         except Exception as e:
             logger.error(f"Error fetching session status: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error fetching session: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error fetching session: {e!s}"
+            )
 
-    @router.get("/interviews/{session_id}/report", response_model=InterviewReportResponse)
+    @router.get(
+        "/interviews/{session_id}/report", response_model=InterviewReportResponse
+    )
     async def get_interview_report(
         session_id: str,
         db: Session = Depends(get_db),
@@ -381,14 +399,18 @@ def create_session_routes(
         """
         try:
             session_obj = db.execute(
-                select(InterviewSession).where(InterviewSession.session_id == session_id)
+                select(InterviewSession).where(
+                    InterviewSession.session_id == session_id
+                )
             ).scalar_one_or_none()
 
             if not session_obj:
                 raise HTTPException(status_code=404, detail="Session not found")
 
             candidate_obj = db.execute(
-                select(Candidate).where(Candidate.candidate_id == session_obj.candidate_id)
+                select(Candidate).where(
+                    Candidate.candidate_id == session_obj.candidate_id
+                )
             ).scalar_one_or_none()
 
             if not candidate_obj:
@@ -434,10 +456,18 @@ def create_session_routes(
 
             # Since evaluation_analysis structure might differ based on other PRs,
             # we will handle nested or flat structures for strengths/improvements.
-            strengths = eval_analysis.get("strengths", llm_feedback.get("strengths", []))
-            improvements = eval_analysis.get("improvements", llm_feedback.get("improvements", []))
-            recommendation = eval_analysis.get("recommendation", llm_feedback.get("recommendation"))
-            detailed_feedback = eval_analysis.get("detailed_feedback", llm_feedback.get("detailed_feedback"))
+            strengths = eval_analysis.get(
+                "strengths", llm_feedback.get("strengths", [])
+            )
+            improvements = eval_analysis.get(
+                "improvements", llm_feedback.get("improvements", [])
+            )
+            recommendation = eval_analysis.get(
+                "recommendation", llm_feedback.get("recommendation")
+            )
+            detailed_feedback = eval_analysis.get(
+                "detailed_feedback", llm_feedback.get("detailed_feedback")
+            )
 
             # Determine risk classification
             risk_score = session_obj.risk_score
@@ -451,11 +481,21 @@ def create_session_routes(
             return InterviewReportResponse(
                 session_id=session_id,
                 candidate=ReportCandidate(
-                    candidate_id=candidate_obj.candidate_id, name=candidate_obj.name, email=candidate_obj.email
+                    candidate_id=candidate_obj.candidate_id,
+                    name=candidate_obj.name,
+                    email=candidate_obj.email,
                 ),
                 interview_summary=ReportInterviewSummary(
-                    start_time=session_obj.start_time.isoformat() if session_obj.start_time else None,
-                    end_time=session_obj.end_time.isoformat() if session_obj.end_time else None,
+                    start_time=(
+                        session_obj.start_time.isoformat()
+                        if session_obj.start_time
+                        else None
+                    ),
+                    end_time=(
+                        session_obj.end_time.isoformat()
+                        if session_obj.end_time
+                        else None
+                    ),
                     duration_minutes=duration_minutes,
                 ),
                 questions=questions_list,
@@ -471,7 +511,9 @@ def create_session_routes(
                     detailed_feedback=detailed_feedback,
                 ),
                 risk_assessment=ReportRiskAssessment(
-                    score=risk_score, classification=classification, factors=eval_analysis.get("risk_factors", [])
+                    score=risk_score,
+                    classification=classification,
+                    factors=eval_analysis.get("risk_factors", []),
                 ),
                 metadata=ReportMetadata(
                     token_usage=None,  # Feature #3 not yet merged
@@ -545,7 +587,11 @@ def create_session_routes(
             result = celery_app.AsyncResult(task_id)
             status = result.status
             payload = {
-                "session_id": result.result.get("session_id") if isinstance(result.result, dict) else None,
+                "session_id": (
+                    result.result.get("session_id")
+                    if isinstance(result.result, dict)
+                    else None
+                ),
                 "task_id": task_id,
                 "status": status,
                 "result": result.result if status == "SUCCESS" else None,
@@ -553,7 +599,9 @@ def create_session_routes(
             return TaskStatusResponse(**payload)
         except Exception as e:
             logger.error(f"Error fetching task status for {task_id}: {e}")
-            raise HTTPException(status_code=500, detail=f"Error fetching task status: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Error fetching task status: {e}"
+            )
 
     # ========== Session Tracking Endpoints ==========
 
@@ -575,7 +623,9 @@ def create_session_routes(
             return {"count": len(active), "sessions": active}
         except Exception as e:
             logger.error(f"Error fetching active sessions: {e!s}")
-            raise HTTPException(status_code=500, detail="Error fetching active sessions")
+            raise HTTPException(
+                status_code=500, detail="Error fetching active sessions"
+            )
 
     @router.get("/completed-sessions")
     @http_cache.cached("completed-sessions", ttl=3)
@@ -594,7 +644,9 @@ def create_session_routes(
             return {"count": len(completed), "sessions": completed}
         except Exception as e:
             logger.error(f"Error fetching completed sessions: {e!s}")
-            raise HTTPException(status_code=500, detail="Error fetching completed sessions")
+            raise HTTPException(
+                status_code=500, detail="Error fetching completed sessions"
+            )
 
     @router.get("/stuck-sessions")
     async def get_stuck_sessions(
@@ -663,11 +715,19 @@ def create_session_routes(
             dict: List of high-risk sessions
         """
         try:
-            high_risk = session_tracker.get_high_risk_sessions(threshold=threshold, limit=limit)
-            return {"count": len(high_risk), "threshold": threshold, "sessions": high_risk}
+            high_risk = session_tracker.get_high_risk_sessions(
+                threshold=threshold, limit=limit
+            )
+            return {
+                "count": len(high_risk),
+                "threshold": threshold,
+                "sessions": high_risk,
+            }
         except Exception as e:
             logger.error(f"Error fetching high-risk sessions: {e!s}")
-            raise HTTPException(status_code=500, detail="Error fetching high-risk sessions")
+            raise HTTPException(
+                status_code=500, detail="Error fetching high-risk sessions"
+            )
 
     @router.get("/interviews")
     async def list_interviews(
@@ -684,7 +744,9 @@ def create_session_routes(
         if status:
             stmt = stmt.where(InterviewSession.status == status.upper())
 
-        stmt = stmt.order_by(InterviewSession.created_at.desc().nullslast()).limit(limit)
+        stmt = stmt.order_by(InterviewSession.created_at.desc().nullslast()).limit(
+            limit
+        )
         rows = session_db.execute(stmt).scalars().all()
         return {
             "total_count": len(rows),
@@ -720,10 +782,14 @@ def create_session_routes(
             asked_ids = session_data.get("questions_asked", [])
             question = question_bank.get_next_question(
                 category=request.category,
-                exclude_ids=[q.get("question_id") for q in asked_ids] if asked_ids else [],
+                exclude_ids=(
+                    [q.get("question_id") for q in asked_ids] if asked_ids else []
+                ),
             )
             if not question:
-                raise HTTPException(status_code=404, detail="No more questions available")
+                raise HTTPException(
+                    status_code=404, detail="No more questions available"
+                )
 
             return AskQuestionResponse(
                 session_id=request.session_id,
@@ -798,7 +864,9 @@ def create_session_routes(
             session_data["answers_provided"] = answers
             session_data["feedback_generated"] = feedbacks
             session_data["overall_score"] = overall_score
-            session_manager.state_sync.set_session_state(request.session_id, session_data)
+            session_manager.state_sync.set_session_state(
+                request.session_id, session_data
+            )
 
             return SubmitAnswerResponse(
                 session_id=request.session_id,
@@ -840,9 +908,13 @@ def create_session_routes(
             }
         except Exception as e:
             logger.error(f"Error fetching failed sessions: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error fetching failed sessions: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error fetching failed sessions: {e!s}"
+            )
 
-    @router.post("/retry-session/{session_id}", dependencies=[Depends(require_role("admin"))])
+    @router.post(
+        "/retry-session/{session_id}", dependencies=[Depends(require_role("admin"))]
+    )
     async def retry_failed_session(session_id: str):
         """
         Retry a failed interview session
@@ -897,7 +969,9 @@ def create_session_routes(
             raise
         except Exception as e:
             logger.error(f"Error retrying session: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error retrying session: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error retrying session: {e!s}"
+            )
 
     @router.get("/recovery-queue")
     async def get_recovery_queue(limit: int = 50):
@@ -922,7 +996,9 @@ def create_session_routes(
             }
         except Exception as e:
             logger.error(f"Error fetching recovery queue: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error fetching recovery queue: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error fetching recovery queue: {e!s}"
+            )
 
     @router.get("/failure-log")
     async def get_failure_log(limit: int = 100):
@@ -947,7 +1023,9 @@ def create_session_routes(
             }
         except Exception as e:
             logger.error(f"Error fetching failure log: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error fetching failure log: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error fetching failure log: {e!s}"
+            )
 
     @router.get("/dead-letter-queue")
     async def get_dead_letter_queue(limit: int = 50):
@@ -972,7 +1050,9 @@ def create_session_routes(
             }
         except Exception as e:
             logger.error(f"Error fetching dead letter queue: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error fetching dead letter queue: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error fetching dead letter queue: {e!s}"
+            )
 
     @router.get("/fault-statistics")
     async def get_fault_statistics():
@@ -995,7 +1075,9 @@ def create_session_routes(
             }
         except Exception as e:
             logger.error(f"Error generating fault statistics: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error generating fault statistics: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error generating fault statistics: {e!s}"
+            )
 
     @router.post("/detect-failures", dependencies=[Depends(require_role("admin"))])
     async def detect_and_handle_failures():
@@ -1023,7 +1105,9 @@ def create_session_routes(
 
             handled = 0
             for worker_id in unhealthy_workers:
-                if fault_manager.handle_worker_failure(worker_id, "Detected as unhealthy"):
+                if fault_manager.handle_worker_failure(
+                    worker_id, "Detected as unhealthy"
+                ):
                     handled += 1
 
             results = {
@@ -1050,6 +1134,8 @@ def create_session_routes(
 
         except Exception as e:
             logger.error(f"Error during failure detection: {e!s}")
-            raise HTTPException(status_code=500, detail=f"Error during failure detection: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Error during failure detection: {e!s}"
+            )
 
     return router

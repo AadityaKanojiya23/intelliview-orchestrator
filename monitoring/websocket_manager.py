@@ -54,7 +54,9 @@ class WebSocketManager:
                 len(self.active_connections),
             )
 
-    async def send_to_connection(self, websocket: WebSocket, message: dict[str, Any]) -> None:
+    async def send_to_connection(
+        self, websocket: WebSocket, message: dict[str, Any]
+    ) -> None:
         """Send a message to a single client."""
         try:
             await websocket.send_json(message)
@@ -77,7 +79,9 @@ class WebSocketManager:
     # --- Typed broadcast helpers -----------------------------------------
 
     async def broadcast_metrics(self, metrics: dict[str, Any]) -> None:
-        await self._broadcast({"type": "metrics", "data": metrics, "timestamp": _now().isoformat()})
+        await self._broadcast(
+            {"type": "metrics", "data": metrics, "timestamp": _now().isoformat()}
+        )
 
     async def broadcast_session_update(
         self,
@@ -97,7 +101,9 @@ class WebSocketManager:
             }
         )
 
-    async def broadcast_worker_alert(self, worker_id: str, alert_type: str, message: str) -> None:
+    async def broadcast_worker_alert(
+        self, worker_id: str, alert_type: str, message: str
+    ) -> None:
         await self._broadcast(
             {
                 "type": "worker_alert",
@@ -108,7 +114,9 @@ class WebSocketManager:
             }
         )
 
-    async def broadcast_health_status(self, health_status: str, details: dict[str, Any]) -> None:
+    async def broadcast_health_status(
+        self, health_status: str, details: dict[str, Any]
+    ) -> None:
         await self._broadcast(
             {
                 "type": "health_update",

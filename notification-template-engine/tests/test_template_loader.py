@@ -1,7 +1,6 @@
 from notification_service import send_notification
 from users import User
 
-
 TEST_DATA = {
     "date": "10 July",
     "time": "5 PM",

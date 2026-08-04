@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader, Template
-
 from models import DigestPayload
 
 DEFAULT_TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"

@@ -1,7 +1,6 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
-
 from processing import run_video_analysis
+from pydantic import BaseModel
 
 app = FastAPI(
     title="CV Processing Service",

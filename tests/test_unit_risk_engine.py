@@ -31,7 +31,9 @@ def test_calculate_final_risk_weighted_and_clamped():
 
 
 def test_video_risk_no_face_is_high():
-    risk = RiskScoringEngine.calculate_video_risk({"face_detected": {"faces_found": False}})
+    risk = RiskScoringEngine.calculate_video_risk(
+        {"face_detected": {"faces_found": False}}
+    )
     assert risk >= 0.4
 
 
@@ -95,6 +97,7 @@ def test_generate_risk_report_shape():
     assert "explanation" in report
     assert "recommendation" in report
 
+
 def test_multiple_persons_override_to_critical():
     report = RiskScoringEngine.generate_risk_report(
         "s1",
@@ -111,6 +114,7 @@ def test_multiple_persons_override_to_critical():
     )
 
     assert report["risk_classification"] == "CRITICAL"
+
 
 def test_face_absent_override_to_high():
     report = RiskScoringEngine.generate_risk_report(
@@ -129,26 +133,6 @@ def test_face_absent_override_to_high():
 
     assert report["risk_classification"] == "HIGH"
 
-def test_no_override_keeps_weighted_classification():
-    report = RiskScoringEngine.generate_risk_report(
-        "s1",
-        {
-            "face_detected": {"faces_found": True},
-            "multiple_persons": {"multiple_persons_detected": False},
-            "phone_detected": {"phone_detected": False},
-            "head_movement_suspicious": {
-                "suspicious_movement_detected": False
-            },
-        },
-        {"transcription": {"text": "hello"}},
-        {
-            "answer_quality_score": {"overall_quality_score": 90},
-            "technical_accuracy": {"accuracy_score": 90},
-            "communication_clarity": {"clarity_score": 90},
-        },
-)
-
-    assert report["risk_classification"] == "LOW"
 
 def test_no_override_keeps_weighted_classification():
     report = RiskScoringEngine.generate_risk_report(
@@ -157,9 +141,7 @@ def test_no_override_keeps_weighted_classification():
             "face_detected": {"faces_found": True},
             "multiple_persons": {"multiple_persons_detected": False},
             "phone_detected": {"phone_detected": False},
-            "head_movement_suspicious": {
-                "suspicious_movement_detected": False
-            },
+            "head_movement_suspicious": {"suspicious_movement_detected": False},
         },
         {"transcription": {"text": "hello"}},
         {
@@ -170,6 +152,27 @@ def test_no_override_keeps_weighted_classification():
     )
 
     assert report["risk_classification"] == "LOW"
+
+
+def test_no_override_keeps_weighted_classification():
+    report = RiskScoringEngine.generate_risk_report(
+        "s1",
+        {
+            "face_detected": {"faces_found": True},
+            "multiple_persons": {"multiple_persons_detected": False},
+            "phone_detected": {"phone_detected": False},
+            "head_movement_suspicious": {"suspicious_movement_detected": False},
+        },
+        {"transcription": {"text": "hello"}},
+        {
+            "answer_quality_score": {"overall_quality_score": 90},
+            "technical_accuracy": {"accuracy_score": 90},
+            "communication_clarity": {"clarity_score": 90},
+        },
+    )
+
+    assert report["risk_classification"] == "LOW"
+
 
 def test_multiple_persons_has_priority_over_face_absent():
     report = RiskScoringEngine.generate_risk_report(

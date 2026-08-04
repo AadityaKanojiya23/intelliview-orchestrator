@@ -30,18 +30,14 @@ def add_subscriber(webhook_id, url, secret_ref, active=True):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+        """
     INSERT INTO subscribers 
     (webhook_id, url, secret_ref, active, created_at)
     VALUES (?, ?, ?, ?, ?)
     """,
-    (
-        webhook_id,
-        url,
-        secret_ref,
-        1 if active else 0,
-        datetime.now().isoformat()
-    ))
+        (webhook_id, url, secret_ref, 1 if active else 0, datetime.now().isoformat()),
+    )
 
     conn.commit()
     conn.close()
@@ -51,10 +47,7 @@ def remove_subscriber(webhook_id):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute(
-        "DELETE FROM subscribers WHERE webhook_id=?",
-        (webhook_id,)
-    )
+    cursor.execute("DELETE FROM subscribers WHERE webhook_id=?", (webhook_id,))
 
     conn.commit()
     conn.close()
@@ -64,9 +57,7 @@ def list_subscribers():
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute(
-        "SELECT * FROM subscribers WHERE active=1"
-    )
+    cursor.execute("SELECT * FROM subscribers WHERE active=1")
 
     data = cursor.fetchall()
 

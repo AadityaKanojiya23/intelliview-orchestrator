@@ -85,7 +85,9 @@ class RetryManager:
             can_retry = retry_count < self.max_retries
 
             if can_retry:
-                logger.debug(f"Session {session_id} can retry ({retry_count}/{self.max_retries})")
+                logger.debug(
+                    f"Session {session_id} can retry ({retry_count}/{self.max_retries})"
+                )
             else:
                 logger.warning(
                     f"Session {session_id} max retries exceeded ({retry_count}/{self.max_retries})"
@@ -132,14 +134,18 @@ class RetryManager:
             else:
                 delay_seconds = min(delay_seconds, self.max_delay)
 
-            logger.info(f"Scheduling retry for {session_id}: attempt {retry_count}, delay {delay_seconds}s")
+            logger.info(
+                f"Scheduling retry for {session_id}: attempt {retry_count}, delay {delay_seconds}s"
+            )
 
             # Create retry record
             retry_data = {
                 "session_id": session_id,
                 "retry_count": retry_count,
                 "scheduled_at": datetime.now(timezone.utc).isoformat(),
-                "retry_after": (datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)).isoformat(),
+                "retry_after": (
+                    datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+                ).isoformat(),
                 "strategy": self.strategy.value,
             }
 
@@ -197,7 +203,9 @@ class RetryManager:
         # Cap at max_delay
         delay = min(delay, self.max_delay)
 
-        logger.debug(f"Calculated delay for retry {retry_count}: {delay}s using {self.strategy.value}")
+        logger.debug(
+            f"Calculated delay for retry {retry_count}: {delay}s using {self.strategy.value}"
+        )
 
         return delay
 
@@ -288,7 +296,9 @@ class RetryManager:
                 "max_retries": self.max_retries,
                 "can_retry": can_retry,
                 "retry_strategy": self.strategy.value,
-                "next_delay": self._calculate_delay(retry_count + 1) if can_retry else None,
+                "next_delay": (
+                    self._calculate_delay(retry_count + 1) if can_retry else None
+                ),
             }
 
             if retry_data:
@@ -319,7 +329,9 @@ class RetryManager:
             count = 0
 
             while count < limit:
-                cursor, keys = self.redis_client.scan(cursor, match=f"{self.retry_scheduled_key}*", count=100)
+                cursor, keys = self.redis_client.scan(
+                    cursor, match=f"{self.retry_scheduled_key}*", count=100
+                )
 
                 for key in keys:
                     if count >= limit:

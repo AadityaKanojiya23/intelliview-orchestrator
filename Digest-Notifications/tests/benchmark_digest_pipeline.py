@@ -27,10 +27,10 @@ import os
 import sys
 import timeit
 
-SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src')
+SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src")
 sys.path.insert(0, os.path.abspath(SRC_DIR))
 
-from digest import get_upcoming_interviews, _build_payload  # noqa: E402
+from digest import _build_payload, get_upcoming_interviews  # noqa: E402
 from renderer import render_digest_html, render_digest_text  # noqa: E402
 
 
@@ -76,7 +76,9 @@ def run_benchmark(runs: int, ref_date: str) -> None:
         render_digest_text(p, unsubscribe_url=unsubscribe_url)
 
     t5 = timeit.timeit(full_pipeline, number=runs)
-    print(f"End-to-end (build + HTML + text)   : {(t5 / runs) * 1000:.3f} ms avg per digest")
+    print(
+        f"End-to-end (build + HTML + text)   : {(t5 / runs) * 1000:.3f} ms avg per digest"
+    )
 
     # ── Output sizes (not timing, but useful alongside it) ──
     html = render_digest_html(payload, unsubscribe_url=unsubscribe_url)
@@ -93,9 +95,20 @@ def run_benchmark(runs: int, ref_date: str) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Benchmark the digest generation pipeline")
-    parser.add_argument("--runs", type=int, default=200, help="Number of timeit runs per stage (default: 200)")
-    parser.add_argument("--ref-date", default="2026-06-27", help="Reference date YYYY-MM-DD (default: 2026-06-27)")
+    parser = argparse.ArgumentParser(
+        description="Benchmark the digest generation pipeline"
+    )
+    parser.add_argument(
+        "--runs",
+        type=int,
+        default=200,
+        help="Number of timeit runs per stage (default: 200)",
+    )
+    parser.add_argument(
+        "--ref-date",
+        default="2026-06-27",
+        help="Reference date YYYY-MM-DD (default: 2026-06-27)",
+    )
     args = parser.parse_args()
 
     run_benchmark(runs=args.runs, ref_date=args.ref_date)

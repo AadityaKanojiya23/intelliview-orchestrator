@@ -13,7 +13,6 @@ from orchestrator.load_balancer import (
     LoadBalancer,
 )
 
-
 TOTAL_TASKS = 10_000
 TOTAL_WORKERS = 4
 
@@ -83,19 +82,11 @@ class SimulationRegistry:
     def get_worker_statistics(self):
         """Return worker statistics."""
 
-        total_capacity = sum(
-            worker["capacity"]
-            for worker in self.workers
-        )
+        total_capacity = sum(worker["capacity"] for worker in self.workers)
 
-        total_active_tasks = sum(
-            worker["active_tasks"]
-            for worker in self.workers
-        )
+        total_active_tasks = sum(worker["active_tasks"] for worker in self.workers)
 
-        utilization = (
-            total_active_tasks / total_capacity
-        ) * 100
+        utilization = (total_active_tasks / total_capacity) * 100
 
         return {
             "total_workers": len(self.workers),
@@ -112,10 +103,7 @@ def calculate_jains_fairness(distribution):
 
     numerator = sum(values) ** 2
 
-    denominator = (
-        len(values)
-        * sum(value ** 2 for value in values)
-    )
+    denominator = len(values) * sum(value**2 for value in values)
 
     if denominator == 0:
         return 0.0
@@ -126,9 +114,7 @@ def calculate_jains_fairness(distribution):
 def run_real_simulation(strategy):
     """Run 10,000 tasks against real LoadBalancer."""
 
-    load_balancer = LoadBalancer(
-        strategy=strategy
-    )
+    load_balancer = LoadBalancer(strategy=strategy)
 
     registry = SimulationRegistry()
 
@@ -148,13 +134,9 @@ def run_real_simulation(strategy):
 
         distribution[worker_id] += 1
 
-        registry.increment_active_tasks(
-            worker_id
-        )
+        registry.increment_active_tasks(worker_id)
 
-    execution_time = (
-        time.perf_counter() - start_time
-    )
+    execution_time = time.perf_counter() - start_time
 
     return (
         distribution,
@@ -165,28 +147,17 @@ def run_real_simulation(strategy):
 def test_real_round_robin_10000_tasks():
     """Test real Round Robin fairness."""
 
-    distribution, execution_time = (
-        run_real_simulation(
-            BalancingStrategy.ROUND_ROBIN
-        )
-    )
+    distribution, execution_time = run_real_simulation(BalancingStrategy.ROUND_ROBIN)
 
-    total_assigned = sum(
-        distribution.values()
-    )
+    total_assigned = sum(distribution.values())
 
-    fairness = calculate_jains_fairness(
-        distribution
-    )
+    fairness = calculate_jains_fairness(distribution)
 
     print("\nROUND ROBIN SIMULATION")
     print(f"Total Tasks: {total_assigned}")
     print(f"Distribution: {dict(distribution)}")
     print(f"Fairness: {fairness * 100:.2f}%")
-    print(
-        f"Execution Time: "
-        f"{execution_time:.6f} seconds"
-    )
+    print(f"Execution Time: " f"{execution_time:.6f} seconds")
 
     assert total_assigned == TOTAL_TASKS
 
@@ -194,36 +165,23 @@ def test_real_round_robin_10000_tasks():
 
     assert fairness >= 0.99
 
-    assert max(distribution.values()) - min(
-        distribution.values()
-    ) <= 1
+    assert max(distribution.values()) - min(distribution.values()) <= 1
 
 
 def test_real_least_loaded_10000_tasks():
     """Test real Least Loaded fairness."""
 
-    distribution, execution_time = (
-        run_real_simulation(
-            BalancingStrategy.LEAST_LOADED
-        )
-    )
+    distribution, execution_time = run_real_simulation(BalancingStrategy.LEAST_LOADED)
 
-    total_assigned = sum(
-        distribution.values()
-    )
+    total_assigned = sum(distribution.values())
 
-    fairness = calculate_jains_fairness(
-        distribution
-    )
+    fairness = calculate_jains_fairness(distribution)
 
     print("\nLEAST LOADED SIMULATION")
     print(f"Total Tasks: {total_assigned}")
     print(f"Distribution: {dict(distribution)}")
     print(f"Fairness: {fairness * 100:.2f}%")
-    print(
-        f"Execution Time: "
-        f"{execution_time:.6f} seconds"
-    )
+    print(f"Execution Time: " f"{execution_time:.6f} seconds")
 
     assert total_assigned == TOTAL_TASKS
 
@@ -231,9 +189,7 @@ def test_real_least_loaded_10000_tasks():
 
     assert fairness >= 0.99
 
-    assert max(distribution.values()) - min(
-        distribution.values()
-    ) <= 1
+    assert max(distribution.values()) - min(distribution.values()) <= 1
 
 
 def test_real_load_balancer_no_tasks_lost():
@@ -246,13 +202,9 @@ def test_real_load_balancer_no_tasks_lost():
 
     for strategy in strategies:
 
-        distribution, _ = run_real_simulation(
-            strategy
-        )
+        distribution, _ = run_real_simulation(strategy)
 
-        assert sum(
-            distribution.values()
-        ) == TOTAL_TASKS
+        assert sum(distribution.values()) == TOTAL_TASKS
 
 
 def test_real_distribution_accuracy():
@@ -263,25 +215,16 @@ def test_real_distribution_accuracy():
         BalancingStrategy.LEAST_LOADED,
     ]
 
-    expected_tasks = (
-        TOTAL_TASKS / TOTAL_WORKERS
-    )
+    expected_tasks = TOTAL_TASKS / TOTAL_WORKERS
 
     for strategy in strategies:
 
-        distribution, _ = run_real_simulation(
-            strategy
-        )
+        distribution, _ = run_real_simulation(strategy)
 
         for task_count in distribution.values():
 
-            difference = abs(
-                task_count - expected_tasks
-            )
+            difference = abs(task_count - expected_tasks)
 
-            accuracy = (
-                1
-                - difference / expected_tasks
-            )
+            accuracy = 1 - difference / expected_tasks
 
             assert accuracy >= 0.99

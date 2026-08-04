@@ -1,8 +1,6 @@
-
-from typing import Any
 import logging
 import time
-
+from typing import Any
 
 try:
     import cv2
@@ -14,7 +12,7 @@ try:
 except ImportError:
 
     HAS_MEDIAPIPE = False
-logger = logging.getLogger(__name__)   
+logger = logging.getLogger(__name__)
 
 
 def run_video_analysis(session_id: str) -> dict[str, Any]:
@@ -43,9 +41,12 @@ def run_video_analysis(session_id: str) -> dict[str, Any]:
             multi,
         ),
     }
-    return results 
+    return results
 
-def detect_faces_in_frame(frame_bytes: bytes | None = None, frame_path: str = "") -> dict[str, Any] | None:
+
+def detect_faces_in_frame(
+    frame_bytes: bytes | None = None, frame_path: str = ""
+) -> dict[str, Any] | None:
     """Detect faces in a single frame using MediaPipe.
 
     Accepts raw bytes or a file path. Returns dict with face_count,
@@ -67,7 +68,9 @@ def detect_faces_in_frame(frame_bytes: bytes | None = None, frame_path: str = ""
             return None
 
         rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        with mp.solutions.face_detection.FaceDetection(model_selection=1, min_detection_confidence=0.5) as fd:
+        with mp.solutions.face_detection.FaceDetection(
+            model_selection=1, min_detection_confidence=0.5
+        ) as fd:
             results = fd.process(rgb)
             detections = []
             if results.detections:
@@ -87,7 +90,7 @@ def detect_faces_in_frame(frame_bytes: bytes | None = None, frame_path: str = ""
         logger.warning("MediaPipe face detection failed: %s", exc)
         return None
 
-    
+
 def _real_detect_face(session_id: str) -> dict[str, Any] | None:
     """Attempt real face detection. Returns None on failure."""
     try:
@@ -112,7 +115,6 @@ def _real_detect_face(session_id: str) -> dict[str, Any] | None:
     except Exception as exc:
         logger.debug("Real face detection unavailable: %s", exc)
         return None
-    
 
 
 def detect_face(session_id: str) -> dict[str, Any]:
@@ -161,6 +163,7 @@ def detect_multiple_persons(session_id: str):
         "detection_confidence": 0.0,
         "timestamp": None,
     }
+
 
 def calculate_video_risk_score(
     face,

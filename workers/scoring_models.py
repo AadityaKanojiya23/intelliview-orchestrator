@@ -102,9 +102,7 @@ class ExperimentalRiskModel(BaseRiskScoringModel):
 
         audio_risk = RiskScoringEngine.calculate_audio_risk(audio_result)
 
-        evaluation_risk = RiskScoringEngine.calculate_evaluation_risk(
-            evaluation_result
-        )
+        evaluation_risk = RiskScoringEngine.calculate_evaluation_risk(evaluation_result)
 
         final_risk = (
             self.VIDEO_WEIGHT * video_risk

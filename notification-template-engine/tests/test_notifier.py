@@ -1,5 +1,4 @@
 import pytest
-
 from notifier import ConsoleNotifier, Notifier
 
 
@@ -11,10 +10,7 @@ def test_notifier_interface_cannot_be_instantiated():
 def test_console_notifier_delivers_message(capsys):
     notifier = ConsoleNotifier()
 
-    notifier.deliver(
-        "alex@gmail.com",
-        "Hello Alex"
-    )
+    notifier.deliver("alex@gmail.com", "Hello Alex")
 
     output = capsys.readouterr().out
 

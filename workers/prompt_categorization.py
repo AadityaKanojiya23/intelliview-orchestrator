@@ -8,26 +8,28 @@ import re
 
 PROMPT_CATEGORIES = {
     "Coding": [
-        "python", "java", "c++", "program", "algorithm",
-        "function", "debug", "code", "script"
+        "python",
+        "java",
+        "c++",
+        "program",
+        "algorithm",
+        "function",
+        "debug",
+        "code",
+        "script",
     ],
-    "Database": [
-        "sql", "mysql", "postgres", "database",
-        "query", "join", "table"
-    ],
-    "DevOps": [
-        "docker", "kubernetes", "jenkins",
-        "ci/cd", "linux", "deployment"
-    ],
-    "Interview": [
-        "interview", "hr", "technical",
-        "behavioral", "question"
-    ],
+    "Database": ["sql", "mysql", "postgres", "database", "query", "join", "table"],
+    "DevOps": ["docker", "kubernetes", "jenkins", "ci/cd", "linux", "deployment"],
+    "Interview": ["interview", "hr", "technical", "behavioral", "question"],
     "AI/ML": [
-        "machine learning", "deep learning",
-        "neural", "llm", "transformer",
-        "tensorflow", "pytorch"
-    ]
+        "machine learning",
+        "deep learning",
+        "neural",
+        "llm",
+        "transformer",
+        "tensorflow",
+        "pytorch",
+    ],
 }
 
 
