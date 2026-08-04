@@ -92,10 +92,19 @@ logger = logging.getLogger(__name__)
 
 APP_START_TIME = datetime.now(timezone.utc)
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Execute on application startup/shutdown."""
+    """Execute on application startup/shutdown.
+
+    Startup: ensure schema exists, run an initial health probe, and warn
+    loudly if the default API token is still in use.
+
+    Shutdown: best-effort graceful drain — flush the request-id log line,
+    close the shared Redis client, and notify clients.
+    """
+
+    settings = get_settings()
+    settings.validate_configuration()
 
     Base.metadata.create_all(bind=engine)
 

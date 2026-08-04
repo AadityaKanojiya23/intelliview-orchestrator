@@ -90,6 +90,19 @@ All settings via environment variables (or `.env`):
 | `API_TOKEN` | `dev-token-change-me` | Auth token for mutations |
 | `SCREEN_LOCK_PIN` | `1234` | Dashboard screen lock PIN |
 
+### Configuration Validation
+
+The application validates configuration during startup before serving requests.
+
+The following configuration rules are enforced:
+
+- `API_TOKEN` must not be empty.
+- `WORKER_CONCURRENCY` must be greater than `0`.
+- `MAX_RETRIES` must be greater than or equal to `0`.
+- `MAX_REQUEST_BODY_BYTES` must be greater than `0`.
+
+If any of these checks fail, the application stops during startup and displays a clear validation error message.
+
 ## API Reference
 
 Full OpenAPI docs at `/docs` when running. Key endpoints:
