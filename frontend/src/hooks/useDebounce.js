@@ -99,6 +99,7 @@ export function useLazyLoad(options = {}) {
 
     observer.observe(element);
     return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { ref, isVisible };

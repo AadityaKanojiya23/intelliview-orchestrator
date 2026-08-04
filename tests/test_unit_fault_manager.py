@@ -1,7 +1,7 @@
 """Unit tests for FaultManager — failure logging, DLQ, recovery queue."""
 
 from datetime import datetime, timezone
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from orchestrator.fault_manager import FailureType, FaultManager
 
@@ -32,6 +32,11 @@ def _manager():
         client.set.return_value = True
         client.incr.return_value = 1
 
+        fm = FaultManager()
+
+    # Expose the mock so tests can inspect calls made after construction.
+    fm.redis_client = mock_redis.return_value
+    return fm
         return FaultManager()
 
 
