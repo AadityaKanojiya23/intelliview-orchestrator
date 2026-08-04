@@ -395,6 +395,7 @@ class WorkerRegistrationRequest(BaseModel):
 
     worker_id: str
     capacity: int = 4
+    weight: int | None = Field(default=None, ge=1, description="Scheduling weight for weighted round robin (defaults to capacity)")
 
 
 class WorkerHeartbeatRequest(BaseModel):
@@ -1687,21 +1688,27 @@ async def register_worker(request: WorkerRegistrationRequest):
         dict: Registration confirmation
     """
     try:
-        logger.info(f"Registering worker: {request.worker_id} with capacity {request.capacity}")
+        logger.info(f"Registering worker: {request.worker_id} with capacity {request.capacity}, weight {request.weight}")
 
         # Register worker in registry
-        worker_registry.register_worker(worker_id=request.worker_id, capacity=request.capacity)
+        worker_registry.register_worker(
+            worker_id=request.worker_id,
+            capacity=request.capacity,
+            weight=request.weight,
+        )
 
         # Log successful registration
         logger.info(f"Worker registered successfully: {request.worker_id}")
         WORKERS_REGISTERED.inc()
         WORKERS_HEALTHY.inc()
 
+        effective_weight = request.weight if request.weight is not None else request.capacity
         return {
             "status": "success",
             "message": f"Worker {request.worker_id} registered",
             "worker_id": request.worker_id,
             "capacity": request.capacity,
+            "weight": effective_weight,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
@@ -1784,6 +1791,7 @@ async def list_workers():
                 {
                     "worker_id": worker_id,
                     "capacity": worker_data.get("capacity", 0),
+                    "weight": worker_data.get("weight", worker_data.get("capacity", 0)),
                     "active_tasks": worker_data.get("active_tasks", 0),
                     "available_capacity": worker_data.get("capacity", 0) - worker_data.get("active_tasks", 0),
                     "health_status": "healthy" if is_healthy else "unhealthy",
@@ -1914,9 +1922,10 @@ async def switch_load_balancing_strategy(strategy: str, request: Request):
     - ROUND_ROBIN: Sequential worker assignment (even task distribution)
     - LEAST_LOADED: Assign to worker with fewest active tasks (recommended)
     - QUEUE_BASED: Use Redis queue length as selection metric
+    - WEIGHTED_ROUND_ROBIN: Smooth weighted distribution proportional to worker weights
 
     Args:
-        strategy: Strategy name (ROUND_ROBIN, LEAST_LOADED, QUEUE_BASED)
+        strategy: Strategy name (ROUND_ROBIN, LEAST_LOADED, QUEUE_BASED, WEIGHTED_ROUND_ROBIN)
 
     Returns:
         dict: Strategy change confirmation
@@ -1929,6 +1938,7 @@ async def switch_load_balancing_strategy(strategy: str, request: Request):
             "ROUND_ROBIN": BalancingStrategy.ROUND_ROBIN,
             "LEAST_LOADED": BalancingStrategy.LEAST_LOADED,
             "QUEUE_BASED": BalancingStrategy.QUEUE_BASED,
+            "WEIGHTED_ROUND_ROBIN": BalancingStrategy.WEIGHTED_ROUND_ROBIN,
         }
 
         if strategy.upper() not in valid_strategies:
