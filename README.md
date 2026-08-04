@@ -120,6 +120,11 @@ pytest tests/ --ignore=tests/test_e2e_smoke.py -v
 ruff check . && ruff format --check .
 ```
 
+# Code Formatting & Pre-commit Hooks We use **Black** for code formatting and **isort** for import sorting
+
+pip install pre-commit
+pre-commit install
+
 ## Tech Stack
 
 | Layer | Technology |
