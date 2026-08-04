@@ -171,6 +171,78 @@ function TrendChart({ sessions }) {
   );
 }
 
+function InterviewMetricsChart({ sessions }) {
+  const trendData = useMemo(() => {
+    const byDate = {};
+    for (const s of sessions) {
+      const date = (s.updated_at || s.created_at || "").slice(0, 10);
+      if (!date) continue;
+      if (!byDate[date]) byDate[date] = { date, avgRisk: 0, count: 0 };
+      if (s.risk_score != null) {
+        byDate[date].avgRisk += s.risk_score;
+        byDate[date].count += 1;
+      }
+    }
+    return Object.values(byDate)
+      .map((d) => ({
+        date: d.date,
+        avgRisk: d.count > 0 ? d.avgRisk / d.count : null,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [sessions]);
+
+  return (
+    <Card title="Interview metrics" description="Average risk score across interviews per day.">
+      {trendData.length === 0 ? (
+        <div className="py-8 text-center text-sm text-muted">No interview metrics yet.</div>
+      ) : (
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={trendData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+            <XAxis dataKey="date" stroke="#71717a" fontSize={11} />
+            <YAxis stroke="#71717a" fontSize={11} domain={[0, 1]} />
+            <Tooltip {...TOOLTIP_STYLE} />
+            <Legend wrapperStyle={{ fontSize: 12, color: "#a1a1aa" }} />
+            <Line type="monotone" dataKey="avgRisk" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} name="Avg risk score" />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
+    </Card>
+  );
+}
+
+function CandidateStatsChart({ sessions }) {
+  const data = useMemo(() => {
+    const map = new Map();
+    for (const s of sessions) {
+      const id = s.candidate_id || "unknown";
+      if (!map.has(id)) map.set(id, { candidate_id: id, sessions: 0 });
+      map.get(id).sessions += 1;
+    }
+    return Array.from(map.values())
+      .sort((a, b) => b.sessions - a.sessions)
+      .slice(0, 10);
+  }, [sessions]);
+
+  return (
+    <Card title="Candidate statistics" description="Top candidates by number of interview sessions.">
+      {data.length === 0 ? (
+        <div className="py-8 text-center text-sm text-muted">No candidate data yet.</div>
+      ) : (
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+            <XAxis dataKey="candidate_id" stroke="#71717a" fontSize={10} interval={0} angle={-20} textAnchor="end" height={50} />
+            <YAxis stroke="#71717a" fontSize={11} />
+            <Tooltip {...TOOLTIP_STYLE} />
+            <Bar dataKey="sessions" fill="#10b981" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </Card>
+  );
+}
+
 function DrillDownModal({ type, sessions, onClose }) {
   const data = useMemo(() => {
     if (type === "risk") {
@@ -414,6 +486,67 @@ export default function AnalyticsPage() {
       <div className="border-t border-border pt-6">
         <MetricsDashboard />
       </div>
-    </ErrorBoundary>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card title="Sessions by status" description="Distribution across the lifecycle states.">
+          {stats.error ? (
+            <ErrorState error={stats.error} onRetry={() => stats.mutate()} />
+          ) : !stats.data ? (
+            <Skeleton className="h-64 w-full" />
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={breakdown}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                <XAxis dataKey="status" stroke="#71717a" fontSize={11} />
+                <YAxis stroke="#71717a" fontSize={11} />
+                <Tooltip {...TOOLTIP_STYLE} />
+                <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </Card>
+
+        <Card title="Failure breakdown" description="Counts grouped by failure type.">
+          {faults.error ? (
+            <ErrorState error={faults.error} onRetry={() => faults.mutate()} />
+          ) : !faults.data ? (
+            <Skeleton className="h-64 w-full" />
+          ) : failureData.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted">No failures recorded.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={failureData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                <XAxis dataKey="type" stroke="#71717a" fontSize={11} />
+                <YAxis stroke="#71717a" fontSize={11} />
+                <Tooltip {...TOOLTIP_STYLE} />
+                <Bar dataKey="count" fill="#ef4444" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <RiskDistribution
+          sessions={filteredSessions}
+          loading={completed.isLoading && failed.isLoading}
+          onDrillDown={(type) => setDrillDown(type)}
+        />
+        <TrendChart sessions={filteredSessions} />
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <InterviewMetricsChart sessions={filteredSessions} />
+        <CandidateStatsChart sessions={filteredSessions} />
+      </div>
+
+      {drillDown && (
+        <DrillDownModal
+          type={drillDown}
+          sessions={filteredSessions}
+          onClose={() => setDrillDown(null)}
+        />
+      )}
+    </div>
   );
 }
