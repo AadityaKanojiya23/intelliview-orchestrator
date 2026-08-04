@@ -80,9 +80,7 @@ def test_small_session_payload_stays_plain_json():
 def test_payload_at_compression_threshold_stays_plain_json(monkeypatch):
     session_data = {"session_id": "s1", "metadata": "x" * 128}
     serialized_size = len(json.dumps(session_data).encode("utf-8"))
-    monkeypatch.setattr(
-        session_payload, "SESSION_COMPRESSION_THRESHOLD_BYTES", serialized_size
-    )
+    monkeypatch.setattr(session_payload, "SESSION_COMPRESSION_THRESHOLD_BYTES", serialized_size)
 
     payload = serialize_session_payload(session_data)
 
@@ -94,9 +92,7 @@ def test_large_session_payload_is_compressed_and_round_trips():
     session_data = {
         "session_id": "s1",
         "status": "PROCESSING",
-        "answers_provided": [
-            {"answer_text": "x" * SESSION_COMPRESSION_THRESHOLD_BYTES}
-        ],
+        "answers_provided": [{"answer_text": "x" * SESSION_COMPRESSION_THRESHOLD_BYTES}],
     }
 
     payload = serialize_session_payload(session_data)

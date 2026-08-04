@@ -58,14 +58,10 @@ def main() -> int:
 
     # Validate required configuration settings right at startup (Issue 1)
     required_settings = ["API_URL", "API_TOKEN"]
-    missing_settings = [
-        setting for setting in required_settings if not os.getenv(setting)
-    ]
+    missing_settings = [setting for setting in required_settings if not os.getenv(setting)]
 
     if missing_settings:
-        logger.error(
-            f"Startup failed: Missing required environment variables: {', '.join(missing_settings)}"
-        )
+        logger.error(f"Startup failed: Missing required environment variables: {', '.join(missing_settings)}")
         return 1
 
     start_worker_metrics()
@@ -123,9 +119,7 @@ def main() -> int:
         if heartbeat_thread is not None:
             heartbeat_thread.join(timeout=10)
             if heartbeat_thread.is_alive():
-                logger.warning(
-                    "Heartbeat thread did not stop within timeout; continuing shutdown anyway"
-                )
+                logger.warning("Heartbeat thread did not stop within timeout; continuing shutdown anyway")
 
         agent.deregister()
 

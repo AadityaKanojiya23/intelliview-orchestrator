@@ -90,9 +90,7 @@ class InterviewTemplateManager:
         db = SessionLocal()
         try:
             t = db.execute(
-                select(InterviewTemplate).where(
-                    InterviewTemplate.template_id == template_id
-                )
+                select(InterviewTemplate).where(InterviewTemplate.template_id == template_id)
             ).scalar_one_or_none()
             if not t:
                 return None
@@ -122,9 +120,7 @@ class InterviewTemplateManager:
         try:
             stmt = select(InterviewTemplate)
             if interview_type:
-                stmt = stmt.where(
-                    InterviewTemplate.interview_type == interview_type.strip().lower()
-                )
+                stmt = stmt.where(InterviewTemplate.interview_type == interview_type.strip().lower())
             stmt = stmt.order_by(InterviewTemplate.created_at.desc()).limit(limit)
             rows = db.execute(stmt).scalars().all()
 
@@ -152,9 +148,7 @@ class InterviewTemplateManager:
         db = SessionLocal()
         try:
             t = db.execute(
-                select(InterviewTemplate).where(
-                    InterviewTemplate.template_id == template_id
-                )
+                select(InterviewTemplate).where(InterviewTemplate.template_id == template_id)
             ).scalar_one_or_none()
             if not t:
                 return False
@@ -164,9 +158,7 @@ class InterviewTemplateManager:
             if t.success_rate is None:
                 t.success_rate = 1.0 if success else 0.0
             else:
-                t.success_rate = (
-                    (t.success_rate * (count - 1)) + (1.0 if success else 0.0)
-                ) / count
+                t.success_rate = ((t.success_rate * (count - 1)) + (1.0 if success else 0.0)) / count
             t.updated_at = utcnow()
             db.commit()
             return True

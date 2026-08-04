@@ -19,9 +19,7 @@ def test_get_interview_report_success():
         start_time=datetime(2023, 1, 1, 10, 0, 0),
         end_time=datetime(2023, 1, 1, 11, 0, 0),
         questions_asked=[{"question_id": "q1", "text": "What is AI?"}],
-        answers_provided=[
-            {"question_id": "q1", "answer_text": "Artificial Intelligence"}
-        ],
+        answers_provided=[{"question_id": "q1", "answer_text": "Artificial Intelligence"}],
         feedback_generated=[{"question_id": "q1", "feedback": "Good", "score": 9.0}],
         evaluation_analysis={
             "quality": 8.0,
@@ -35,9 +33,7 @@ def test_get_interview_report_success():
         risk_score=0.1,
     )
 
-    mock_candidate = Candidate(
-        candidate_id="cand_123", name="John Doe", email="john@example.com"
-    )
+    mock_candidate = Candidate(candidate_id="cand_123", name="John Doe", email="john@example.com")
 
     def side_effect(stmt):
         mock_result = MagicMock()

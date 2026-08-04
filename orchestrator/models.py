@@ -14,27 +14,13 @@ class RiskWeights(BaseModel):
     so they do not need to sum to 1.
     """
 
-    tab_switching: float = Field(
-        default=1.0, ge=0.0, description="Weight for tab switching events"
-    )
-    browser_activity: float = Field(
-        default=1.0, ge=0.0, description="Weight for suspicious browser activity"
-    )
-    audio_interruptions: float = Field(
-        default=1.0, ge=0.0, description="Weight for audio quality issues"
-    )
-    multiple_persons: float = Field(
-        default=1.0, ge=0.0, description="Weight for multiple persons detected"
-    )
-    candidate_absence: float = Field(
-        default=1.0, ge=0.0, description="Weight for candidate not present"
-    )
-    gaze_deviation: float = Field(
-        default=1.0, ge=0.0, description="Weight for gaze direction anomalies"
-    )
-    background_noise: float = Field(
-        default=1.0, ge=0.0, description="Weight for background noise level"
-    )
+    tab_switching: float = Field(default=1.0, ge=0.0, description="Weight for tab switching events")
+    browser_activity: float = Field(default=1.0, ge=0.0, description="Weight for suspicious browser activity")
+    audio_interruptions: float = Field(default=1.0, ge=0.0, description="Weight for audio quality issues")
+    multiple_persons: float = Field(default=1.0, ge=0.0, description="Weight for multiple persons detected")
+    candidate_absence: float = Field(default=1.0, ge=0.0, description="Weight for candidate not present")
+    gaze_deviation: float = Field(default=1.0, ge=0.0, description="Weight for gaze direction anomalies")
+    background_noise: float = Field(default=1.0, ge=0.0, description="Weight for background noise level")
 
     @model_validator(mode="after")
     def at_least_one_nonzero(self):
