@@ -23,7 +23,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -64,6 +64,7 @@ from monitoring.dashboard_api import create_dashboard_routes
 from monitoring.metrics_collector import MetricsCollector
 from monitoring.websocket_manager import ws_manager
 from orchestrator import http_cache
+from orchestrator.audit_logger import audit_logger
 from orchestrator.auth import create_access_token
 from orchestrator.candidate_manager import CandidateManager
 from orchestrator.fault_manager import FaultManager
@@ -1803,8 +1804,8 @@ async def get_scheduling_status():
         raise HTTPException(status_code=500, detail=f"Error fetching scheduling status: {e!s}")
 
 
-@app.post("/switch-strategy", dependencies=[Depends(require_role("admin"))])
-async def switch_load_balancing_strategy(strategy: str):
+@app.post("/switch-strategy", dependencies=[Depends(require_token)])
+async def switch_load_balancing_strategy(strategy: str, request: Request):
     """
     Change the active load balancing strategy
 
@@ -1835,17 +1836,33 @@ async def switch_load_balancing_strategy(strategy: str):
                 detail=f"Invalid strategy. Valid options: {', '.join(valid_strategies.keys())}",
             )
 
+        # Capture the outgoing strategy BEFORE switching so the audit trail
+        # and response both reflect the true before/after transition.
+        previous_strategy = load_balancer.strategy
+
         # Switch strategy
         new_strategy = valid_strategies[strategy.upper()]
         load_balancer.switch_strategy(new_strategy)
 
         logger.info(f"Load balancing strategy switched to: {strategy}")
 
+        # Record this as a config-change audit event so there's a
+        # tamper-evident trail of who changed runtime scheduling behavior
+        # and when — this is an administrative action with system-wide
+        # effect, so it belongs in the audit log alongside other mutations.
+        audit_logger.log_config_change(
+            setting="load_balancing_strategy",
+            old_value=previous_strategy.name,
+            new_value=new_strategy.name,
+            actor=request.headers.get("x-api-token", "unknown")[:8] or "unknown",
+            request_id=getattr(request.state, "request_id", ""),
+        )
+
         return {
             "status": "success",
             "message": f"Strategy switched to {strategy}",
-            "previous_strategy": load_balancer.strategy.name,
-            "new_strategy": strategy,
+            "previous_strategy": previous_strategy.name,
+            "new_strategy": new_strategy.name,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     except HTTPException:
@@ -2184,6 +2201,106 @@ async def detect_and_handle_failures():
     except Exception as e:
         logger.error(f"Error during failure detection: {e!s}")
         raise HTTPException(status_code=500, detail=f"Error during failure detection: {e!s}")
+
+
+# ========== Audit Log Endpoints ==========
+
+_AUDIT_CATEGORIES = frozenset(audit_logger.CATEGORIES.keys())
+_AUDIT_EXPORT_FORMATS = frozenset({"json", "jsonl"})
+
+
+@app.get("/audit-log", dependencies=[Depends(require_token)])
+async def get_audit_log(category: str | None = None, limit: int = 100):
+    """
+    Get recent audit events (API mutations, config changes, security
+    events, AI decisions, data access)
+
+    Args:
+        category: Optional filter - one of: mutation, ai_decision,
+            security, config, system, data_access
+        limit: Maximum number of events to return (default: 100)
+
+    Returns:
+        dict: Recent audit events, newest first
+    """
+    try:
+        if category and category not in _AUDIT_CATEGORIES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid category. Valid options: {', '.join(sorted(_AUDIT_CATEGORIES))}",
+            )
+
+        logger.debug(f"Fetching audit log (category={category}, limit={limit})")
+
+        events = (
+            audit_logger.get_events_by_category(category, limit=limit)
+            if category
+            else audit_logger.get_recent_events(limit=limit)
+        )
+
+        return {
+            "count": len(events),
+            "category": category,
+            "events": events,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching audit log: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error fetching audit log: {e!s}")
+
+
+@app.get("/audit-log/export", dependencies=[Depends(require_token)])
+async def export_audit_log(
+    format: str = "json",
+    category: str | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
+):
+    """
+    Export audit events for compliance / offline analysis
+
+    Args:
+        format: Output format - "json" or "jsonl" (default: "json")
+        category: Optional filter - one of: mutation, ai_decision,
+            security, config, system, data_access
+        start_time: ISO timestamp filter (inclusive)
+        end_time: ISO timestamp filter (inclusive)
+
+    Returns:
+        Raw exported audit events in the requested format
+    """
+    try:
+        if format not in _AUDIT_EXPORT_FORMATS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid format. Valid options: {', '.join(sorted(_AUDIT_EXPORT_FORMATS))}",
+            )
+        if category and category not in _AUDIT_CATEGORIES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid category. Valid options: {', '.join(sorted(_AUDIT_CATEGORIES))}",
+            )
+
+        logger.info(f"Exporting audit log (format={format}, category={category})")
+
+        exported = audit_logger.export_events(
+            format=format,
+            start_time=start_time,
+            end_time=end_time,
+            category=category,
+        )
+
+        from fastapi.responses import PlainTextResponse
+
+        media_type = "application/json" if format == "json" else "application/x-ndjson"
+        return PlainTextResponse(content=exported, media_type=media_type)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting audit log: {e!s}")
+        raise HTTPException(status_code=500, detail=f"Error exporting audit log: {e!s}")
 
 
 # ========== Moment Tracking Endpoints ==========
