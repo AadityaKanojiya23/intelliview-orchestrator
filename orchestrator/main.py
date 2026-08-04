@@ -245,17 +245,16 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         elapsed_ms = (_time.perf_counter() - start) * 1000
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Response-Time-ms"] = f"{elapsed_ms:.1f}"
-        if request.url.path != "/health":
-            log_event(
-                logger,
-                logging.INFO,
-                "request",
-                request_id=request_id,
-                method=request.method,
-                path=request.url.path,
-                status=response.status_code,
-                elapsed_ms=round(elapsed_ms, 1),
-            )
+        log_event(
+            logger,
+            logging.DEBUG if request.url.path == "/health" else logging.INFO,
+            "request",
+            request_id=request_id,
+            method=request.method,
+            path=request.url.path,
+            status=response.status_code,
+            elapsed_ms=round(elapsed_ms, 1),
+        )
         return response
 
 
