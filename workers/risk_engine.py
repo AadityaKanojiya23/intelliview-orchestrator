@@ -1,3 +1,4 @@
+from workers.risk_spike_detector import RiskSpikeDetector
 """
 Risk Scoring Engine
 Combines signals from all pipelines to calculate final interview risk score
