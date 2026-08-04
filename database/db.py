@@ -1,8 +1,8 @@
 """Database connection manager for AI Interview Orchestrator.
 
-Centralises SQLAlchemy connection and session management. Use `SessionLocal()`
+Centralises SQLAlchemy connection and session management. Use SessionLocal()
 as a context-manager (or close it manually) and prefer the type-hinted
-`with SessionLocal() as db:` pattern in new code.
+with SessionLocal() as db: pattern in new code.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from config import DATABASE_SSLMODE, DATABASE_URL
 
 logger = logging.getLogger(__name__)
 
+
 _connect_args = {}
 _engine_kwargs = {
     "echo": False,
@@ -25,12 +26,33 @@ _engine_kwargs = {
     "pool_recycle": 1800,
 }
 
+
 if DATABASE_SSLMODE and DATABASE_SSLMODE != "disable":
     _connect_args["sslmode"] = DATABASE_SSLMODE
     _engine_kwargs["connect_args"] = _connect_args
     logger.info("Database SSL enabled: mode=%s", DATABASE_SSLMODE)
 
-engine = create_engine(DATABASE_URL, **_engine_kwargs)
+
+# Database engine initialization with structured error handling
+try:
+    engine = create_engine(
+        DATABASE_URL,
+        **_engine_kwargs,
+    )
+
+    logger.info("Database engine initialized successfully")
+
+except Exception as exc:
+    logger.exception(
+        "Database engine initialization failed. "
+        "Please check database configuration and server availability. "
+        "Reason: %s",
+        exc,
+    )
+
+    # Stop application startup because database connection is required
+    raise
+
 
 SessionLocal = sessionmaker(
     autocommit=False,
@@ -38,21 +60,5 @@ SessionLocal = sessionmaker(
     bind=engine,
 )
 
+
 Base = declarative_base()
-
-
-def get_db():
-    """
-    FastAPI dependency that provides a database session.
-
-    Rolls back failed transactions and always closes the session.
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    except Exception:
-        db.rollback()
-        logger.exception("Database session failed; transaction rolled back")
-        raise
-    finally:
-        db.close()
