@@ -19,6 +19,7 @@ const MAX_SAMPLES = 20;
 export default function OverviewPage() {
  
   const health = useSWR("/system-health", { refreshInterval: 3000 });
+  const forceLoading = true;
   const workers = useSWR("/workers", { refreshInterval: 5000 });
   const stats = useSWR("/session-statistics", { refreshInterval: 5000 });
   const active = useSWR("/active-sessions", { refreshInterval: 3000 });
@@ -91,7 +92,7 @@ export default function OverviewPage() {
         <div className="glass-card p-4 animate-slide-in-up delay-100">
           <Stat
             label="Completed"
-            value={stats.data ? stats.data.completed_sessions : <Skeleton className="h-7 w-12" />}
+           value={stats.data ? stats.data.completed_sessions : <Skeleton className="h-7 w-12" />}
             hint={stats.data ? `${stats.data.active_sessions} active · ${stats.data.failed_sessions} failed` : ""}
             icon={<CheckCircle2 size={16} />}
           />
@@ -102,7 +103,7 @@ export default function OverviewPage() {
             value={
               stats.data ? (
                 stats.data.risk_score_stats.average_risk_score.toFixed(3)
-              ) : (
+              ) : (                        
                 <Skeleton className="h-7 w-16" />
               )
             }
