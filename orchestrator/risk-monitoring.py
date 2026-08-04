@@ -1,9 +1,7 @@
-from typing import Any
-
+from datetime import datetime
+from typing import Dict, Any
 from sqlalchemy.orm import Session
-
 from .models import RiskPredictionMonitoring
-
 
 class RiskMonitoringService:
     @staticmethod
@@ -20,41 +18,34 @@ class RiskMonitoringService:
     def log_recruiter_review(db: Session, session_id: str, action: str) -> None:
         """Updates the table when a recruiter submits a manual action ('CONFIRM' or 'OVERRIDE')."""
         try:
-            entry = (
-                db.query(RiskPredictionMonitoring)
-                .filter(
-                    RiskPredictionMonitoring.session_id == session_id,
-                    RiskPredictionMonitoring.predicted_risk_level == "HIGH",
-                )
-                .order_by(RiskPredictionMonitoring.created_at.desc())
-                .first()
-            )
+            entry = db.query(RiskPredictionMonitoring).filter(
+                RiskPredictionMonitoring.session_id == session_id,
+                RiskPredictionMonitoring.predicted_risk_level == "HIGH"
+            ).order_by(RiskPredictionMonitoring.created_at.desc()).first()
+
             if entry:
                 entry.recruiter_outcome = action
                 # If predicted HIGH but recruiter overrides it -> It's a False Positive
-                entry.is_false_positive = action == "OVERRIDE"
+                entry.is_false_positive = (action == "OVERRIDE")
                 db.commit()
         except Exception:
             db.rollback()
 
     @staticmethod
-    def get_metrics(db: Session) -> dict[str, Any]:
+    def get_metrics(db: Session) -> Dict[str, Any]:
         """Calculates the analytics requested in the issue."""
-        base_query = db.query(RiskPredictionMonitoring).filter(
-            RiskPredictionMonitoring.predicted_risk_level == "HIGH"
-        )
-        total_high = base_query.count()
-
-        # Branch filters from base_query without mutating it, or filter separately
-        confirmed = base_query.filter(RiskPredictionMonitoring.recruiter_outcome == "CONFIRM").count()
-        false_positives = base_query.filter(RiskPredictionMonitoring.is_false_positive.is_(True)).count()
-
+        query = db.query(RiskPredictionMonitoring).filter(RiskPredictionMonitoring.predicted_risk_level == "HIGH")
+        
+        total_high = query.count()
+        confirmed = query.filter(RiskPredictionMonitoring.recruiter_outcome == "CONFIRM").count()
+        false_positives = query.filter(RiskPredictionMonitoring.is_false_positive == True).count()
+        
         reviewed = confirmed + false_positives
-        fp_rate = ((false_positives / reviewed) * 100) if reviewed > 0 else 0.0
+        fp_rate = (false_positives / reviewed * 100) if reviewed > 0 else 0.0
 
         return {
             "total_high_predictions": total_high,
             "confirmed_high_predictions": confirmed,
             "false_positive_count": false_positives,
-            "false_positive_rate_percent": round(fp_rate, 2),
+            "false_positive_rate_percent": round(fp_rate, 2)
         }
