@@ -45,12 +45,13 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
         from workers.ai_client import HAS_OPENAI, chat_completion
 
         if HAS_OPENAI:
-            response = chat_completion(
+            response, usage = chat_completion(
                 [{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}],
                 model="gpt-4o",
                 temperature=0.3,
                 max_tokens=512,
             )
+            logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
             if response:
                 try:
                     parsed = json.loads(response)
@@ -65,6 +66,7 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                     "clarity": round(parsed.get("clarity", 0.5), 2),
                     "feedback": parsed.get("feedback", ""),
                     "provider": "openai",
+                    "usage": usage,
                 }
     except Exception as exc:
         logger.debug("OpenAI quality evaluation failed: %s", exc)
@@ -73,7 +75,8 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
         from workers.ai_client import HAS_GEMINI, gemini_generate
 
         if HAS_GEMINI:
-            response = gemini_generate(f"{prompt}\n\n{user_msg}", temperature=0.3, max_output_tokens=512)
+            response, usage = gemini_generate(f"{prompt}\n\n{user_msg}", temperature=0.3, max_output_tokens=512)
+            logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
             if response:
                 try:
                     parsed = json.loads(response)
@@ -87,6 +90,7 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                     "clarity": round(parsed.get("clarity", 0.5), 2),
                     "feedback": parsed.get("feedback", ""),
                     "provider": "gemini",
+                    "usage": usage,
                 }
     except Exception as exc:
         logger.debug("Gemini quality evaluation failed: %s", exc)
@@ -95,11 +99,12 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
         from workers.ai_client import HAS_GROK, grok_completion
 
         if HAS_GROK:
-            response = grok_completion(
+            response, usage = grok_completion(
                 [{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}],
                 temperature=0.3,
                 max_tokens=512,
             )
+            logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
             if response:
                 try:
                     parsed = json.loads(response)
@@ -113,7 +118,8 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                     "clarity": round(parsed.get("clarity", 0.5), 2),
                     "feedback": parsed.get("feedback", ""),
                     "provider": "grok",
-                } 
+                    "usage": usage,
+                }
     except Exception as exc:
         logger.debug("Grok quality evaluation failed: %s", exc)
 
@@ -129,12 +135,13 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
         from workers.ai_client import HAS_OPENAI, chat_completion
 
         if HAS_OPENAI:
-            response = chat_completion(
+            response, usage = chat_completion(
                 [{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}],
                 model="gpt-4o",
                 temperature=0.3,
                 max_tokens=512,
             )
+            logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
             if response:
                 try:
                     parsed = json.loads(response)
@@ -147,6 +154,7 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
                     "incorrect_concepts_count": parsed.get("incorrect_concepts_count", 0),
                     "knowledge_gaps": parsed.get("knowledge_gaps", []),
                     "provider": "openai",
+                    "usage": usage,
                 }
     except Exception as exc:
         logger.debug("OpenAI accuracy evaluation failed: %s", exc)
@@ -155,7 +163,8 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
         from workers.ai_client import HAS_GEMINI, gemini_generate
 
         if HAS_GEMINI:
-            response = gemini_generate(f"{prompt}\n\n{user_msg}", temperature=0.3, max_output_tokens=512)
+            response, usage = gemini_generate(f"{prompt}\n\n{user_msg}", temperature=0.3, max_output_tokens=512)
+            logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
             if response:
                 try:
                     parsed = json.loads(response)
@@ -168,6 +177,7 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
                     "incorrect_concepts_count": parsed.get("incorrect_concepts_count", 0),
                     "knowledge_gaps": parsed.get("knowledge_gaps", []),
                     "provider": "gemini",
+                    "usage": usage,
                 }
     except Exception as exc:
         logger.debug("Gemini accuracy evaluation failed: %s", exc)
@@ -176,11 +186,12 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
         from workers.ai_client import HAS_GROK, grok_completion
 
         if HAS_GROK:
-            response = grok_completion(
+            response, usage = grok_completion(
                 [{"role": "system", "content": prompt}, {"role": "user", "content": user_msg}],
                 temperature=0.3,
                 max_tokens=512,
             )
+            logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
             if response:
                 try:
                     parsed = json.loads(response)
@@ -193,6 +204,7 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
                     "incorrect_concepts_count": parsed.get("incorrect_concepts_count", 0),
                     "knowledge_gaps": parsed.get("knowledge_gaps", []),
                     "provider": "grok",
+                    "usage": usage,
                 }
     except Exception as exc:
         logger.debug("Grok accuracy evaluation failed: %s", exc)
@@ -205,7 +217,7 @@ def _llm_evaluate_communication(session_id: str, question: str, answer: str) -> 
     try:
         from workers.ai_client import chat_completion
 
-        response = chat_completion(
+        response, usage = chat_completion(
             [
                 {
                     "role": "system",
@@ -217,6 +229,7 @@ def _llm_evaluate_communication(session_id: str, question: str, answer: str) -> 
             temperature=0.3,
             max_tokens=512,
         )
+        logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
         if response is None:
             return None
         try:
@@ -229,6 +242,7 @@ def _llm_evaluate_communication(session_id: str, question: str, answer: str) -> 
             "professionalism": round(parsed.get("professionalism", 50), 2),
             "confidence_level": round(parsed.get("confidence_level", 0.5), 2),
             "pace_appropriateness": round(parsed.get("pace_appropriateness", 0.5), 2),
+            "usage": usage,
         }
     except Exception as exc:
         logger.debug("LLM communication evaluation unavailable: %s", exc)
@@ -240,7 +254,7 @@ def _llm_generate_feedback(session_id: str, question: str, answer: str) -> dict[
     try:
         from workers.ai_client import chat_completion
 
-        response = chat_completion(
+        response, usage = chat_completion(
             [
                 {
                     "role": "system",
@@ -258,6 +272,7 @@ def _llm_generate_feedback(session_id: str, question: str, answer: str) -> dict[
             temperature=0.5,
             max_tokens=1024,
         )
+        logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
         if response is None:
             return None
         try:
@@ -273,6 +288,7 @@ def _llm_generate_feedback(session_id: str, question: str, answer: str) -> dict[
             "improvements": parsed.get("improvements", []),
             "detailed_feedback": parsed.get("detailed_feedback", ""),
             "recommendation": recommendation,
+            "usage": usage,
         }
     except Exception as exc:
         logger.debug("LLM feedback generation unavailable: %s", exc)
@@ -283,9 +299,6 @@ def _llm_generate_feedback(session_id: str, question: str, answer: str) -> dict[
 # Question guardrail — no external dependencies
 # ---------------------------------------------------------------------------
 
-# Patterns are compiled lazily on first use via _get_banned_patterns() so
-# that importing config (and therefore pydantic) is deferred until runtime,
-# consistent with the rest of this module's deferred-import style.
 _BANNED_TOPIC_PATTERNS: list[re.Pattern[str]] | None = None
 
 
@@ -318,7 +331,6 @@ def _get_banned_patterns() -> list[re.Pattern[str]]:
     return _BANNED_TOPIC_PATTERNS
 
 
-# Crude yes/no question detector: starts with a modal/auxiliary verb + subject.
 _YES_NO_RE = re.compile(
     r"^(do|does|did|have|has|had|is|are|was|were|will|would|can|could|should|may|might)\s",
     re.IGNORECASE,
@@ -330,27 +342,19 @@ _MAX_LENGTH = 500
 
 
 def validate_generated_question(question: str) -> tuple[bool, list[str]]:
-    """Validate an LLM-generated interview question before it is used.
-
-    Returns a ``(is_valid, reasons)`` tuple.  When *is_valid* is ``False``,
-    *reasons* is a non-empty list of human-readable rejection causes suitable
-    for structured logging.
-    """
+    """Validate an LLM-generated interview question before it is used."""
     reasons: list[str] = []
 
-    # --- A. Banned topics -----------------------------------------------
     for pattern in _get_banned_patterns():
         if pattern.search(question):
             reasons.append(f"banned topic matched: '{pattern.pattern}'")
 
-    # --- B. Length validation -------------------------------------------
     length = len(question)
     if length < _MIN_LENGTH:
         reasons.append(f"question too short ({length} chars, minimum {_MIN_LENGTH})")
     elif length > _MAX_LENGTH:
         reasons.append(f"question too long ({length} chars, maximum {_MAX_LENGTH})")
 
-    # --- C. Question format ---------------------------------------------
     if not question.rstrip().endswith("?"):
         reasons.append("question does not end with '?'")
 
@@ -361,17 +365,11 @@ def validate_generated_question(question: str) -> tuple[bool, list[str]]:
 
 
 def _llm_generate_question(session_id: str, topic: str = "systems_design") -> str | None:
-    """Use LLM to generate a dynamic interview question.
-
-    The raw LLM response is passed through :func:`validate_generated_question`
-    before being returned.  If validation fails the question is discarded,
-    a structured warning is logged, and ``None`` is returned so the caller
-    can fall back gracefully.
-    """
+    """Use LLM to generate a dynamic interview question."""
     try:
         from workers.ai_client import chat_completion
 
-        response = chat_completion(
+        response, usage = chat_completion(
             [
                 {
                     "role": "system",
@@ -386,6 +384,7 @@ def _llm_generate_question(session_id: str, topic: str = "systems_design") -> st
             temperature=0.8,
             max_tokens=256,
         )
+        logger.info("llm_token_usage session_id=%s provider=%s model=%s tokens=%s", session_id, usage.get("provider"), usage.get("model"), usage.get("total_tokens"))
         if not response:
             return None
 
