@@ -244,9 +244,7 @@ services:
       - "4317:4317"
     networks:
       - ai-interview-network
-    depends_on:
-      prometheus:
-        condition: service_healthy
+ 
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
       interval: 15s
