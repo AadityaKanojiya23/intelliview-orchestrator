@@ -126,7 +126,9 @@ class WorkerRegistry:
         try:
             pubsub = self.redis_client.raw.pubsub()
             await pubsub.subscribe(self.SYNC_CHANNEL)
-            logger.info("Worker Registry Pub/Sub listener started on %s", self.SYNC_CHANNEL)
+            logger.info(
+                "Worker Registry Pub/Sub listener started on %s", self.SYNC_CHANNEL
+            )
             async for message in pubsub.listen():
                 if message["type"] != "message":
                     continue
@@ -140,7 +142,9 @@ class WorkerRegistry:
                         with self.lock:
                             self.local_workers.pop(wid, None)
                     elif act == "update":
-                        raw = self.redis_client.hgetall(f"{self.WORKER_KEY_PREFIX}{wid}")
+                        raw = self.redis_client.hgetall(
+                            f"{self.WORKER_KEY_PREFIX}{wid}"
+                        )
                         if raw:
                             with self.lock:
                                 self.local_workers[wid] = {
@@ -151,10 +155,14 @@ class WorkerRegistry:
                                     "weight": int(raw.get("weight", 4)),
                                     "registered_at": raw.get("registered_at", ""),
                                     "last_heartbeat": raw.get("last_heartbeat", ""),
-                                    "total_tasks_processed": int(raw.get("total_tasks_processed", 0)),
+                                    "total_tasks_processed": int(
+                                        raw.get("total_tasks_processed", 0)
+                                    ),
                                     "failed_tasks": int(raw.get("failed_tasks", 0)),
                                     "failure_count": int(raw.get("failure_count", 0)),
-                                    "penalty_weight": float(raw.get("penalty_weight", 1.0)),
+                                    "penalty_weight": float(
+                                        raw.get("penalty_weight", 1.0)
+                                    ),
                                     "penalty_until": raw.get("penalty_until"),
                                 }
                 except Exception as exc:

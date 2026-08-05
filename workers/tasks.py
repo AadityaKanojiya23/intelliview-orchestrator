@@ -248,9 +248,11 @@ def process_interview_session(self, session_id):
         # and started recently, this is a duplicate delivery from a lost
         # worker - skip it.
         if interview and interview.status == session_manager.VIDEO_PROCESSING:
-            if interview.start_time and (
-                datetime.now(timezone.utc) - interview.start_time
-            ).total_seconds() < 1800:
+            if (
+                interview.start_time
+                and (datetime.now(timezone.utc) - interview.start_time).total_seconds()
+                < 1800
+            ):
                 logger.info(
                     "Skipping duplicate delivery for session %s (already processing)",
                     session_id,

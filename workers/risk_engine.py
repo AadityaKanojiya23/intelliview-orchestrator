@@ -303,9 +303,7 @@ class RiskScoringEngine:
         return risk_factors
 
     @staticmethod
-    def _generate_explanation(
-        risk_classification: str, risk_factors: list
-    ) -> str:
+    def _generate_explanation(risk_classification: str, risk_factors: list) -> str:
         """Generate a human-readable explanation of the risk assessment."""
         if not risk_factors:
             return "No significant risk factors detected."

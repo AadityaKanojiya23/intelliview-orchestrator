@@ -16,6 +16,7 @@ export default function WorkersPage() {
   const stats = useSWR("/worker-statistics", { refreshInterval: 5000 });
   const scheduling = useSWR("/scheduling-status", { refreshInterval: 5000 });
   const [search, setSearch] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: "", order: "asc" });
 
   const filtered = useMemo(() => {
     if (!workers.data?.workers) return [];
