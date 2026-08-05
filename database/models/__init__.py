@@ -10,6 +10,7 @@ from database.models._base import Base, utcnow
 from database.models.candidate import Candidate
 from database.models.interview_session import InterviewSession
 from database.models.interview_template import InterviewTemplate
+from database.models.notification import Notification
 from database.models.question import Question
 
 __all__ = [
@@ -17,6 +18,7 @@ __all__ = [
     "Candidate",
     "InterviewSession",
     "InterviewTemplate",
+    "Notification",
     "Question",
     "utcnow",
 ]

@@ -5,6 +5,7 @@ FAILED only after Celery has exhausted its retries.
 """
 
 from celery import Celery, signals
+from opentelemetry.instrumentation.celery import CeleryInstrumentor
 from kombu import Queue
 
 from config import REDIS_URL

@@ -1,4 +1,8 @@
 import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(__file__))
 
 from compare import similarity
 
@@ -19,7 +23,7 @@ def get_current_response(prompt):
 
 
 # Load baseline prompts and expected outputs
-with open("baseline.json") as f:
+with open(os.path.join(os.path.dirname(__file__), "baseline.json")) as f:
     tests = json.load(f)
 
 threshold = 0.90

@@ -117,7 +117,7 @@ class HealthMonitor:
     # Readiness probe (Kubernetes-style)
     # ------------------------------------------------------------------
 
-    def readiness_check(self) -> dict[str, Any]:
+    async def readiness_check(self) -> dict[str, Any]:
         """Return true readiness â€” all critical dependencies must be up.
 
         Use this for k8s readinessProbe: the service only receives

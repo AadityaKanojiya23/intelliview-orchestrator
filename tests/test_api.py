@@ -3,14 +3,15 @@ test_api.py — Unit tests for Risk Weight Configuration API
 Run: pytest tests/test_api.py -v
 """
 
+import os
 import sys
 
-sys.path.insert(0, "../src")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
-import store
 from fastapi.testclient import TestClient
-from main import app
+from orchestrator.main import app
+from orchestrator.store import clear_all
 
 client = TestClient(app)
 
@@ -18,9 +19,9 @@ client = TestClient(app)
 @pytest.fixture(autouse=True)
 def reset_store():
     """Clear store before each test for isolation."""
-    store.clear_all()
+    clear_all()
     yield
-    store.clear_all()
+    clear_all()
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────

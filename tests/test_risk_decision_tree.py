@@ -1,4 +1,4 @@
-from workers.risk_engine import RiskDecisionTree
+from workers.risk_engine import RiskScoringEngine as RiskDecisionTree
 
 
 def test_multiple_persons_returns_critical():

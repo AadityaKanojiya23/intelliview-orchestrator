@@ -49,6 +49,7 @@ from orchestrator.health_monitor import HealthMonitor
 from orchestrator.interview_templates import InterviewTemplateManager
 from orchestrator.load_balancer import BalancingStrategy, LoadBalancer
 from orchestrator.logging_config import configure_logging, log_event
+from orchestrator.middleware.capacity_guard import CapacityGuardMiddleware
 from orchestrator.notification_manager import NotificationManager
 from orchestrator.question_bank import QuestionBank
 from orchestrator.rate_limiter import RateLimiterMiddleware

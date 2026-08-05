@@ -6,7 +6,7 @@ Simulates a database. Replace with SQLAlchemy/MongoDB adapter as needed.
 import uuid
 from datetime import datetime, timezone
 
-from models import RiskConfigCreate, RiskConfigResponse, RiskConfigUpdate, RiskWeights
+from orchestrator.models import RiskConfigCreate, RiskConfigResponse, RiskConfigUpdate, RiskWeights
 
 # Default fallback config — used when no job-specific config exists
 DEFAULT_WEIGHTS = RiskWeights()
