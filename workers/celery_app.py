@@ -5,8 +5,8 @@ FAILED only after Celery has exhausted its retries.
 """
 
 from celery import Celery, signals
-from opentelemetry.instrumentation.celery import CeleryInstrumentor
 from kombu import Queue
+from opentelemetry.instrumentation.celery import CeleryInstrumentor
 
 from config import REDIS_URL
 from metrics.prometheus_metrics import TASKS_PERMANENTLY_FAILED

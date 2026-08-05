@@ -5,6 +5,7 @@ Exposes CRUD endpoints for recruiters to manage per-position risk weights.
 
 import store
 from fastapi import APIRouter, HTTPException, status
+
 from orchestrator.models import RiskConfigCreate, RiskConfigResponse, RiskConfigUpdate
 
 router = APIRouter(prefix="/risk-configs", tags=["Risk Weight Configuration"])
