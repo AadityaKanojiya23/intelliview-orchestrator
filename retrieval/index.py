@@ -32,7 +32,7 @@ def retrieve(query, top_k=3):
 
     query_embedding = model.encode([query])
 
-    distances, ids = index.search(np.array(query_embedding).astype("float32"), top_k)
+    _distances, ids = index.search(np.array(query_embedding).astype("float32"), top_k)
 
     results = []
 

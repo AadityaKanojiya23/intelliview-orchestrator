@@ -33,6 +33,7 @@ from monitoring.prometheus_metrics import (
 )
 from orchestrator.session_manager import SessionManager
 from orchestrator.state_sync import StateSynchronizer
+from orchestrator.worker_registry import WorkerRegistry
 from workers.celery_app import celery_app
 from workers.evaluation_pipeline import evaluate_answers
 from workers.risk_engine import RiskScoringEngine
@@ -242,6 +243,22 @@ def process_interview_session(self, session_id):
 
         finally:
             db_session.close()
+
+        # Redelivery guard: if the session is already in VIDEO_PROCESSING
+        # and started recently, this is a duplicate delivery from a lost
+        # worker - skip it.
+        if interview and interview.status == session_manager.VIDEO_PROCESSING:
+            if interview.start_time and (
+                datetime.now(timezone.utc) - interview.start_time
+            ).total_seconds() < 1800:
+                logger.info(
+                    "Skipping duplicate delivery for session %s (already processing)",
+                    session_id,
+                )
+                return {
+                    "session_id": session_id,
+                    "status": "skipped_duplicate_delivery",
+                }
 
         session_manager.update_session_status(
             session_id,

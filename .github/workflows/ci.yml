@@ -62,7 +62,7 @@ jobs:
       - name: isort import check
         run: isort --check-only --profile black .
       - name: Ruff lint
-        run: ruff check orchestrator workers monitoring database tests scripts
+        run: ruff check orchestrator workers monitoring database tests scripts routers retrieval
       - name: Pytest
         run: pytest tests/ --ignore=tests/test_e2e_smoke.py -v
 
@@ -126,7 +126,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install
-        run: npm install --no-audit --no-fund --legacy-peer-deps --force
+        run: npm install --no-audit --no-fund --legacy-peer-deps
       - name: Build
         run: npm run build
 #       - name: Lint
