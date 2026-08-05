@@ -149,8 +149,9 @@ export default function SessionsPage() {
         </div>
 
         <StartInterviewForm disabled={!token} />
+        </div>
 
-      <Card>
+        <Card>
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {TABS.map((t) => (
             <button

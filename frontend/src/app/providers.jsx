@@ -1,5 +1,5 @@
 "use client";
-import { initWebVitals } from "@/lib/webVitals";
+import { reportWebVitals } from "@/lib/webVitals";
 import { Suspense, lazy, useEffect, useState, useCallback } from "react";
 import { SWRConfig } from "swr";
 import { swrFetcher } from "@/lib/fetcher";
@@ -66,7 +66,7 @@ export function ClientProviders({ children }) {
   useHydrateToken();
 useEffect(() => {
   hydrateTheme();
-  initWebVitals();
+  reportWebVitals();
 }, []);
 
   const [paletteOpen, setPaletteOpen] = useState(false);

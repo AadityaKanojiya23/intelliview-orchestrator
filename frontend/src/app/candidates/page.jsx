@@ -312,7 +312,7 @@ export default function CandidatesPage() {
                 </Card>
               </div>
             )}
-          </Card>
+          </div>
         </div>
 
         <div className="lg:col-span-2">

@@ -168,42 +168,6 @@ export default function WorkersPage() {
               })}
             </Tbody>
           </Table>
-          <div className="overflow-x-auto"> 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-muted">
-                <tr>
-                  <th className="py-2 pr-4">Worker</th>
-                  <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">Active</th>
-                  <th className="py-2 pr-4">Capacity</th>
-                  <th className="py-2 pr-4">Utilization</th>
-                  <th className="py-2 pr-4">Heartbeat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((w) => {
-                  const util = w.capacity ? (w.active_tasks / w.capacity) * 100 : 0;
-                  return (
-                    <tr key={w.worker_id} className="border-t border-border">
-                      <td className="py-2 pr-4 font-mono text-xs text-zinc-200">{w.worker_id}</td>
-                      <td className="py-2 pr-4">
-                        <StatusBadge status={w.health_status} />
-                      </td>
-                      <td className="py-2 pr-4">{w.active_tasks}</td>
-                      <td className="py-2 pr-4">{w.capacity}</td>
-                      <td className="py-2 pr-4">
-                        <Badge variant={util > 90 ? "danger" : util > 70 ? "warn" : "success"}>
-                          {formatPercent(util)}
-                        </Badge>
-                      </td>
-                      <td className="py-2 pr-4 text-muted">{formatRelative(w.last_heartbeat)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
         )}
       </Card>
     </div>

@@ -233,27 +233,28 @@ export default function InterviewPage() {
                     opacity: isLive ? 1 : 0.3,
                   }}
                 />
-                {!videoEnabled && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-muted">
-                    <VideoOff size={48} className="mb-3 opacity-30" />
-                    <p className="text-sm">Camera is off</p>
+              ))}
+              {!videoEnabled && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-muted">
+                  <VideoOff size={48} className="mb-3 opacity-30" />
+                  <p className="text-sm">Camera is off</p>
+                </div>
+              )}
+              {isPaused && videoEnabled && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <div className="flex items-center gap-2 rounded-md bg-bg-panel px-4 py-2 text-sm text-zinc-300">
+                    <Pause size={16} />
+                    Paused
                   </div>
-                )}
-                {isPaused && videoEnabled && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                    <div className="flex items-center gap-2 rounded-md bg-bg-panel px-4 py-2 text-sm text-zinc-300">
-                      <Pause size={16} />
-                      Paused
-                    </div>
-                  </div>
-                )}
-                {isLive && activeSession && (
-                  <div className="absolute left-3 top-3 rounded-md bg-black/60 px-2 py-1 text-[10px] font-mono text-zinc-300">
-                    {activeSession}
-                  </div>
-                )}
-              </div>
-              {isLive && (
+                </div>
+              )}
+              {isLive && activeSession && (
+                <div className="absolute left-3 top-3 rounded-md bg-black/60 px-2 py-1 text-[10px] font-mono text-zinc-300">
+                  {activeSession}
+                </div>
+              )}
+            </div>
+            {isLive && (
                 <div className="flex items-center gap-2 border-t border-border px-4 py-3">
                   <button
                     onClick={toggleAudio}
@@ -282,32 +283,6 @@ export default function InterviewPage() {
                 </div>
               )}
             </Card>
-
-            <Card title="Audio Visualization">
-              <div className="flex items-end gap-[2px] h-16">
-                {audioLevels.map((level, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 rounded-t transition-all duration-75"
-                    style={{
-                      height: `${Math.max(2, (level / maxLevel) * 100)}%`,
-                      backgroundColor:
-                        level / maxLevel > 0.7
-                          ? "#ef4444"
-                          : level / maxLevel > 0.4
-                            ? "#f59e0b"
-                            : "#6366f1",
-                      opacity: isLive ? 1 : 0.3,
-                    }}
-                  />
-                ))}
-              </div>
-              <div className="mt-2 flex items-center gap-2 text-xs text-muted">
-                <Volume2 size={12} />
-                <span>{isLive ? "Microphone active" : "Microphone inactive"}</span>
-              </div>
-            </Card>
-          </div>
 
           <div className="space-y-4">
             <Card title="Risk Score" description="Real-time risk assessment">
@@ -407,8 +382,7 @@ export default function InterviewPage() {
       </div>
     )}
   </Card>
-            
-          </div>
+
         </div>
       </div>
     </ErrorBoundary>
