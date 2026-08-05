@@ -193,6 +193,9 @@ class _RedisClientWrapper:
     def info(self, *a: Any, **kw: Any) -> Any:
         return self._call("info", *a, **kw)
 
+    def publish(self, channel: str, message: str) -> int:
+        return self._call("publish", channel, message)
+
 
 def get_redis() -> _RedisClientWrapper:
     """Alias for get_redis_client() for backward compatibility."""

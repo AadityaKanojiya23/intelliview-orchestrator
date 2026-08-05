@@ -20,6 +20,7 @@ from sqlalchemy import select
 from database.db import SessionLocal
 from database.models import InterviewSession
 from orchestrator.redis_client import get_redis_client, is_circuit_open
+from orchestrator.session_payload import deserialize_session_payload, serialize_session_payload
 
 logger = logging.getLogger(__name__)
 

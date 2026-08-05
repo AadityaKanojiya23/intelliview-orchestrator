@@ -89,15 +89,13 @@ def test_stale_active_session_is_recovered():
     with (
         patch.object(tasks, "SessionLocal", return_value=db_session),
         patch.object(tasks, "group") as fake_group,
-        patch.object(tasks, "chord") as fake_chord,
         patch.object(tasks, "_after_parallel") as fake_after_parallel,
     ):
+        fake_group.return_value.apply_async.return_value = _FakeGroupResult("video_out", "audio_out")
         result = tasks.process_interview_session.run("session-456")
 
     fake_group.assert_called_once()
-    # chord(header)(callback.s(session_id))
-    fake_chord.assert_called_once()
-    fake_after_parallel.s.assert_called_once_with("session-456")
+    fake_after_parallel.delay.assert_called_once_with("session-456", "video_out", "audio_out")
     assert result["status"] == "processing_parallel"
 
 
@@ -108,12 +106,11 @@ def test_fresh_queued_session_dispatches_normally():
     with (
         patch.object(tasks, "SessionLocal", return_value=db_session),
         patch.object(tasks, "group") as fake_group,
-        patch.object(tasks, "chord") as fake_chord,
         patch.object(tasks, "_after_parallel") as fake_after_parallel,
     ):
+        fake_group.return_value.apply_async.return_value = _FakeGroupResult("video_out", "audio_out")
         result = tasks.process_interview_session.run("session-789")
 
     fake_group.assert_called_once()
-    fake_chord.assert_called_once()
-    fake_after_parallel.s.assert_called_once_with("session-789")
+    fake_after_parallel.delay.assert_called_once_with("session-789", "video_out", "audio_out")
     assert result["status"] == "processing_parallel"

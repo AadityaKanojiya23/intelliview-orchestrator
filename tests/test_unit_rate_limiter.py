@@ -47,13 +47,14 @@ class FakeRedisClient:
 
 
 def create_app(monkeypatch, request_count):
-    from orchestrator import rate_limiter
+    from orchestrator import cache_manager
 
     monkeypatch.setattr(
-        rate_limiter,
+        cache_manager,
         "get_redis_client",
         lambda: FakeRedisClient(request_count),
     )
+    cache_manager.CacheManager._instance = None
 
     app = FastAPI()
 

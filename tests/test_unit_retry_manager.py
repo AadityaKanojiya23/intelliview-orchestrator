@@ -39,9 +39,12 @@ def retry_manager(monkeypatch):
     fake = FakeRedis()
 
     monkeypatch.setattr(
-        "orchestrator.retry_manager.get_redis_client",
+        "orchestrator.cache_manager.get_redis_client",
         lambda: fake,
     )
+    from orchestrator import cache_manager
+
+    cache_manager.CacheManager._instance = None
 
     return RetryManager(
         max_retries=3,
@@ -63,9 +66,12 @@ def test_exponential_backoff(retry_manager):
 
 def test_linear_backoff(monkeypatch):
     monkeypatch.setattr(
-        "orchestrator.retry_manager.get_redis_client",
+        "orchestrator.cache_manager.get_redis_client",
         lambda: FakeRedis(),
     )
+    from orchestrator import cache_manager
+
+    cache_manager.CacheManager._instance = None
 
     manager = RetryManager(
         strategy=RetryStrategy.LINEAR_BACKOFF,
@@ -79,9 +85,12 @@ def test_linear_backoff(monkeypatch):
 
 def test_immediate_backoff(monkeypatch):
     monkeypatch.setattr(
-        "orchestrator.retry_manager.get_redis_client",
+        "orchestrator.cache_manager.get_redis_client",
         lambda: FakeRedis(),
     )
+    from orchestrator import cache_manager
+
+    cache_manager.CacheManager._instance = None
 
     manager = RetryManager(
         strategy=RetryStrategy.IMMEDIATE,

@@ -34,7 +34,7 @@ def _manager():
         fm = FaultManager()
 
     # Expose the mock so tests can inspect calls made after construction.
-    fm.redis_client = mock_redis.return_value
+    fm.redis_client = mock_get_redis_client.return_value
     return fm
 
 

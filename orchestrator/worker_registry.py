@@ -11,6 +11,7 @@ Responsibilities:
 """
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 from threading import Lock
@@ -105,6 +106,67 @@ class WorkerRegistry:
             self._hydrated = True
         except Exception as exc:
             logger.warning("Could not hydrate worker registry from Redis: %s", exc)
+
+    def _trigger_sync_broadcast(self, worker_id: str, action: str = "update") -> None:
+        """Publish a sync event to Redis Pub/Sub so other cluster instances
+        can update their local worker registry."""
+        if not self.redis_client:
+            return
+        try:
+            message = json.dumps({"worker_id": worker_id, "action": action})
+            self.redis_client.publish(self.SYNC_CHANNEL, message)
+        except Exception as exc:
+            logger.warning("Failed to broadcast sync event for %s: %s", worker_id, exc)
+
+    async def _start_pubsub_listener(self) -> None:
+        """Listen for sync events from other cluster instances and update
+        the local worker registry accordingly."""
+        if not self.redis_client:
+            return
+        try:
+            pubsub = self.redis_client.raw.pubsub()
+            await pubsub.subscribe(self.SYNC_CHANNEL)
+            logger.info("Worker Registry Pub/Sub listener started on %s", self.SYNC_CHANNEL)
+            async for message in pubsub.listen():
+                if message["type"] != "message":
+                    continue
+                try:
+                    data = json.loads(message["data"])
+                    wid = data.get("worker_id")
+                    act = data.get("action")
+                    if not wid:
+                        continue
+                    if act == "deregister":
+                        with self.lock:
+                            self.local_workers.pop(wid, None)
+                    elif act == "update":
+                        raw = self.redis_client.hgetall(f"{self.WORKER_KEY_PREFIX}{wid}")
+                        if raw:
+                            with self.lock:
+                                self.local_workers[wid] = {
+                                    "worker_id": wid,
+                                    "status": raw.get("status", "healthy"),
+                                    "active_tasks": int(raw.get("active_tasks", 0)),
+                                    "capacity": int(raw.get("capacity", 4)),
+                                    "weight": int(raw.get("weight", 4)),
+                                    "registered_at": raw.get("registered_at", ""),
+                                    "last_heartbeat": raw.get("last_heartbeat", ""),
+                                    "total_tasks_processed": int(raw.get("total_tasks_processed", 0)),
+                                    "failed_tasks": int(raw.get("failed_tasks", 0)),
+                                    "failure_count": int(raw.get("failure_count", 0)),
+                                    "penalty_weight": float(raw.get("penalty_weight", 1.0)),
+                                    "penalty_until": raw.get("penalty_until"),
+                                }
+                except Exception as exc:
+                    logger.warning("Error processing sync event: %s", exc)
+        except Exception as exc:
+            logger.warning("Pub/Sub listener error: %s", exc)
+        finally:
+            try:
+                await pubsub.unsubscribe(self.SYNC_CHANNEL)
+                await pubsub.close()
+            except Exception:
+                pass
 
     def register_worker(
         self, worker_id: str, capacity: int = 4, weight: int | None = None
