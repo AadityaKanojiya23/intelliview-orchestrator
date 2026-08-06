@@ -306,8 +306,9 @@ def process_interview_session(self, session_id):
             _run_audio.s(session_id),
         )
 
-        # Chord: runs parallel_group, then _after_parallel with results
-        chord(parallel_group)(_after_parallel.s(session_id)).apply_async()
+        # Chord: runs parallel_group, then _after_parallel with results.
+        # chord(self)(callback) applies the chord and returns an AsyncResult.
+        chord(parallel_group)(_after_parallel.s(session_id))
 
         # Record successful task initiation
         registry.record_success(worker_hostname)

@@ -31,15 +31,13 @@ def test_process_interview_session_pipeline(
     mock_db.execute.return_value.scalar_one_or_none.return_value = interview
 
     fake_chord_obj = MagicMock()
-    fake_chord_callback = MagicMock()
     mock_chord.return_value = fake_chord_obj
-    fake_chord_obj.return_value = fake_chord_callback
-    fake_chord_callback.apply_async.return_value = None
+    fake_chord_obj.return_value = MagicMock()
 
     result = process_interview_session.run("test-session-001")
 
-    assert result["session_id"] == "test-session-001"
     assert result["status"] == "processing_parallel"
+    assert result["session_id"] == "test-session-001"
 
     # Verify the group was created with video + audio subtasks
     mock_group.assert_called_once()
@@ -47,7 +45,6 @@ def test_process_interview_session_pipeline(
     # Verify chord was called with the group and callback
     mock_chord.assert_called_once()
     fake_chord_obj.assert_called_once()
-    fake_chord_callback.apply_async.assert_called_once()
 
     # Verify session status updates (PROCESSING and VIDEO_PROCESSING)
     assert mock_session_manager.update_session_status.call_count == 2
