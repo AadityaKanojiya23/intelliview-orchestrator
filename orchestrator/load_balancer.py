@@ -276,16 +276,18 @@ class LoadBalancer:
 
     def is_system_overloaded(self, threshold: float = 0.8) -> bool:
         """Preserve previous contract for tests."""
-        workers = self._get_cached_workers()
-        if not workers:
-            return False
-        total_active_tasks = sum(w.get("active_tasks", 0) for w in workers)
-        total_capacity = sum(w.get("max_capacity", 1) for w in workers)
-        utilization = total_active_tasks / max(1, total_capacity)
-        return utilization >= threshold
+        stats = self.worker_registry.get_worker_statistics()
+        if stats and "capacity_utilization" in stats:
+            return (stats["capacity_utilization"] / 100.0) >= threshold
+        return False
 
-    def get_best_worker_for_priority(self, priority: int):
-        return self.select_worker()
+    def get_best_worker_for_priority(self, priority: str):
+        workers = self.worker_registry.get_available_workers()
+        if not workers:
+            return None
+        if priority == "high":
+            return min(workers, key=lambda w: w.get("active_tasks", 0))
+        return workers[-1]
 
     def get_load_status(self) -> dict[str, Any]:
         """
