@@ -77,6 +77,9 @@ jobs:
     env:
       API_TOKEN: test-token
       API_BASE_URL: http://localhost:8000
+      XDG_CACHE_HOME: /tmp/.cache
+      HOME: /tmp
+      TMPDIR: /tmp
     steps:
       - uses: actions/checkout@v4
         with:
@@ -91,7 +94,7 @@ jobs:
           pip install httpx pytest
 
       - name: Validate API import path
-        run: docker compose run --rm fastapi python -c "import orchestrator.main; print('ok')"
+        run: docker compose run --rm -e XDG_CACHE_HOME=/tmp/.cache -e HOME=/tmp -e TMPDIR=/tmp fastapi python -c "import orchestrator.main; print('ok')"
 
       - name: Bring up full stack (redis, postgres, api, worker)
         run: docker compose up -d --build redis postgres fastapi worker
