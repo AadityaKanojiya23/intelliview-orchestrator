@@ -30,9 +30,6 @@ import pathlib
 import sys
 
 import pytest
-from testcontainers.postgres import PostgresContainer
-
-from workers.celery_app import celery_app
 
 # Make project root importable so `from config import ...` works.
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -51,6 +48,8 @@ os.environ.setdefault("API_TOKEN", "test-token")
 @pytest.fixture(scope="session")
 def postgres_container():
     """Start a PostgreSQL Testcontainer for integration tests."""
+    from testcontainers.postgres import PostgresContainer
+
     with PostgresContainer("postgres:16") as postgres:
         os.environ["POSTGRES_HOST"] = postgres.get_container_host_ip()
         os.environ["POSTGRES_PORT"] = str(postgres.get_exposed_port(5432))
@@ -79,4 +78,6 @@ def celery_config():
 
 @pytest.fixture(scope="session")
 def celery_app_fixture():
+    from workers.celery_app import celery_app
+
     return celery_app
