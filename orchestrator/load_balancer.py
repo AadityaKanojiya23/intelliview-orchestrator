@@ -61,18 +61,6 @@ class LoadBalancer:
 
         logger.info(f"Load Balancer initialized with strategy: {strategy.value}")
 
-    def _get_cached_workers(self) -> list[dict[str, Any]]:
-        if isinstance(self._worker_cache, dict):
-            return list(self._worker_cache.values())
-        return list(self._worker_cache)
-
-    def is_system_overloaded(self) -> bool:
-        workers = self._get_cached_workers()
-        return bool(workers) and all(
-            getattr(w, "load", w.get("load", 1.0) if isinstance(w, dict) else 1.0)
-            >= 1.0
-            for w in workers
-        )
 
     def select_worker(self) -> dict[str, Any] | None:
         """

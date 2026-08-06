@@ -206,12 +206,6 @@ class RiskScoringEngine:
             return "HIGH"
         return "CRITICAL"
 
-    @classmethod
-    def classify(
-        cls, video: dict = None, audio: dict = None, evaluation: dict = None
-    ) -> str:
-        score = cls.calculate_final_risk(video, audio, evaluation)
-        return cls.classify_risk(score)
 
     @staticmethod
     def generate_risk_report(

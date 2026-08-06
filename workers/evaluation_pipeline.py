@@ -504,7 +504,7 @@ def _llm_generate_question(
             return None
 
         question = response.strip()
-        is_valid, reasons = validate_generated_question(question)
+        is_valid, _reasons = validate_generated_question(question)
         if not question or not is_valid:
             logger.warning("Invalid LLM-generated question: %s", question)
             return None
