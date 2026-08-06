@@ -195,7 +195,9 @@ def run_video_analysis(session_id: str) -> dict[str, Any]:
     logger.info(f"Starting video analysis for session {session_id}")
 
     import os
+
     import requests
+
     from workers.risk_engine import RiskScoringEngine
 
     cv_url = os.environ.get("CV_SERVICE_URL")
