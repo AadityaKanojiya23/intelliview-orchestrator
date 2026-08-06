@@ -59,6 +59,7 @@ from orchestrator.scheduler import Scheduler
 from orchestrator.session_manager import SessionManager
 from orchestrator.session_tracker import SessionTracker
 from orchestrator.state_sync import StateSynchronizer
+from orchestrator.store import DEFAULT_WEIGHTS, get_config_by_position
 from orchestrator.worker_registry import WorkerRegistry
 from routers.admin import create_admin_routes
 from routers.candidates import create_candidate_routes
@@ -331,6 +332,19 @@ app.include_router(risk_configs_router)
 
 app.include_router(metrics_router)
 
+
+DEFAULT_WEIGHTS = {
+    "technical_accuracy": 0.4,
+    "communication": 0.3,
+    "culture_fit": 0.3
+}
+
+@app.get("/risk-engine/weights/{role}")
+def get_weights(role: str):
+    from orchestrator import store
+    config = store.get_config_by_position(role)
+    weights = config.weights if config else DEFAULT_WEIGHTS
+    return {"role": role, "weights": weights, "is_custom": config is not None}
 
 if __name__ == "__main__":
     import uvicorn

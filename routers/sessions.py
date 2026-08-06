@@ -278,6 +278,9 @@ def create_session_routes(
             HTTPException: On creation failure
         """
         try:
+            if not re.match(r"^[A-Za-z0-9._-]+$", request.candidate_id):
+                raise HTTPException(status_code=422, detail="Invalid candidate_id")
+
             logger.info(
                 f"API: Creating interview session for candidate {request.candidate_id}"
             )

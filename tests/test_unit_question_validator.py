@@ -172,7 +172,7 @@ class TestLlmGenerateQuestionIntegration:
     def _patch_chat(self, return_value):
         """Return a context manager that patches chat_completion at import time."""
         ai_mock = MagicMock()
-        ai_mock.chat_completion = MagicMock(return_value=return_value)
+        ai_mock.chat_completion = MagicMock(return_value=(return_value, {}))
         ai_mock.HAS_OPENAI = True
         return patch.dict("sys.modules", {"workers.ai_client": ai_mock})
 

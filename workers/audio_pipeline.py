@@ -126,8 +126,10 @@ def _get_audio_duration(audio_path: str, segments: list[dict[str, Any]]) -> floa
     return 0.0
 
 
-def _real_transcribe(session_id: str) -> dict[str, Any] | None:
+def _real_transcribe(session_id: str, audio_url: str | None = None) -> dict[str, Any] | None:
     """Transcribe audio using local Whisper model."""
+    audio_path = session_id
+    vad_ran = False
     try:
         import numpy as np
 
@@ -142,11 +144,11 @@ def _real_transcribe(session_id: str) -> dict[str, Any] | None:
     try:
         from workers.ai_client import transcribe_audio_file
 
-        url = audio_url or os.environ.get("AUDIO_STREAM_URL", "").strip()
+        url = session_id or os.environ.get("AUDIO_STREAM_URL", "").strip()
         if not url and not vad_ran:
             logger.debug("Transcription skipped: no audio URL configured.")
             return None
-        result = transcribe_audio_file(audio_path)
+        result = transcribe_audio_file(session_id)
         segments = result.get("segments", [])
         if segments:
             avg_logprob = np.mean([s.get("avg_logprob", -1.0) for s in segments])
@@ -168,7 +170,7 @@ def _real_transcribe(session_id: str) -> dict[str, Any] | None:
             "text": result.get("text", ""),
             "confidence": confidence,
             "language": result.get("language", "en"),
-            "duration_seconds": _get_audio_duration(audio_path, result.get("segments", [])),
+            "duration_seconds": _get_audio_duration(session_id, result.get("segments", [])),
             "timestamp": time.time(),
         }
 
@@ -195,6 +197,7 @@ def _real_transcribe(session_id: str) -> dict[str, Any] | None:
 
 def _real_detect_background_voices(session_id: str, audio_url: str | None = None) -> BackgroundVoiceResult | None:
     """Detect background voices using pyannote speaker diarisation."""
+    audio_path = session_id
     import tempfile
     import urllib.request
 
@@ -249,7 +252,7 @@ def _real_detect_suspicious(session_id: str) -> SuspiciousPatternResult | None:
     """Use an LLM to detect suspicious conversation patterns."""
     try:
         from workers.ai_client import chat_completion
-        result = _real_transcribe(session_id)
+        result = _real_transcribe(session_id, audio_url=None)
         text = result.get("text", "") if result else ""
         if not text:
             return None
@@ -341,7 +344,7 @@ def transcribe_speech(session_id: str) -> dict[str, Any]:
     """Convert speech to text — real Whisper with seeded stub fallback."""
     logger.info(f"Transcribing audio for session {session_id}")
 
-    real = _real_transcribe(session_id)
+    real = _real_transcribe(session_id, audio_url=None)
     if real is not None:
         return real
 

@@ -63,6 +63,8 @@ jobs:
         run: isort --check-only --profile black .
       - name: Ruff lint
         run: ruff check orchestrator workers monitoring database tests scripts routers retrieval
+      - name: Run DB migrations
+        run: alembic upgrade head
       - name: Pytest
         run: pytest tests/ --ignore=tests/test_e2e_smoke.py -v
 

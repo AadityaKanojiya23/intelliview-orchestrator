@@ -45,6 +45,12 @@ class LoadBalancer:
         self.worker_registry = WorkerRegistry()
         self.strategy = strategy
         self.round_robin_index = 0
+        self._wrr_weights_cache = {}
+        self._lock = Lock()
+        self._worker_cache = []
+        self._cache_timestamp = 0
+        self._cache_ttl = 5
+        self._registry_lookup_count = 0
 
         # Smooth Weighted Round Robin state — tracks the running
         # ``current_weight`` for each worker across scheduling calls.
@@ -54,6 +60,15 @@ class LoadBalancer:
         self._wrr_lock = Lock()
 
         logger.info(f"Load Balancer initialized with strategy: {strategy.value}")
+
+    def _get_cached_workers(self) -> list[dict[str, Any]]:
+        if isinstance(self._worker_cache, dict):
+            return list(self._worker_cache.values())
+        return list(self._worker_cache)
+
+    def is_system_overloaded(self) -> bool:
+        workers = self._get_cached_workers()
+        return bool(workers) and all(getattr(w, "load", w.get("load", 1.0) if isinstance(w, dict) else 1.0) >= 1.0 for w in workers)
 
     def select_worker(self) -> dict[str, Any] | None:
         """
@@ -244,14 +259,14 @@ class LoadBalancer:
         )
         return best
 
-    def get_best_worker_for_priority(self, priority: str) -> dict[str, Any] | None:
+    def _get_cached_workers(self) -> list[dict[str, Any]]:
         """
         Return cached workers if cache is still valid.
         """
         current_time = time.time()
 
         if (
-            self._worker_cache is None
+            not self._worker_cache
             or current_time - self._cache_timestamp > self._cache_ttl
         ):
             self._registry_lookup_count += 1
@@ -262,7 +277,12 @@ class LoadBalancer:
             self._worker_cache = self.worker_registry.get_available_workers()
             self._cache_timestamp = current_time
 
-        return self._worker_cache
+        return list(self._worker_cache.values()) if isinstance(self._worker_cache, dict) else list(self._worker_cache)
+
+    def is_system_overloaded(self) -> bool:
+        """Preserve previous contract for tests."""
+        workers = self._get_cached_workers()
+        return bool(workers) and all(w.get("load", w.get("active_tasks", 1.0)) >= 1.0 for w in workers)
 
     def get_load_status(self) -> dict[str, Any]:
         """

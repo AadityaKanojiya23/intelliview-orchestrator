@@ -18,6 +18,7 @@ import logging
 import re
 from typing import Any
 
+from workers.semantic_similarity import calculate_semantic_similarity
 logger = logging.getLogger(__name__)
 
 
@@ -503,12 +504,8 @@ def _llm_generate_question(
 
         question = response.strip()
         is_valid, reasons = validate_generated_question(question)
-        if not is_valid:
-            logger.warning(
-                "LLM-generated question rejected for session %s. Reasons: %s",
-                session_id,
-                "; ".join(reasons),
-            )
+        if not question or not is_valid:
+            logger.warning("Invalid LLM-generated question: %s", question)
             return None
 
         return question

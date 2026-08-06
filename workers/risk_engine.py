@@ -181,6 +181,20 @@ class RiskScoringEngine:
         return final_risk
 
     @classmethod
+    def classify(cls, video: dict, audio: dict, evaluation: dict) -> str:
+        """Compatibility method for tests."""
+        video_risk = cls.calculate_video_risk(video)
+        audio_risk = cls.calculate_audio_risk(audio)
+        evaluation_risk = cls.calculate_evaluation_risk(evaluation)
+        final_risk = cls.calculate_final_risk(video_risk, audio_risk, evaluation_risk)
+        
+        risk_classification = cls.classify_risk(final_risk)
+        override = RiskOverrideEngine.evaluate(video, audio, evaluation)
+        if override is not None:
+            return override
+        return risk_classification
+
+    @classmethod
     def classify_risk(cls, risk_score: float) -> str:
         """Classify risk level based on score."""
         low, med, high = cls.get_thresholds()
@@ -191,6 +205,11 @@ class RiskScoringEngine:
         if risk_score < high:
             return "HIGH"
         return "CRITICAL"
+
+    @classmethod
+    def classify(cls, video: dict = None, audio: dict = None, evaluation: dict = None) -> str:
+        score = cls.calculate_final_risk(video, audio, evaluation)
+        return cls.classify_risk(score)
 
     @staticmethod
     def generate_risk_report(
