@@ -16,7 +16,6 @@ import json
 import logging
 import re
 import time
-import time as _time
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
@@ -72,6 +71,7 @@ from routers.sessions import (  # noqa: F401 (re-exported for tests)
 )
 from routers.templates import create_template_routes
 from routers.workers import create_worker_routes
+from routers.metrics import router as metrics_router
 
 # Configure logging after imports so startup messages are structured.
 configure_logging()
@@ -98,11 +98,6 @@ async def lifespan(app: FastAPI):
 
     subscribers = list_subscribers()
     logger.info("Loaded %d webhook subscribers", len(subscribers))
-    if API_TOKEN == "dev-token-change-me":
-        raise RuntimeError(
-            "CRITICAL SECURITY ERROR: Default API_TOKEN detected! "
-            "You MUST set a secure API_TOKEN environment variable."
-        )
 
     logger.info("AI Interview Orchestrator server starting...")
 
@@ -214,11 +209,11 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         request_id = incoming if _VALID_ID_RE.match(incoming) else uuid4().hex
         request.state.request_id = request_id
         trace.get_current_span().set_attribute("request_id", request_id)
-        start = _time.perf_counter()
+        start = time.perf_counter()
         try:
             response = await call_next(request)
         except Exception:
-            elapsed_ms = (_time.perf_counter() - start) * 1000
+            elapsed_ms = (time.perf_counter() - start) * 1000
             log_event(
                 logger,
                 logging.ERROR,
@@ -229,7 +224,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             )
             logger.debug("traceback", exc_info=True)
             raise
-        elapsed_ms = (_time.perf_counter() - start) * 1000
+        elapsed_ms = (time.perf_counter() - start) * 1000
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Response-Time-ms"] = f"{elapsed_ms:.1f}"
         log_event(
@@ -335,21 +330,7 @@ app.include_router(
 )
 app.include_router(risk_configs_router)
 
-from fastapi import Request
-
-
-@app.post("/metrics/web-vitals")
-async def receive_web_vitals(request: Request):
-    """Receive Web Vitals metrics from the frontend."""
-    try:
-        metric = await request.json()
-        logger.info(f"Web Vitals: {metric}")
-        return {"status": "success", "message": "Web Vitals received"}
-    except Exception as e:
-        logger.error(f"Error receiving Web Vitals: {e!s}")
-        raise HTTPException(
-            status_code=500, detail=f"Error receiving Web Vitals: {e!s}"
-        )
+app.include_router(metrics_router)
 
 
 if __name__ == "__main__":

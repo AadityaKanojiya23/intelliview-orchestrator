@@ -732,6 +732,7 @@ def create_session_routes(
     @router.get("/interviews")
     async def list_interviews(
         limit: int = 100,
+        offset: int = 0,
         status: str | None = None,
         session_db: Session = Depends(get_db),
     ):
@@ -744,7 +745,7 @@ def create_session_routes(
         if status:
             stmt = stmt.where(InterviewSession.status == status.upper())
 
-        stmt = stmt.order_by(InterviewSession.created_at.desc().nullslast()).limit(
+        stmt = stmt.order_by(InterviewSession.created_at.desc().nullslast()).offset(offset).limit(
             limit
         )
         rows = session_db.execute(stmt).scalars().all()

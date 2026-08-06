@@ -26,116 +26,100 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------# Override via environment variables (prefix RISK_), e.g.
 # ----------------------------------
 
-RISK_CONFIG: dict[str, float] = {
-    # Pipeline weights (must sum to 1.0)
-    "video_weight": float(os.getenv("RISK_VIDEO_WEIGHT", "0.4")),
-    "audio_weight": float(os.getenv("RISK_AUDIO_WEIGHT", "0.3")),
-    "evaluation_weight": float(os.getenv("RISK_EVALUATION_WEIGHT", "0.3")),
-    # Thresholds
-    "low_risk_threshold": float(os.getenv("RISK_LOW_RISK_THRESHOLD", "0.3")),
-    "medium_risk_threshold": float(os.getenv("RISK_MEDIUM_RISK_THRESHOLD", "0.6")),
-    "high_risk_threshold": float(os.getenv("RISK_HIGH_RISK_THRESHOLD", "0.8")),
-    # Video factors
-    "video_multiple_persons": float(os.getenv("RISK_VIDEO_MULTIPLE_PERSONS", "0.35")),
-    "video_phone_detected": float(os.getenv("RISK_VIDEO_PHONE_DETECTED", "0.25")),
-    "video_suspicious_head_movement": float(
-        os.getenv("RISK_VIDEO_SUSPICIOUS_HEAD", "0.20")
-    ),
-    "video_no_face_detected": float(os.getenv("RISK_VIDEO_NO_FACE", "0.45")),
-    # Audio factors
-    "audio_background_voices": float(os.getenv("RISK_AUDIO_BACKGROUND_VOICES", "0.35")),
-    "audio_suspicious_pattern": float(
-        os.getenv("RISK_AUDIO_SUSPICIOUS_PATTERN", "0.25")
-    ),
-    "audio_no_transcription": float(os.getenv("RISK_AUDIO_NO_TRANSCRIPTION", "0.40")),
-    # Evaluation factors
-    "eval_low_quality": float(os.getenv("RISK_EVAL_LOW_QUALITY", "0.30")),
-    "eval_low_accuracy": float(os.getenv("RISK_EVAL_LOW_ACCURACY", "0.40")),
-    "eval_poor_communication": float(os.getenv("RISK_EVAL_POOR_COMMUNICATION", "0.20")),
-    "eval_hallucination": float(os.getenv("RISK_EVAL_HALLUCINATION", "0.30")),
-}
-
-
 class RiskScoringEngine:
     """
     Calculates comprehensive risk scores from interview analysis results.
-    All numeric constants read from RISK_CONFIG.
+    Reads numeric constants dynamically from environment variables.
     """
 
-    # Pipeline weights
-    VIDEO_WEIGHT = RISK_CONFIG["video_weight"]
-    AUDIO_WEIGHT = RISK_CONFIG["audio_weight"]
-    EVALUATION_WEIGHT = RISK_CONFIG["evaluation_weight"]
+    @classmethod
+    def get_pipeline_weights(cls) -> tuple[float, float, float]:
+        return (
+            float(os.getenv("RISK_VIDEO_WEIGHT", "0.4")),
+            float(os.getenv("RISK_AUDIO_WEIGHT", "0.3")),
+            float(os.getenv("RISK_EVALUATION_WEIGHT", "0.3")),
+        )
 
-    # Risk thresholds
-    LOW_RISK_THRESHOLD = RISK_CONFIG["low_risk_threshold"]
-    MEDIUM_RISK_THRESHOLD = RISK_CONFIG["medium_risk_threshold"]
-    HIGH_RISK_THRESHOLD = RISK_CONFIG["high_risk_threshold"]
+    @classmethod
+    def get_thresholds(cls) -> tuple[float, float, float]:
+        return (
+            float(os.getenv("RISK_LOW_RISK_THRESHOLD", "0.3")),
+            float(os.getenv("RISK_MEDIUM_RISK_THRESHOLD", "0.6")),
+            float(os.getenv("RISK_HIGH_RISK_THRESHOLD", "0.8")),
+        )
 
-    # Factor weights
-    VIDEO_FACTORS = {
-        "multiple_persons": RISK_CONFIG["video_multiple_persons"],
-        "phone_detected": RISK_CONFIG["video_phone_detected"],
-        "suspicious_head_movement": RISK_CONFIG["video_suspicious_head_movement"],
-        "no_face_detected": RISK_CONFIG["video_no_face_detected"],
-    }
+    @classmethod
+    def get_video_factors(cls) -> dict[str, float]:
+        return {
+            "multiple_persons": float(os.getenv("RISK_VIDEO_MULTIPLE_PERSONS", "0.35")),
+            "phone_detected": float(os.getenv("RISK_VIDEO_PHONE_DETECTED", "0.25")),
+            "suspicious_head_movement": float(os.getenv("RISK_VIDEO_SUSPICIOUS_HEAD", "0.20")),
+            "no_face_detected": float(os.getenv("RISK_VIDEO_NO_FACE", "0.45")),
+        }
 
-    AUDIO_FACTORS = {
-        "background_voices": RISK_CONFIG["audio_background_voices"],
-        "suspicious_pattern": RISK_CONFIG["audio_suspicious_pattern"],
-        "no_transcription": RISK_CONFIG["audio_no_transcription"],
-    }
+    @classmethod
+    def get_audio_factors(cls) -> dict[str, float]:
+        return {
+            "background_voices": float(os.getenv("RISK_AUDIO_BACKGROUND_VOICES", "0.35")),
+            "suspicious_pattern": float(os.getenv("RISK_AUDIO_SUSPICIOUS_PATTERN", "0.25")),
+            "no_transcription": float(os.getenv("RISK_AUDIO_NO_TRANSCRIPTION", "0.40")),
+        }
 
-    EVALUATION_FACTORS = {
-        "low_quality_answers": RISK_CONFIG["eval_low_quality"],
-        "low_accuracy": RISK_CONFIG["eval_low_accuracy"],
-        "poor_communication": RISK_CONFIG["eval_poor_communication"],
-        "hallucination": RISK_CONFIG["eval_hallucination"],
-    }
+    @classmethod
+    def get_evaluation_factors(cls) -> dict[str, float]:
+        return {
+            "low_quality_answers": float(os.getenv("RISK_EVAL_LOW_QUALITY", "0.30")),
+            "low_accuracy": float(os.getenv("RISK_EVAL_LOW_ACCURACY", "0.40")),
+            "poor_communication": float(os.getenv("RISK_EVAL_POOR_COMMUNICATION", "0.20")),
+            "hallucination": float(os.getenv("RISK_EVAL_HALLUCINATION", "0.30")),
+        }
 
-    @staticmethod
-    def calculate_video_risk(video_result: dict[str, Any]) -> float:
+    @classmethod
+    def calculate_video_risk(cls, video_result: dict[str, Any]) -> float:
         """Calculate risk score from video analysis."""
         risk_score = 0.0
+        factors = cls.get_video_factors()
 
         if video_result.get("multiple_persons", {}).get("multiple_persons_detected"):
-            risk_score += RiskScoringEngine.VIDEO_FACTORS["multiple_persons"]
+            risk_score += factors["multiple_persons"]
 
         if video_result.get("phone_detected", {}).get("phone_detected"):
-            risk_score += RiskScoringEngine.VIDEO_FACTORS["phone_detected"]
+            risk_score += factors["phone_detected"]
 
         if video_result.get("head_movement_suspicious", {}).get(
             "suspicious_movement_detected"
         ):
-            risk_score += RiskScoringEngine.VIDEO_FACTORS["suspicious_head_movement"]
+            risk_score += factors["suspicious_head_movement"]
 
         if not video_result.get("face_detected", {}).get("faces_found"):
-            risk_score += RiskScoringEngine.VIDEO_FACTORS["no_face_detected"]
+            risk_score += factors["no_face_detected"]
 
         return min(risk_score, 1.0)
 
-    @staticmethod
-    def calculate_audio_risk(audio_result: dict[str, Any]) -> float:
+    @classmethod
+    def calculate_audio_risk(cls, audio_result: dict[str, Any]) -> float:
         """Calculate risk score from audio analysis."""
         risk_score = 0.0
+        factors = cls.get_audio_factors()
 
         if audio_result.get("background_voices", {}).get("background_voices_detected"):
-            risk_score += RiskScoringEngine.AUDIO_FACTORS["background_voices"]
+            risk_score += factors["background_voices"]
 
         if audio_result.get("suspicious_conversation", {}).get(
             "suspicious_pattern_detected"
         ):
-            risk_score += RiskScoringEngine.AUDIO_FACTORS["suspicious_pattern"]
+            risk_score += factors["suspicious_pattern"]
 
         if not audio_result.get("transcription", {}).get("text"):
-            risk_score += RiskScoringEngine.AUDIO_FACTORS["no_transcription"]
+            risk_score += factors["no_transcription"]
 
         return min(risk_score, 1.0)
 
-    @staticmethod
-    def calculate_evaluation_risk(evaluation_result: dict[str, Any]) -> float:
+    @classmethod
+    def calculate_evaluation_risk(cls, evaluation_result: dict[str, Any]) -> float:
         """Calculate risk score from answer evaluation."""
         risk_score = 0.0
+        factors = cls.get_evaluation_factors()
 
         quality_score = evaluation_result.get("answer_quality_score", {}).get(
             "overall_quality_score", 50
@@ -151,25 +135,26 @@ class RiskScoringEngine:
         )
 
         if quality_score < 40:
-            risk_score += RiskScoringEngine.EVALUATION_FACTORS["low_quality_answers"]
+            risk_score += factors["low_quality_answers"]
         if accuracy_score < 40:
-            risk_score += RiskScoringEngine.EVALUATION_FACTORS["low_accuracy"]
+            risk_score += factors["low_accuracy"]
         if clarity_score < 40:
-            risk_score += RiskScoringEngine.EVALUATION_FACTORS["poor_communication"]
+            risk_score += factors["poor_communication"]
         if hallucination_flagged:
-            risk_score += RiskScoringEngine.EVALUATION_FACTORS["hallucination"]
+            risk_score += factors["hallucination"]
 
         return min(risk_score, 1.0)
 
-    @staticmethod
+    @classmethod
     def calculate_final_risk(
-        video_risk: float, audio_risk: float, evaluation_risk: float
+        cls, video_risk: float, audio_risk: float, evaluation_risk: float
     ) -> float:
         """Calculate final combined risk score using weighted average."""
+        video_weight, audio_weight, eval_weight = cls.get_pipeline_weights()
         final_risk = (
-            RiskScoringEngine.VIDEO_WEIGHT * video_risk
-            + RiskScoringEngine.AUDIO_WEIGHT * audio_risk
-            + RiskScoringEngine.EVALUATION_WEIGHT * evaluation_risk
+            video_weight * video_risk
+            + audio_weight * audio_risk
+            + eval_weight * evaluation_risk
         )
         return round(min(max(final_risk, 0.0), 1.0), 3)
 
@@ -186,14 +171,15 @@ class RiskScoringEngine:
             return max(final_risk, 0.6)
         return final_risk
 
-    @staticmethod
-    def classify_risk(risk_score: float) -> str:
+    @classmethod
+    def classify_risk(cls, risk_score: float) -> str:
         """Classify risk level based on score."""
-        if risk_score < RiskScoringEngine.LOW_RISK_THRESHOLD:
+        low, med, high = cls.get_thresholds()
+        if risk_score < low:
             return "LOW"
-        if risk_score < RiskScoringEngine.MEDIUM_RISK_THRESHOLD:
+        if risk_score < med:
             return "MEDIUM"
-        if risk_score < RiskScoringEngine.HIGH_RISK_THRESHOLD:
+        if risk_score < high:
             return "HIGH"
         return "CRITICAL"
 

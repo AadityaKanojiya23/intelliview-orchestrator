@@ -97,6 +97,23 @@ class SessionManager:
         """
         session_db = SessionLocal()
         try:
+            from database.models import Candidate
+            # Ensure candidate exists to prevent foreign key violations
+            candidate = session_db.execute(
+                select(Candidate).where(Candidate.candidate_id == candidate_id)
+            ).scalar_one_or_none()
+            
+            if not candidate:
+                logger.info(f"Auto-creating missing candidate: {candidate_id}")
+                new_candidate = Candidate(
+                    candidate_id=candidate_id,
+                    name=candidate_name or f"Candidate {candidate_id}",
+                    email=f"{candidate_id}@placeholder.local"
+                )
+                session_db.add(new_candidate)
+                # Flush to ensure candidate_id is available for foreign key check
+                session_db.flush()
+
             # Generate collision-safe unique session ID
             session_id = f"session_{uuid.uuid4().hex[:16]}"
 

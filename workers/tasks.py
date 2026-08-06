@@ -180,6 +180,9 @@ def _after_parallel(self, session_id: str, video_result: dict, audio_result: dic
                 interview.end_time = now
                 interview.updated_at = now
                 db_session.commit()
+        except Exception:
+            db_session.rollback()
+            raise
         finally:
             db_session.close()
 
@@ -240,7 +243,9 @@ def process_interview_session(self, session_id):
             if interview.status == "FAILED":
                 interview.status = "QUEUED"
                 db_session.commit()
-
+        except Exception:
+            db_session.rollback()
+            raise
         finally:
             db_session.close()
 
@@ -248,19 +253,19 @@ def process_interview_session(self, session_id):
         # and started recently, this is a duplicate delivery from a lost
         # worker - skip it.
         if interview and interview.status == session_manager.VIDEO_PROCESSING:
-            if (
-                interview.start_time
-                and (datetime.now(timezone.utc) - interview.start_time).total_seconds()
-                < 1800
-            ):
-                logger.info(
-                    "Skipping duplicate delivery for session %s (already processing)",
-                    session_id,
-                )
-                return {
-                    "session_id": session_id,
-                    "status": "skipped_duplicate_delivery",
-                }
+            if interview.start_time:
+                start_time = interview.start_time
+                if start_time.tzinfo is None:
+                    start_time = start_time.replace(tzinfo=timezone.utc)
+                if (datetime.now(timezone.utc) - start_time).total_seconds() < 1800:
+                    logger.info(
+                        "Skipping duplicate delivery for session %s (already processing)",
+                        session_id,
+                    )
+                    return {
+                        "session_id": session_id,
+                        "status": "skipped_duplicate_delivery",
+                    }
 
         session_manager.update_session_status(
             session_id,
@@ -280,7 +285,9 @@ def process_interview_session(self, session_id):
                 interview.assigned_node = worker_hostname
                 interview.start_time = datetime.now(timezone.utc)
                 db_session.commit()
-
+        except Exception:
+            db_session.rollback()
+            raise
         finally:
             db_session.close()
 

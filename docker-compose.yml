@@ -59,8 +59,8 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ai_interview_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
-      API_TOKEN: "${API_TOKEN}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+      API_TOKEN: "${API_TOKEN:-dev-token-change-me}"
       CORS_ALLOW_ORIGINS: "${CORS_ALLOW_ORIGINS:-*}"
       ENABLE_PROMETHEUS: "${ENABLE_PROMETHEUS:-true}"
       AUDIT_LOG_FILE: "${AUDIT_LOG_FILE:-}"
@@ -97,9 +97,9 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ai_interview_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
       API_URL: "http://fastapi:8000"
-      API_TOKEN: "${API_TOKEN}"
+      API_TOKEN: "${API_TOKEN:-dev-token-change-me}"
       WORKER_CONCURRENCY: "4"
       WORKER_ID: "${WORKER_ID:-worker-1}"
       CV_SERVICE_URL: "http://cv-service:8001"
@@ -161,7 +161,7 @@ services:
       - "5555:5555"
     environment:
       REDIS_URL: "redis://redis:6379/0"
-      API_TOKEN: "${API_TOKEN}"
+      API_TOKEN: "${API_TOKEN:-dev-token-change-me}"
       PYTHONPATH: "/app"
     depends_on:
       redis:

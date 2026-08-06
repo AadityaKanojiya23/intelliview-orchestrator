@@ -78,8 +78,8 @@ class InterviewSession(Base):
     )
 
     assigned_node = Column(String(255), nullable=True)
-    start_time = Column(DateTime, nullable=True, default=utcnow)
-    end_time = Column(DateTime, nullable=True)
+    start_time = Column(DateTime(timezone=True), nullable=True, default=utcnow)
+    end_time = Column(DateTime(timezone=True), nullable=True)
 
     risk_score = Column(Float, nullable=True)
 
@@ -105,9 +105,9 @@ class InterviewSession(Base):
         index=True,
     )
 
-    created_at = Column(DateTime, nullable=False, default=utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
     updated_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         default=utcnow,
         onupdate=utcnow,
@@ -144,8 +144,8 @@ class Question(Base):
     usage_count = Column(Integer, nullable=False, default=0, index=True)
     avg_score = Column(Float, nullable=True, index=True)
 
-    created_at = Column(DateTime, nullable=False, default=utcnow)
-    updated_at = Column(DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
     def __repr__(self):
         return (
@@ -172,9 +172,9 @@ class Candidate(Base):
     avg_score = Column(Float, nullable=True, index=True)
     total_interviews = Column(Integer, nullable=False, default=0, index=True)
 
-    created_at = Column(DateTime, nullable=False, default=utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
     updated_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         default=utcnow,
         onupdate=utcnow,
@@ -205,9 +205,9 @@ class InterviewTemplate(Base):
     usage_count = Column(Integer, nullable=False, default=0, index=True)
     success_rate = Column(Float, nullable=True, index=True)
 
-    created_at = Column(DateTime, nullable=False, default=utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
     updated_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         default=utcnow,
         onupdate=utcnow,

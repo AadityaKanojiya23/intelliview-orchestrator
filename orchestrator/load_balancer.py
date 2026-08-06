@@ -263,3 +263,21 @@ class LoadBalancer:
             self._cache_timestamp = current_time
 
         return self._worker_cache
+
+    def get_load_status(self) -> dict[str, Any]:
+        """
+        Get current load and worker status
+        """
+        stats = self.worker_registry.get_worker_statistics()
+        available = self.worker_registry.get_available_workers()
+        
+        is_overloaded = False
+        if stats["total_capacity"] > 0:
+            is_overloaded = stats["capacity_utilization"] >= 80.0
+            
+        return {
+            "worker_stats": stats,
+            "available_workers": len(available),
+            "system_overloaded": is_overloaded,
+            "recommended_strategy": BalancingStrategy.LEAST_LOADED.value
+        }

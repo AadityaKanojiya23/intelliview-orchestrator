@@ -150,6 +150,11 @@ class Settings(BaseSettings):
 
         if not self.api_token.strip():
             errors.append("API_TOKEN is required.")
+        elif self.api_token == "dev-token-change-me":
+            raise RuntimeError(
+                "CRITICAL SECURITY ERROR: Default API_TOKEN detected! "
+                "You MUST set a secure API_TOKEN environment variable."
+            )
 
         if self.worker_concurrency <= 0:
             errors.append("WORKER_CONCURRENCY must be greater than 0.")

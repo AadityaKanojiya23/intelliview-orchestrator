@@ -278,14 +278,9 @@ class HealthMonitor:
                 result = conn.execute(__import__("sqlalchemy").text("SELECT 1 AS ok"))
                 row = result.fetchone()
                 dep.healthy = row is not None and row[0] == 1
-
-                # Mark PostgreSQL as healthy in Prometheus
-                POSTGRES_HEALTH.set(1)
             dep.latency_ms = (time.monotonic() - start) * 1000
             dep.last_check = datetime.now(timezone.utc).isoformat()
         except Exception as exc:
-            # Mark PostgreSQL as unhealthy in Prometheus
-            POSTGRES_HEALTH.set(0)
             dep.healthy = False
             dep.error = str(exc)
             dep.latency_ms = (time.monotonic() - start) * 1000
@@ -495,8 +490,6 @@ class HealthMonitor:
                 self.redis_client.llen("celery_queue") if self.redis_client else 0
             )
 
-            # Update current Celery queue depth
-            QUEUE_DEPTH.set(queue_length)
             status = HealthStatus.HEALTHY
             if queue_length > self.queue_threshold:
                 status = HealthStatus.CRITICAL
@@ -529,8 +522,6 @@ class HealthMonitor:
 
             self.redis_client.ping()
 
-            # Mark Redis as healthy in Prometheus
-            REDIS_HEALTH.set(1)
             # Get Redis server information
             info = self.redis_client.info()
 
@@ -558,8 +549,6 @@ class HealthMonitor:
             }
 
         except Exception as e:
-            # Mark Redis as unhealthy in Prometheus
-            REDIS_HEALTH.set(0)
             logger.error("Error checking Redis health: %s", e)
             return {"status": HealthStatus.UNHEALTHY, "error": str(e)}
 

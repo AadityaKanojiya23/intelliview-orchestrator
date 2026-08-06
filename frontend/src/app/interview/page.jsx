@@ -217,7 +217,7 @@ export default function InterviewPage() {
           </Card>
 
           <Card title="Audio Visualization">
-            <div className="flex items-end gap-[2px] h-16">
+            <div className="relative flex items-end gap-[2px] h-16 overflow-hidden">
               {audioLevels.map((level, i) => (
                 <div
                   key={i}

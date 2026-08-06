@@ -190,31 +190,48 @@ def _real_detect_multiple_persons(session_id: str) -> dict[str, Any] | None:
 def run_video_analysis(session_id: str) -> dict[str, Any]:
     """
     Execute video analysis pipeline for an interview session.
-
-    Args:
-        session_id: Unique interview session identifier.
-
-    Returns:
-        dict: Analysis results including detection findings and risk scores.
+    Delegates to the external CV microservice if configured.
     """
     logger.info(f"Starting video analysis for session {session_id}")
 
-    face = detect_face(session_id)
-    head = detect_suspicious_head_movement(session_id)
-    phone = detect_mobile_phone(session_id)
-    multi = detect_multiple_persons(session_id)
+    import os
+    import requests
+    from workers.risk_engine import RiskScoringEngine
 
-    results = {
-        "session_id": session_id,
-        "face_detected": face,
-        "head_movement_suspicious": head,
-        "phone_detected": phone,
-        "multiple_persons": multi,
-        "risk_score": 0.0,
-    }
+    cv_url = os.environ.get("CV_SERVICE_URL")
+    results = None
+    
+    if cv_url:
+        try:
+            logger.info("Forwarding video analysis to CV microservice at %s", cv_url)
+            response = requests.post(
+                f"{cv_url}/analyze-video",
+                json={"session_id": session_id},
+                timeout=30
+            )
+            response.raise_for_status()
+            results = response.json()
+        except Exception as exc:
+            logger.warning("CV microservice failed: %s, falling back to local/stubs", exc)
+            
+    if results is None:
+        face = detect_face(session_id)
+        head = detect_suspicious_head_movement(session_id)
+        phone = detect_mobile_phone(session_id)
+        multi = detect_multiple_persons(session_id)
 
+        results = {
+            "session_id": session_id,
+            "face_detected": face,
+            "head_movement_suspicious": head,
+            "phone_detected": phone,
+            "multiple_persons": multi,
+            "risk_score": 0.0,
+        }
+
+    # Recalculate risk score locally using the latest risk config
     results["risk_score"] = calculate_video_risk_score(results)
-    logger.info(f"Video analysis completed for session {session_id}: {results}")
+    logger.info(f"Video analysis completed for session {session_id}")
     return results
 
 
@@ -290,12 +307,14 @@ def calculate_video_risk_score(results: dict[str, Any]) -> float:
     from workers.risk_engine import RiskScoringEngine
 
     score = 0.0
+    factors = RiskScoringEngine.get_video_factors()
+    
     if results.get("multiple_persons", {}).get("multiple_persons_detected"):
-        score += RiskScoringEngine.VIDEO_FACTORS["multiple_persons"]
+        score += factors["multiple_persons"]
     if results.get("phone_detected", {}).get("phone_detected"):
-        score += RiskScoringEngine.VIDEO_FACTORS["phone_detected"]
+        score += factors["phone_detected"]
     if results.get("head_movement_suspicious", {}).get("suspicious_movement_detected"):
-        score += RiskScoringEngine.VIDEO_FACTORS["suspicious_head_movement"]
+        score += factors["suspicious_head_movement"]
     if not results.get("face_detected", {}).get("faces_found"):
-        score += RiskScoringEngine.VIDEO_FACTORS["no_face_detected"]
+        score += factors["no_face_detected"]
     return round(min(score, 1.0), 3)

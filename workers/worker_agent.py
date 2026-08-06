@@ -47,6 +47,7 @@ class WorkerAgent:
             os.getenv("MAX_TASKS_BEFORE_RESTART", "100")
         )  # restart limit
         self._restart_requested = False  # restart flag
+        self.draining = False
 
         self._stop = False
         self._headers = {
@@ -134,6 +135,7 @@ class WorkerAgent:
                     "active_tasks": reported_active_tasks,
                 },
             )
+            time.sleep(self.heartbeat_interval)
 
     def _handle_shutdown(self, signum, frame) -> None:
         logger.info(
@@ -141,6 +143,9 @@ class WorkerAgent:
         )
         self._stop = True
         self.deregister()
+
+    def enter_drain_mode(self) -> None:
+        self.draining = True
 
     def start(self) -> None:
         signal.signal(signal.SIGTERM, self._handle_shutdown)
