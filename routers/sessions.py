@@ -745,8 +745,10 @@ def create_session_routes(
         if status:
             stmt = stmt.where(InterviewSession.status == status.upper())
 
-        stmt = stmt.order_by(InterviewSession.created_at.desc().nullslast()).offset(offset).limit(
-            limit
+        stmt = (
+            stmt.order_by(InterviewSession.created_at.desc().nullslast())
+            .offset(offset)
+            .limit(limit)
         )
         rows = session_db.execute(stmt).scalars().all()
         return {

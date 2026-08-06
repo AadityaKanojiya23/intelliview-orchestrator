@@ -709,7 +709,9 @@ def calculate_evaluation_risk_score(results: dict[str, Any]) -> float:
     from workers.risk_engine import RiskScoringEngine
 
     # Fallback default values
-    quality = results.get("answer_quality_score", {}).get("overall_quality_score", 50) / 100.0
+    quality = (
+        results.get("answer_quality_score", {}).get("overall_quality_score", 50) / 100.0
+    )
     accuracy = results.get("technical_accuracy", {}).get("accuracy_score", 50) / 100.0
     clarity = results.get("communication_clarity", {}).get("clarity_score", 50) / 100.0
     hallucination_score = (
@@ -717,7 +719,7 @@ def calculate_evaluation_risk_score(results: dict[str, Any]) -> float:
     )
 
     factors = RiskScoringEngine.get_evaluation_factors()
-    
+
     quality_risk = (1 - quality) * factors["low_quality_answers"]
     accuracy_risk = (1 - accuracy) * factors["low_accuracy"]
     clarity_risk = (1 - clarity) * factors["poor_communication"]

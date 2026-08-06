@@ -29,7 +29,7 @@ def get_current_user(
         # Fall back to checking if the bearer token is actually the raw API token
         if token == API_TOKEN:
             return {"role": "admin"}
-        
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",

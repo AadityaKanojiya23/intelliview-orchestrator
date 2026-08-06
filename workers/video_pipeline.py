@@ -200,20 +200,20 @@ def run_video_analysis(session_id: str) -> dict[str, Any]:
 
     cv_url = os.environ.get("CV_SERVICE_URL")
     results = None
-    
+
     if cv_url:
         try:
             logger.info("Forwarding video analysis to CV microservice at %s", cv_url)
             response = requests.post(
-                f"{cv_url}/analyze-video",
-                json={"session_id": session_id},
-                timeout=30
+                f"{cv_url}/analyze-video", json={"session_id": session_id}, timeout=30
             )
             response.raise_for_status()
             results = response.json()
         except Exception as exc:
-            logger.warning("CV microservice failed: %s, falling back to local/stubs", exc)
-            
+            logger.warning(
+                "CV microservice failed: %s, falling back to local/stubs", exc
+            )
+
     if results is None:
         face = detect_face(session_id)
         head = detect_suspicious_head_movement(session_id)
@@ -308,7 +308,7 @@ def calculate_video_risk_score(results: dict[str, Any]) -> float:
 
     score = 0.0
     factors = RiskScoringEngine.get_video_factors()
-    
+
     if results.get("multiple_persons", {}).get("multiple_persons_detected"):
         score += factors["multiple_persons"]
     if results.get("phone_detected", {}).get("phone_detected"):

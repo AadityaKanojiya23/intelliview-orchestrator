@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------# Override via environment variables (prefix RISK_), e.g.
 # ----------------------------------
 
+
 class RiskScoringEngine:
     """
     Calculates comprehensive risk scores from interview analysis results.
@@ -53,15 +54,21 @@ class RiskScoringEngine:
         return {
             "multiple_persons": float(os.getenv("RISK_VIDEO_MULTIPLE_PERSONS", "0.35")),
             "phone_detected": float(os.getenv("RISK_VIDEO_PHONE_DETECTED", "0.25")),
-            "suspicious_head_movement": float(os.getenv("RISK_VIDEO_SUSPICIOUS_HEAD", "0.20")),
+            "suspicious_head_movement": float(
+                os.getenv("RISK_VIDEO_SUSPICIOUS_HEAD", "0.20")
+            ),
             "no_face_detected": float(os.getenv("RISK_VIDEO_NO_FACE", "0.45")),
         }
 
     @classmethod
     def get_audio_factors(cls) -> dict[str, float]:
         return {
-            "background_voices": float(os.getenv("RISK_AUDIO_BACKGROUND_VOICES", "0.35")),
-            "suspicious_pattern": float(os.getenv("RISK_AUDIO_SUSPICIOUS_PATTERN", "0.25")),
+            "background_voices": float(
+                os.getenv("RISK_AUDIO_BACKGROUND_VOICES", "0.35")
+            ),
+            "suspicious_pattern": float(
+                os.getenv("RISK_AUDIO_SUSPICIOUS_PATTERN", "0.25")
+            ),
             "no_transcription": float(os.getenv("RISK_AUDIO_NO_TRANSCRIPTION", "0.40")),
         }
 
@@ -70,7 +77,9 @@ class RiskScoringEngine:
         return {
             "low_quality_answers": float(os.getenv("RISK_EVAL_LOW_QUALITY", "0.30")),
             "low_accuracy": float(os.getenv("RISK_EVAL_LOW_ACCURACY", "0.40")),
-            "poor_communication": float(os.getenv("RISK_EVAL_POOR_COMMUNICATION", "0.20")),
+            "poor_communication": float(
+                os.getenv("RISK_EVAL_POOR_COMMUNICATION", "0.20")
+            ),
             "hallucination": float(os.getenv("RISK_EVAL_HALLUCINATION", "0.30")),
         }
 

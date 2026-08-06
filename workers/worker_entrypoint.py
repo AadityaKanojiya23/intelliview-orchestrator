@@ -8,7 +8,12 @@ import os
 import sys
 import threading
 
-from celery.signals import task_postrun, task_prerun, worker_shutdown, worker_shutting_down
+from celery.signals import (
+    task_postrun,
+    task_prerun,
+    worker_shutdown,
+    worker_shutting_down,
+)
 
 from config import WORKER_CONCURRENCY
 from workers.celery_app import celery_app

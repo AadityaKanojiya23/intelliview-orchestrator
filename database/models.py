@@ -145,7 +145,9 @@ class Question(Base):
     avg_score = Column(Float, nullable=True, index=True)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+    updated_at = Column(
+        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
+    )
 
     def __repr__(self):
         return (
