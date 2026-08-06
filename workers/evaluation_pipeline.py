@@ -19,6 +19,7 @@ import re
 from typing import Any
 
 from workers.semantic_similarity import calculate_semantic_similarity
+
 logger = logging.getLogger(__name__)
 
 

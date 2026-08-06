@@ -57,6 +57,7 @@ def postgres_container():
         os.environ["POSTGRES_PASSWORD"] = postgres.password
         os.environ["DATABASE_URL"] = postgres.get_connection_url()
         from database.db import Base, engine
+
         Base.metadata.create_all(bind=engine)
         yield postgres
 

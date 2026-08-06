@@ -187,7 +187,7 @@ class RiskScoringEngine:
         audio_risk = cls.calculate_audio_risk(audio)
         evaluation_risk = cls.calculate_evaluation_risk(evaluation)
         final_risk = cls.calculate_final_risk(video_risk, audio_risk, evaluation_risk)
-        
+
         risk_classification = cls.classify_risk(final_risk)
         override = RiskOverrideEngine.evaluate(video, audio, evaluation)
         if override is not None:
@@ -207,7 +207,9 @@ class RiskScoringEngine:
         return "CRITICAL"
 
     @classmethod
-    def classify(cls, video: dict = None, audio: dict = None, evaluation: dict = None) -> str:
+    def classify(
+        cls, video: dict = None, audio: dict = None, evaluation: dict = None
+    ) -> str:
         score = cls.calculate_final_risk(video, audio, evaluation)
         return cls.classify_risk(score)
 

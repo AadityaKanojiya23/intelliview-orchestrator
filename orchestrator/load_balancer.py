@@ -68,7 +68,11 @@ class LoadBalancer:
 
     def is_system_overloaded(self) -> bool:
         workers = self._get_cached_workers()
-        return bool(workers) and all(getattr(w, "load", w.get("load", 1.0) if isinstance(w, dict) else 1.0) >= 1.0 for w in workers)
+        return bool(workers) and all(
+            getattr(w, "load", w.get("load", 1.0) if isinstance(w, dict) else 1.0)
+            >= 1.0
+            for w in workers
+        )
 
     def select_worker(self) -> dict[str, Any] | None:
         """
@@ -277,12 +281,18 @@ class LoadBalancer:
             self._worker_cache = self.worker_registry.get_available_workers()
             self._cache_timestamp = current_time
 
-        return list(self._worker_cache.values()) if isinstance(self._worker_cache, dict) else list(self._worker_cache)
+        return (
+            list(self._worker_cache.values())
+            if isinstance(self._worker_cache, dict)
+            else list(self._worker_cache)
+        )
 
     def is_system_overloaded(self) -> bool:
         """Preserve previous contract for tests."""
         workers = self._get_cached_workers()
-        return bool(workers) and all(w.get("load", w.get("active_tasks", 1.0)) >= 1.0 for w in workers)
+        return bool(workers) and all(
+            w.get("load", w.get("active_tasks", 1.0)) >= 1.0 for w in workers
+        )
 
     def get_load_status(self) -> dict[str, Any]:
         """
