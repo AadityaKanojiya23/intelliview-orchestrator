@@ -198,8 +198,6 @@ def run_video_analysis(session_id: str) -> dict[str, Any]:
 
     import requests
 
-    from workers.risk_engine import RiskScoringEngine
-
     cv_url = os.environ.get("CV_SERVICE_URL")
     results = None
 

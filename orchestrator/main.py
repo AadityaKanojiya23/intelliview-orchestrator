@@ -30,7 +30,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 
 from config import (
-    API_TOKEN,
     CORS_ALLOW_ORIGINS,
     MAX_REQUEST_BODY_BYTES,
     get_settings,
