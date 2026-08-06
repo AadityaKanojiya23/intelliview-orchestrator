@@ -95,7 +95,7 @@ def test_worker_register_requires_token(api_base_url):
     r = httpx.post(
         f"{api_base_url}/register-worker",
         json={"worker_id": "test-w", "capacity": 2},
-        headers={"X-API-Token": "dev-token-change-me"},
+        headers=API_HEADERS,
         timeout=5.0,
     )
     assert r.status_code == 200, r.text

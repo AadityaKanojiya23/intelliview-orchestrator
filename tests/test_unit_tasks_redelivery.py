@@ -88,18 +88,20 @@ def test_stale_active_session_is_recovered():
 
     with (
         patch.object(tasks, "SessionLocal", return_value=db_session),
+        patch.object(tasks, "chord") as fake_chord,
         patch.object(tasks, "group") as fake_group,
-        patch.object(tasks, "_after_parallel") as fake_after_parallel,
     ):
-        fake_group.return_value.apply_async.return_value = _FakeGroupResult(
-            "video_out", "audio_out"
-        )
+        fake_chord_obj = MagicMock()
+        fake_chord_callback = MagicMock()
+        fake_chord.return_value = fake_chord_obj
+        fake_chord_obj.return_value = fake_chord_callback
+        fake_chord_callback.apply_async.return_value = None
         result = tasks.process_interview_session.run("session-456")
 
     fake_group.assert_called_once()
-    fake_after_parallel.delay.assert_called_once_with(
-        "session-456", "video_out", "audio_out"
-    )
+    fake_chord.assert_called_once()
+    fake_chord_obj.assert_called_once()
+    fake_chord_callback.apply_async.assert_called_once()
     assert result["status"] == "processing_parallel"
 
 
@@ -109,16 +111,18 @@ def test_fresh_queued_session_dispatches_normally():
 
     with (
         patch.object(tasks, "SessionLocal", return_value=db_session),
+        patch.object(tasks, "chord") as fake_chord,
         patch.object(tasks, "group") as fake_group,
-        patch.object(tasks, "_after_parallel") as fake_after_parallel,
     ):
-        fake_group.return_value.apply_async.return_value = _FakeGroupResult(
-            "video_out", "audio_out"
-        )
+        fake_chord_obj = MagicMock()
+        fake_chord_callback = MagicMock()
+        fake_chord.return_value = fake_chord_obj
+        fake_chord_obj.return_value = fake_chord_callback
+        fake_chord_callback.apply_async.return_value = None
         result = tasks.process_interview_session.run("session-789")
 
     fake_group.assert_called_once()
-    fake_after_parallel.delay.assert_called_once_with(
-        "session-789", "video_out", "audio_out"
-    )
+    fake_chord.assert_called_once()
+    fake_chord_obj.assert_called_once()
+    fake_chord_callback.apply_async.assert_called_once()
     assert result["status"] == "processing_parallel"

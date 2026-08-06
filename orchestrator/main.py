@@ -14,6 +14,7 @@ Integrates:
 
 import json
 import logging
+import os
 import re
 import time
 from contextlib import asynccontextmanager
@@ -256,7 +257,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(RateLimiterMiddleware, limit=60, window_seconds=60)
+app.add_middleware(
+    RateLimiterMiddleware,
+    limit=int(os.getenv("RATE_LIMIT_PER_MINUTE", "60")),
+    window_seconds=60,
+)
 app.add_middleware(
     RequestValidationMiddleware,
     max_body_size_bytes=MAX_REQUEST_BODY_BYTES,
@@ -268,8 +273,8 @@ session_manager = SessionManager()
 session_tracker = SessionTracker()
 state_sync = StateSynchronizer()
 load_balancer = LoadBalancer(strategy=BalancingStrategy.LEAST_LOADED)
-scheduler = Scheduler(load_balancer=load_balancer)
 worker_registry = WorkerRegistry()
+scheduler = Scheduler(load_balancer=load_balancer, worker_registry=worker_registry)
 fault_manager = FaultManager()
 retry_manager = RetryManager(max_retries=3, strategy=RetryStrategy.EXPONENTIAL_BACKOFF)
 health_monitor = HealthMonitor()
