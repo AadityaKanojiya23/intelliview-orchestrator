@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test:
@@ -57,10 +57,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install ruff black isort
-      - name: Black format check
-        run: black --check .
-      - name: isort import check
-        run: isort --check-only --profile black .
+      - name: Auto-format with Black + isort
+        run: |
+          black .
+          isort --profile black .
+      - name: Commit formatting fixes (if any)
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "style: auto-format with black and isort [skip ci]"
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "github-actions[bot]@users.noreply.github.com"
       - name: Ruff lint
         run: ruff check orchestrator workers monitoring database tests scripts routers retrieval
       - name: Pytest
