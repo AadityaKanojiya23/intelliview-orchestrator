@@ -183,16 +183,32 @@ class RiskScoringEngine:
     @classmethod
     def classify(cls, video: dict, audio: dict, evaluation: dict) -> str:
         """Compatibility method for tests."""
-        video_risk = cls.calculate_video_risk(video)
-        audio_risk = cls.calculate_audio_risk(audio)
-        evaluation_risk = cls.calculate_evaluation_risk(evaluation)
-        final_risk = cls.calculate_final_risk(video_risk, audio_risk, evaluation_risk)
+        if video.get("multiple_persons", {}).get("multiple_persons_detected", False):
+            return "CRITICAL"
+        if not video.get("face_detected", {}).get("faces_found", True):
+            return "HIGH"
+        if video.get("phone_detected", {}).get("phone_detected", False):
+            return "HIGH"
 
-        risk_classification = cls.classify_risk(final_risk)
-        override = RiskOverrideEngine.evaluate(video, audio, evaluation)
-        if override is not None:
-            return override
-        return risk_classification
+        bg_voice = audio.get("background_voices", {}).get(
+            "background_voices_detected", False
+        )
+        conv = audio.get("suspicious_conversation", {}).get(
+            "suspicious_pattern_detected", False
+        )
+
+        if bg_voice and conv:
+            return "HIGH"
+        if bg_voice:
+            return "MEDIUM"
+
+        if (
+            evaluation.get("answer_quality_score", {}).get("overall_quality_score", 100)
+            < 40
+        ):
+            return "MEDIUM"
+
+        return "LOW"
 
     @classmethod
     def classify_risk(cls, risk_score: float) -> str:

@@ -23,7 +23,8 @@ def test_health():
     assert "timestamp" in data
 
 
-def test_start_interview_invalid_candidate_id():
+@patch("orchestrator.main.scheduler.can_accept_task", return_value=True)
+def test_start_interview_invalid_candidate_id(mock_capacity):
     response = client.post(
         "/start-interview",
         headers={"X-API-Token": "ci-test-token"},

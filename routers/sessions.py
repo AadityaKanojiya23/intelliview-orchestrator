@@ -260,26 +260,11 @@ def create_session_routes(
     ):
         """
         Start a new interview session using intelligent scheduling
-
-        Execution flow:
-        1. Create session in database (status: CREATED)
-        2. Cache session in Redis
-        3. Update status to QUEUED
-        4. Use Scheduler to intelligently assign to worker
-        5. Task pushed to Redis queue and/or assigned to specific worker
-
-        Args:
-            request: Interview session request with candidate details
-
-        Returns:
-            InterviewSessionResponse: Created session details with estimated wait time
-
-        Raises:
-            HTTPException: On creation failure
         """
+        if not re.match(r"^[A-Za-z0-9._-]+$", request.candidate_id):
+            raise HTTPException(status_code=422, detail="Invalid candidate_id")
+
         try:
-            if not re.match(r"^[A-Za-z0-9._-]+$", request.candidate_id):
-                raise HTTPException(status_code=422, detail="Invalid candidate_id")
 
             logger.info(
                 f"API: Creating interview session for candidate {request.candidate_id}"
