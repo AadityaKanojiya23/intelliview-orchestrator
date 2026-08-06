@@ -61,7 +61,6 @@ class LoadBalancer:
 
         logger.info(f"Load Balancer initialized with strategy: {strategy.value}")
 
-
     def select_worker(self) -> dict[str, Any] | None:
         """
         Select a worker for task execution based on current strategy

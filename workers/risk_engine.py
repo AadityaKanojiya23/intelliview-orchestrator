@@ -206,7 +206,6 @@ class RiskScoringEngine:
             return "HIGH"
         return "CRITICAL"
 
-
     @staticmethod
     def generate_risk_report(
         session_id: str,
