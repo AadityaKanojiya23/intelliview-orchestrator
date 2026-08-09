@@ -501,10 +501,9 @@ class WorkerRegistry:
         available = []
         with self.lock:
             for worker in self.local_workers.values():
-                if (
-                    worker["status"] == "healthy"
-                    and worker["active_tasks"] < worker["capacity"]
-                ):
+                if worker.get("status") == "healthy" and worker.get(
+                    "active_tasks", 0
+                ) < worker.get("capacity", 0):
                     available.append(worker)
 
         return available
