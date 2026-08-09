@@ -49,7 +49,7 @@ def test_start_interview_and_get_status(api_base_url):
     # The worker pool may take a few seconds to become available after startup.
     # Retry a few times before declaring failure.
     r = None
-    for attempt in range(5):
+    for _ in range(5):
         r = httpx.post(
             f"{api_base_url}/start-interview",
             headers=API_HEADERS,
@@ -113,7 +113,7 @@ def test_full_pipeline_completes(api_base_url):
     """End-to-end: start an interview, wait for the worker to process it."""
     _wait_for_api(api_base_url)
     r = None
-    for attempt in range(5):
+    for _ in range(5):
         r = httpx.post(
             f"{api_base_url}/start-interview",
             headers=API_HEADERS,
