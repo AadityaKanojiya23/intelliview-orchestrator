@@ -126,7 +126,6 @@ def test_full_pipeline_completes(api_base_url):
     assert r.status_code == 200
     session_id = r.json()["session_id"]
 
-
     # Poll for terminal state (worker is a stub pipeline so this is fast)
     deadline = time.time() + 60
     last = None
