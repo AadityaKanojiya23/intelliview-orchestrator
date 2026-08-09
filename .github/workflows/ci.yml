@@ -115,6 +115,18 @@ jobs:
           docker compose -f docker-compose.yml logs
           exit 1
 
+      - name: Register CI worker so /start-interview can accept tasks
+        run: |
+          curl -fsS -X POST "$API_BASE_URL/register-worker" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Token: $API_TOKEN" \
+            -d '{"worker_id": "ci-worker-1", "capacity": 4}'
+          # Send an initial heartbeat so worker is immediately marked healthy
+          curl -fsS -X POST "$API_BASE_URL/worker/heartbeat" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Token: $API_TOKEN" \
+            -d '{"worker_id": "ci-worker-1", "active_tasks": 0}'
+
       - name: Run end-to-end smoke tests
         run: pytest tests/test_e2e_smoke.py -v -m e2e
 
