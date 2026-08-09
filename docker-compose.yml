@@ -7,6 +7,7 @@ services:
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     environment:
       - REDIS_REPLICATION_MODE=master
+      - MALLOC_CONF=lg_dirty_mult:8
     volumes:
       - redis_data:/data
     networks:

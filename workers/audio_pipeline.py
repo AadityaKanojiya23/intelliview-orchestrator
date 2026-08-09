@@ -149,6 +149,12 @@ def _real_transcribe(session_id: str, audio_url: str | None = None) -> dict[str,
             logger.debug("Transcription skipped: no audio URL configured.")
             return None
         result = transcribe_audio_file(session_id)
+        if result is None:
+            logger.warning(
+                "transcribe_audio_file returned None for session %s",
+                session_id,
+            )
+            return None
         segments = result.get("segments", [])
         if segments:
             avg_logprob = np.mean([s.get("avg_logprob", -1.0) for s in segments])
@@ -158,6 +164,7 @@ def _real_transcribe(session_id: str, audio_url: str | None = None) -> dict[str,
                 3,
             )
         else:
+            avg_logprob = None
             confidence = 0.0
 
         logger.info(
