@@ -5,6 +5,8 @@ import logging
 import re
 from datetime import datetime, timezone
 
+from requests import request
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
@@ -812,14 +814,11 @@ def create_session_routes(
 
             question_bank.record_usage(request.question_id, score=request.score)
 
-            feedback = f"Answer recorded for: {question['text'][:80]}..."
-            if request.score is not None:
-                if request.score >= 7:
-                    feedback = f"Strong answer ({request.score}/10). Good demonstration of knowledge."
-                elif request.score >= 5:
-                    feedback = f"Acceptable answer ({request.score}/10). Some areas for improvement."
-                else:
-                    feedback = f"Needs improvement ({request.score}/10). Consider reviewing core concepts."
+            from workers.evaluation_pipeline import score_answer
+            ai_result = score_answer(question["text"], request.answer_text)
+            score = ai_result["score"]
+            feedback = ai_result["reasoning"]
+
 
             questions_asked = session_data.get("questions_asked", [])
             questions_asked.append(
@@ -830,23 +829,25 @@ def create_session_routes(
                 }
             )
 
+
             answers = session_data.get("answers_provided", [])
             answers.append(
                 {
                     "question_id": request.question_id,
                     "answer_text": request.answer_text,
-                    "score": request.score,
-                }
-            )
-
+                    "score": score,
+                    }
+                    )
             feedbacks = session_data.get("feedback_generated", [])
             feedbacks.append(
                 {
                     "question_id": request.question_id,
-                    "feedback": feedback,
-                    "score": request.score,
-                }
-            )
+                    "score": score,
+                    "reasoning": ai_result["reasoning"],
+                    "strengths": ai_result["strengths"],
+                    "gaps": ai_result["gaps"],
+                    }
+                    )
 
             scores = [a.get("score") for a in answers if a.get("score") is not None]
             overall_score = sum(scores) / len(scores) if scores else None
@@ -863,7 +864,7 @@ def create_session_routes(
                 session_id=request.session_id,
                 question_id=request.question_id,
                 feedback=feedback,
-                score=request.score,
+                score=score,
                 questions_asked=len(questions_asked),
                 overall_score=overall_score,
             )

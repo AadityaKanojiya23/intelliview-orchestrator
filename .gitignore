@@ -43,3 +43,6 @@ frontend/*.tsbuildinfo
 
 .env.local
 subscribers.db
+
+.cache/
+build_log.txt

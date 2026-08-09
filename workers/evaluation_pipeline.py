@@ -572,6 +572,73 @@ def evaluate_hallucination(
         "explanation": "Stub evaluation (models unavailable): deterministic seeded signal.",
     }
 
+def score_answer(question: str, answer: str) -> dict[str, Any]:
+    """
+    Score a single candidate answer using Gemini on a 0-10 scale.
+
+    Returns:
+        {
+            "score": float,          # 0-10
+            "reasoning": str,
+            "strengths": list[str],
+            "gaps": list[str],
+        }
+    Falls back to a neutral, clearly-labeled stub if Gemini is unavailable
+    or returns invalid JSON, so this never crashes the calling endpoint.
+    """
+    prompt = (
+        "You are an expert technical interviewer. Score the candidate's answer "
+        "to the given interview question on a scale of 0 to 10.\n\n"
+        "Judge on: technical accuracy, clarity, and depth.\n\n"
+        f"Question: {question}\n\n"
+        f"Answer: {answer}\n\n"
+        "Respond with ONLY valid JSON in exactly this shape, no markdown, "
+        "no extra text:\n"
+        '{"score": <number 0-10>, "reasoning": "<1-3 sentence explanation>", '
+        '"strengths": ["<point>", ...], "gaps": ["<point>", ...]}'
+    )
+
+    try:
+        from workers.ai_client import HAS_GEMINI, gemini_generate
+
+        if HAS_GEMINI:
+            response, usage = gemini_generate(
+                prompt, temperature=0.2, max_output_tokens=512
+            )
+            logger.info(
+                "llm_token_usage provider=%s model=%s tokens=%s",
+                usage.get("provider"),
+                usage.get("model"),
+                usage.get("total_tokens"),
+            )
+            if response:
+                try:
+                    parsed = json.loads(response)
+                    score = float(parsed.get("score", 0))
+                    score = max(0.0, min(10.0, score))
+                    return {
+                        "score": round(score, 1),
+                        "reasoning": parsed.get("reasoning", ""),
+                        "strengths": parsed.get("strengths", []),
+                        "gaps": parsed.get("gaps", []),
+                    }
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    logger.error(
+                        "Invalid JSON from Gemini in score_answer: %s", response
+                    )
+    except Exception as exc:
+        logger.debug("Gemini scoring failed in score_answer: %s", exc)
+
+    # Fallback stub — keeps the endpoint working if Gemini is down/unset
+    return {
+        "score": 5.0,
+        "reasoning": (
+            "AI scoring unavailable; returning a neutral placeholder score."
+        ),
+        "strengths": [],
+        "gaps": [],
+    }
+
 
 # ---------------------------------------------------------------------------
 # Public pipeline API — real LLM evaluation with seeded stub fallback
