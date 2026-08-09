@@ -1,0 +1,29 @@
+groups:
+  - name: worker-monitoring
+    rules:
+      - alert: WorkerUnhealthy
+        expr: intelliview_workers_unhealthy > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Worker is unhealthy"
+          description: "One or more IntelliView workers are unhealthy."
+
+      - alert: WorkerQueueDepthHigh
+        expr: intelliview_queue_depth > 50
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Worker queue depth is high"
+          description: "Celery queue depth has exceeded 50."
+
+      - alert: WorkerNoHeartbeat
+        expr: intelliview_worker_heartbeat_age_seconds > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Worker heartbeat missing"
+          description: "A worker has not sent a heartbeat for more than 60 seconds."

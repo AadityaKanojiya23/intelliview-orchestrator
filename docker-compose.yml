@@ -208,8 +208,9 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
+      - "./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - "./monitoring/alerts:/etc/prometheus/alerts:ro"
+      - "prometheus_data:/prometheus"
     networks:
       - ai-interview-network
     command:
