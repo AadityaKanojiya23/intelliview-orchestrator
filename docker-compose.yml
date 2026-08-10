@@ -54,6 +54,8 @@ services:
     container_name: ai-interview-fastapi
     ports:
       - "8000:8000"
+    volumes:
+    - ./data:/app/data
     environment:
       REDIS_URL: redis://redis:6379/0
       POSTGRES_HOST: postgres
@@ -208,9 +210,11 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - "./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
-      - "./monitoring/alerts:/etc/prometheus/alerts:ro"
-      - "prometheus_data:/prometheus"
+      volumes:
+        - "./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+        - "./monitoring/alerts:/etc/prometheus/alerts:ro"
+        - "./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro"
+        - "prometheus_data:/prometheus"
     networks:
       - ai-interview-network
     command:
