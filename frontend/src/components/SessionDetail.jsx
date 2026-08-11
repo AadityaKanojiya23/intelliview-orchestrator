@@ -7,8 +7,9 @@ import { StatusBadge, Badge } from "@/components/Badge";
 import { Shimmer } from "@/components/Shimmer";
 import { useAppStore } from "@/lib/store";
 import { formatDate, riskColor, formatRelative } from "@/lib/utils";
-import { Activity, Calendar, Cpu, Hash, RefreshCw, User, Film, Mic, MessageSquare, Clock } from "lucide-react";
+import { Activity, Calendar, Cpu, Hash, RefreshCw, User, Film, Mic, MessageSquare, Clock, GraduationCap } from "lucide-react";
 import useSWR from "swr";
+import Link from "next/link";
 import { MomentTimeline } from "@/hooks/useMomentTracking";
 
 function SessionDetailImpl({ sessionId, onClose }) {
@@ -66,6 +67,16 @@ function SessionDetailImpl({ sessionId, onClose }) {
                   <Pipeline current={data.status} />
                 </div>
               </div>
+
+              {data.status === "completed" && (
+                <Link
+                  href={`/coaching?session=${sessionId}`}
+                  className="flex items-center justify-center gap-2 rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-sm font-medium text-accent-light transition-colors hover:bg-accent/20"
+                >
+                  <GraduationCap size={14} />
+                  View coaching report
+                </Link>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Candidate" value={data.candidate_id} icon={User} />
                 <Field label="Assigned worker" value={data.assigned_node ?? "—"} icon={Cpu} />
