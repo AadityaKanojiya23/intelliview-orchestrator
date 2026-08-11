@@ -15,6 +15,7 @@ from database.models import Candidate, InterviewSession
 from metrics.prometheus_metrics import SESSIONS_ACTIVE, SESSIONS_CREATED
 from orchestrator import http_cache
 from orchestrator.scheduler import TaskPriority
+from workers.adaptive_difficulty import get_next_difficulty
 from orchestrator.security import get_current_user, require_role
 
 logger = logging.getLogger(__name__)
@@ -773,10 +774,19 @@ def create_session_routes(
             asked_ids = session_data.get("questions_asked", [])
             question = question_bank.get_next_question(
                 category=request.category,
+                difficulty=session_data.get("next_difficulty"),
                 exclude_ids=(
                     [q.get("question_id") for q in asked_ids] if asked_ids else []
                 ),
             )
+            if not question and session_data.get("next_difficulty"):
+                question = question_bank.get_next_question(
+                    category=request.category,
+                    exclude_ids=(
+                        [q.get("question_id") for q in asked_ids] if asked_ids else []
+                    ),
+                )
+                  
             if not question:
                 raise HTTPException(
                     status_code=404, detail="No more questions available"
@@ -811,6 +821,10 @@ def create_session_routes(
                 raise HTTPException(status_code=404, detail="Question not found")
 
             question_bank.record_usage(request.question_id, score=request.score)
+
+            next_difficulty = None
+            if request.score is not None:
+                next_difficulty = get_next_difficulty(request.score)
 
             feedback = f"Answer recorded for: {question['text'][:80]}..."
             if request.score is not None:
@@ -855,6 +869,7 @@ def create_session_routes(
             session_data["answers_provided"] = answers
             session_data["feedback_generated"] = feedbacks
             session_data["overall_score"] = overall_score
+            session_data["next_difficulty"] = next_difficulty
             session_manager.state_sync.set_session_state(
                 request.session_id, session_data
             )
