@@ -29,6 +29,11 @@ class StartInterviewRequest(BaseModel):
     )
     candidate_name: str | None = Field(default=None, max_length=200)
     position: str | None = Field(default=None, max_length=120)
+    language: str = Field(
+    default="en",
+    max_length=10,
+    description="Interview language code",
+    )
     priority: str = Field(default="medium", description="One of: low, medium, high")
 
     @field_validator("candidate_id")
@@ -62,6 +67,7 @@ class InterviewSessionResponse(BaseModel):
     status: str
     created_at: str | None = None
     candidate_id: str
+    language: str = "en"
     risk_score: float | None = None
     estimated_wait_time: int | None = None
 
@@ -72,6 +78,7 @@ class SessionStatusResponse(BaseModel):
     session_id: str
     status: str
     candidate_id: str
+    language: str = "en"
     risk_score: float | None = None
     assigned_node: str | None = None
     start_time: str | None = None
@@ -282,6 +289,7 @@ def create_session_routes(
                 candidate_id=request.candidate_id,
                 candidate_name=request.candidate_name,
                 position=request.position,
+                language=request.language,
             )
 
             # Increment total interview sessions created
@@ -315,6 +323,7 @@ def create_session_routes(
                 status=session_manager.QUEUED,
                 created_at=session_data.get("created_at"),
                 candidate_id=request.candidate_id,
+                language=request.language,
                 risk_score=None,
                 estimated_wait_time=wait_time if wait_time >= 0 else None,
             )
@@ -361,6 +370,7 @@ def create_session_routes(
                 session_id=session_id,
                 status=session_data.get("status"),
                 candidate_id=session_data.get("candidate_id"),
+                language=session_data.get("language", "en"),
                 risk_score=session_data.get("risk_score"),
                 assigned_node=session_data.get("assigned_node"),
                 start_time=session_data.get("start_time"),
