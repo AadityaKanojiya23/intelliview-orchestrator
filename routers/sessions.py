@@ -136,6 +136,26 @@ class InterviewReportResponse(BaseModel):
     metadata: ReportMetadata
 
 
+class CoachingQuestionFeedback(BaseModel):
+    question_id: str
+    question: str
+    answer: str | None = None
+    score: float | None = None
+    feedback: str | None = None
+
+
+class CoachingResponse(BaseModel):
+    session_id: str
+    candidate_id: str
+    overall_score: float | None = None
+    strengths: list[str] = Field(default_factory=list)
+    focus_areas: list[str] = Field(default_factory=list)
+    action_items: list[str] = Field(default_factory=list)
+    question_feedback: list[CoachingQuestionFeedback] = Field(default_factory=list)
+    recommendation: str | None = None
+    detailed_feedback: str | None = None
+
+
 class TaskStatusResponse(BaseModel):
     """Response model for Celery task status (used by /task-status/{task_id})."""
 
@@ -514,6 +534,110 @@ def create_session_routes(
         except Exception as e:
             logger.error(f"Error fetching interview report: {e!s}")
             raise HTTPException(status_code=500, detail=f"Error fetching report: {e!s}")
+
+    @router.get(
+        "/interviews/{session_id}/coaching",
+        response_model=CoachingResponse,
+    )
+    async def get_interview_coaching(
+        session_id: str,
+        db: Session = Depends(get_db),
+    ):
+        """Get structured coaching feedback for an interview session."""
+        try:
+            session_obj = db.execute(
+                select(InterviewSession).where(
+                    InterviewSession.session_id == session_id
+                )
+            ).scalar_one_or_none()
+
+            if not session_obj:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Session not found",
+                )
+
+            # Get questions, answers, and generated feedback.
+            q_asked = session_obj.questions_asked or []
+            a_provided = session_obj.answers_provided or []
+            f_generated = session_obj.feedback_generated or []
+
+            # Build question lookup by question_id.
+            q_dict = {q.get("question_id"): q for q in q_asked if q.get("question_id")}
+
+            # Attach answers to their questions.
+            for answer in a_provided:
+                q_id = answer.get("question_id")
+                if q_id in q_dict:
+                    q_dict[q_id]["answer"] = answer.get("answer_text")
+
+            # Attach feedback and score to their questions.
+            for feedback in f_generated:
+                q_id = feedback.get("question_id")
+                if q_id in q_dict:
+                    q_dict[q_id]["feedback"] = feedback.get("feedback")
+                    q_dict[q_id]["score"] = feedback.get("score")
+
+            # Convert mapped questions into coaching question feedback.
+            question_feedback = [
+                CoachingQuestionFeedback(
+                    question_id=q_id,
+                    question=q_data.get("text", ""),
+                    answer=q_data.get("answer"),
+                    score=q_data.get("score"),
+                    feedback=q_data.get("feedback"),
+                )
+                for q_id, q_data in q_dict.items()
+            ]
+
+            # Get overall evaluation feedback.
+            eval_analysis = session_obj.evaluation_analysis or {}
+            llm_feedback = eval_analysis.get("llm_feedback", {})
+
+            strengths = eval_analysis.get(
+                "strengths",
+                llm_feedback.get("strengths", []),
+            )
+
+            improvements = eval_analysis.get(
+                "improvements",
+                llm_feedback.get("improvements", []),
+            )
+
+            recommendation = eval_analysis.get(
+                "recommendation",
+                llm_feedback.get("recommendation"),
+            )
+
+            detailed_feedback = eval_analysis.get(
+                "detailed_feedback",
+                llm_feedback.get("detailed_feedback"),
+            )
+
+            return CoachingResponse(
+                session_id=session_obj.session_id,
+                candidate_id=session_obj.candidate_id,
+                overall_score=session_obj.overall_score,
+                strengths=strengths,
+                focus_areas=improvements,
+                action_items=[],
+                question_feedback=question_feedback,
+                recommendation=recommendation,
+                detailed_feedback=detailed_feedback,
+            )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(
+                "Error fetching interview coaching: %s",
+                e,
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Error fetching interview coaching",
+            )
 
     @router.get("/session-status/{session_id}/risk-report")
     async def get_session_risk_report(session_id: str, format: str = "json"):
