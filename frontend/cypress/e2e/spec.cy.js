@@ -22,4 +22,12 @@ describe('Recruiter Dashboard', () => {
     cy.contains('Sessions').should('be.visible')
   })
 
+  it('opens Coaching page', () => {
+    cy.visit('http://localhost:3000')
+
+    cy.contains('Coaching').click()
+
+    cy.contains('Your interview performance').should('be.visible')
+  })
+
 })
