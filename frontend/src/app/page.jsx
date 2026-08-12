@@ -12,7 +12,7 @@ import { Skeleton, ErrorState, EmptyState } from "@/components/States";
 import Sparkline from "@/components/Sparkline";
 import { formatPercent, formatRelative } from "@/lib/utils";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui";
-
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 const MAX_SAMPLES = 20;
 
 export default function OverviewPage() {
