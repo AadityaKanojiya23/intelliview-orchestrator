@@ -247,3 +247,51 @@ class InterviewTemplate(Base):
 
     def __repr__(self):
         return f"<InterviewTemplate(template_id='{self.template_id}', name='{self.name}', type='{self.interview_type}')>"
+
+
+class InterviewSchedule(Base):
+    """InterviewSchedule model for managing scheduled interview events."""
+
+    __tablename__ = "interview_schedules"
+
+    id = Column(String(255), primary_key=True, index=True, nullable=False)
+    candidate_id = Column(
+        String(255),
+        ForeignKey("candidates.candidate_id"),
+        nullable=False,
+        index=True,
+    )
+    interviewer_id = Column(
+        String(255),
+        nullable=False,
+        index=True,
+    )
+    scheduled_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    status = Column(
+        String(50),
+        nullable=False,
+        default="scheduled",
+        index=True,
+    )
+    notes = Column(String(1000), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+    )
+
+    def __repr__(self):
+        return (
+            f"<InterviewSchedule(id='{self.id}', "
+            f"candidate_id='{self.candidate_id}', "
+            f"interviewer_id='{self.interviewer_id}', "
+            f"scheduled_at='{self.scheduled_at}', "
+            f"status='{self.status}')>"
+        )
