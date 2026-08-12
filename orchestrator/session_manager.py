@@ -83,6 +83,7 @@ class SessionManager:
         candidate_id: str,
         position: str | None = None,
         candidate_name: str | None = None,
+        language: str = "en",
     ) -> str:
         """
         Create a new interview session
@@ -126,6 +127,7 @@ class SessionManager:
             interview_session = InterviewSession(
                 session_id=session_id,
                 candidate_id=candidate_id,
+                language=language,
                 status=self.CREATED,
                 created_at=_utcnow(),
                 updated_at=_utcnow(),
@@ -138,6 +140,7 @@ class SessionManager:
             session_data = {
                 "session_id": session_id,
                 "candidate_id": candidate_id,
+                "language": language,
                 "candidate_name": candidate_name or "Unknown",
                 "position": position or "Unknown",
                 "status": self.CREATED,
@@ -263,6 +266,7 @@ class SessionManager:
                 session_data = {
                     "session_id": interview.session_id,
                     "candidate_id": interview.candidate_id,
+                    "language": interview.language,
                     "status": interview.status,
                     "risk_score": interview.risk_score,
                     "assigned_node": interview.assigned_node,
