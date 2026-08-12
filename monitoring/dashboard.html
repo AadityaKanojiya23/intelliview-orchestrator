@@ -252,7 +252,6 @@
             <h1>🎯 AI Interview Orchestrator</h1>
             <p>Real-Time Monitoring Dashboard</p>
             <div id="system-health" class="status-badge status-healthy">System: Healthy</div>
-            <div id="last-updated">Last checked: --</div>
         </header>
         
         <!-- System Overview Cards -->
@@ -514,8 +513,6 @@
             const healthBadge = document.getElementById('system-health');
             healthBadge.className = 'status-badge status-' + health;
             healthBadge.textContent = 'System: ' + health.charAt(0).toUpperCase() + health.slice(1);
-            const lastUpdated = document.getElementById('last-updated');
-            lastUpdated.textContent = 'Last checked: ' + new Date().toLocaleString();
         }
         
         function updateCharts(dashboard) {
