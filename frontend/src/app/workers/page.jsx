@@ -7,9 +7,6 @@ import Stat from "@/components/Stat";
 import { StatusBadge, Badge } from "@/components/Badge";
 import { Skeleton, ErrorState, EmptyState } from "@/components/States";
 import { SearchInput } from "@/components/ui";
-import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui";
-import { formatPercent, formatRelative } from "@/lib/utils";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function WorkersPage() {
   const workers = useSWR("/workers", { refreshInterval: 4000 });
@@ -25,28 +22,6 @@ export default function WorkersPage() {
       w.worker_id.toLowerCase().includes(q)
     );
   }, [workers.data?.workers, search]);
-  const sorted = useMemo(() => {
-    let data = filtered;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      data = data.filter((w) =>
-        w.worker_id.toLowerCase().includes(q)
-      );
-    }
-
-    if (sortConfig.key && sortConfig.order) {
-      data = [...data].sort((a, b) => {
-        const aVal = a[sortConfig.key];
-        const bVal = b[sortConfig.key];
-
-        if (aVal < bVal) return sortConfig.order === "asc" ? -1 : 1;
-        if (aVal > bVal) return sortConfig.order === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
-
-    return data;
-  }, [workers.data?.workers, search, sortConfig]);
   return (
     <div className="space-y-6 animate-fade-in">
       <div>

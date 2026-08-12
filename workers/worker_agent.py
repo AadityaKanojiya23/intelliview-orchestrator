@@ -31,6 +31,7 @@ class WorkerAgent:
         heartbeat_interval: int = 15,
         tags: list[str] | None = None,
     ):
+        self.draining = False
         self.api_url = api_url.rstrip("/")
         self.worker_id = worker_id
         self.capacity = capacity
