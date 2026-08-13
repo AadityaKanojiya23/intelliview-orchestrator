@@ -11,7 +11,8 @@ import {
   Shield,
   Video,
   UserCircle,
-  Mail
+  Mail,
+  BookOpen
 } from "lucide-react";
 import { jsx, jsxs } from "react/jsx-runtime";
 const items = [
@@ -21,6 +22,7 @@ const items = [
   { href: "/candidates", label: "Candidates", icon: UserCircle },
   { href: "/workers", label: "Workers", icon: Users },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/questions", label: "Question Bank", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "http://localhost:8080", label: "Digest Control", icon: Mail, external: true }
 ];
