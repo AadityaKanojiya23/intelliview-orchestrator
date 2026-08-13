@@ -55,7 +55,6 @@ services:
     container_name: ai-interview-fastapi
     ports:
       - "8000:8000"
-
     environment:
       REDIS_URL: redis://redis:6379/0
       POSTGRES_HOST: postgres
@@ -68,21 +67,16 @@ services:
       CORS_ALLOW_ORIGINS: "${CORS_ALLOW_ORIGINS:-*}"
       ENABLE_PROMETHEUS: "${ENABLE_PROMETHEUS:-true}"
       AUDIT_LOG_FILE: "${AUDIT_LOG_FILE:-}"
-
     volumes:
       - sqlite_data:/app/data
-
     depends_on:
       redis:
         condition: service_healthy
       postgres:
         condition: service_healthy
-
     networks:
       - ai-interview-network
-
     command: uvicorn orchestrator.main:app --host 0.0.0.0 --port 8000 --workers 1
-
     healthcheck:
       test:
         [
@@ -95,7 +89,6 @@ services:
       timeout: 10s
       start_period: 40s
       retries: 3
-
     deploy:
       resources:
         limits:
@@ -109,7 +102,6 @@ services:
     container_name: ai-interview-worker
     ports:
       - "9101:9101"
-
     environment:
       REDIS_URL: redis://redis:6379/0
       POSTGRES_HOST: postgres
@@ -122,7 +114,6 @@ services:
       WORKER_CONCURRENCY: "4"
       WORKER_ID: "${WORKER_ID:-worker-1}"
       CV_SERVICE_URL: http://cv-service:8001
-
     depends_on:
       redis:
         condition: service_healthy
@@ -132,17 +123,12 @@ services:
         condition: service_healthy
       cv-service:
         condition: service_started
-
     volumes:
       - .:/app
-
     networks:
       - ai-interview-network
-
     command: python -m workers.worker_entrypoint
-
     restart: unless-stopped
-
     healthcheck:
       test:
         [
@@ -157,7 +143,6 @@ services:
       timeout: 10s
       start_period: 30s
       retries: 5
-
     deploy:
       resources:
         limits:
@@ -174,7 +159,6 @@ services:
     networks:
       - ai-interview-network
     restart: unless-stopped
-
     healthcheck:
       test:
         [
@@ -194,28 +178,22 @@ services:
     container_name: ai-interview-flower
     ports:
       - "5555:5555"
-
     environment:
       REDIS_URL: redis://redis:6379/0
       API_TOKEN: "${API_TOKEN:-dev-token-change-me}"
       PYTHONPATH: /app
-
     depends_on:
       redis:
         condition: service_healthy
-
     working_dir: /app
-
     networks:
       - ai-interview-network
-
     command:
       - celery
       - -A
       - workers.celery_app.celery_app
       - flower
       - --url_prefix=flower
-
     healthcheck:
       test:
         [
@@ -228,7 +206,6 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
-
     deploy:
       resources:
         limits:
@@ -238,7 +215,6 @@ services:
   celery-exporter:
     image: danihodovic/celery-exporter
     container_name: ai-interview-celery-exporter
-
     command:
       - --broker-url
       - redis://redis:6379/0
@@ -246,14 +222,11 @@ services:
       - 0.0.0.0
       - --port
       - "9540"
-
     ports:
       - "9540:9540"
-
     depends_on:
       redis:
         condition: service_healthy
-
     networks:
       - ai-interview-network
 
@@ -262,19 +235,15 @@ services:
     container_name: ai-interview-prometheus
     ports:
       - "9090:9090"
-
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
-
     networks:
       - ai-interview-network
-
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=30d"
       - "--web.enable-lifecycle"
-
     healthcheck:
       test:
         [
@@ -294,33 +263,26 @@ services:
     container_name: ai-interview-grafana
     ports:
       - "3001:3000"
-
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:-admin}"
       GF_USERS_ALLOW_SIGN_UP: "false"
-
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-
     networks:
       - ai-interview-network
 
   jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: ai-interview-jaeger
-
     environment:
-      - COLLECTOR_OTLP_ENABLED=true
-
+      COLLECTOR_OTLP_ENABLED: "true"
     ports:
       - "16686:16686"
       - "4317:4317"
-
     networks:
       - ai-interview-network
-
     healthcheck:
       test:
         [
@@ -334,7 +296,6 @@ services:
       timeout: 5s
       start_period: 30s
       retries: 3
-
     deploy:
       resources:
         limits:
@@ -348,17 +309,13 @@ services:
     container_name: ai-interview-frontend
     ports:
       - "3000:3000"
-
     environment:
       NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8000}"
-
     depends_on:
       fastapi:
         condition: service_healthy
-
     networks:
       - ai-interview-network
-
     healthcheck:
       test:
         [
@@ -372,7 +329,6 @@ services:
       timeout: 5s
       start_period: 30s
       retries: 3
-
     deploy:
       resources:
         limits:
@@ -386,19 +342,14 @@ services:
     container_name: ai-interview-digest-notifications
     ports:
       - "8081:8080"
-
     environment:
       API_TOKEN: "${API_TOKEN:-dev-token-change-me}"
       DIGEST_BATCH_SIZE: "5"
-
     volumes:
       - .:/app
-
     networks:
       - ai-interview-network
-
     working_dir: /app/Digest-Notifications
-
     command:
       - python
       - src/digest.py
@@ -407,9 +358,7 @@ services:
       - "8080"
       - --host
       - "0.0.0.0"
-
     restart: unless-stopped
-
     healthcheck:
       test:
         [
@@ -422,7 +371,6 @@ services:
       timeout: 5s
       start_period: 30s
       retries: 3
-
     deploy:
       resources:
         limits:
