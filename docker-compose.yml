@@ -1,4 +1,5 @@
 services:
+
   redis:
     image: redis:7-alpine
     container_name: ai-interview-redis
@@ -66,6 +67,8 @@ services:
       CORS_ALLOW_ORIGINS: "${CORS_ALLOW_ORIGINS:-*}"
       ENABLE_PROMETHEUS: "${ENABLE_PROMETHEUS:-true}"
       AUDIT_LOG_FILE: "${AUDIT_LOG_FILE:-}"
+    volumes:
+      - sqlite_data:/app/data
     depends_on:
       redis:
         condition: service_healthy
@@ -75,7 +78,13 @@ services:
       - ai-interview-network
     command: uvicorn orchestrator.main:app --host 0.0.0.0 --port 8000 --workers 1
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=8)"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=8)"
+        ]
       interval: 20s
       timeout: 10s
       start_period: 40s
@@ -100,11 +109,11 @@ services:
       POSTGRES_DB: ai_interview_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
-      API_URL: "http://fastapi:8000"
+      API_URL: http://fastapi:8000
       API_TOKEN: "${API_TOKEN:-dev-token-change-me}"
       WORKER_CONCURRENCY: "4"
       WORKER_ID: "${WORKER_ID:-worker-1}"
-      CV_SERVICE_URL: "http://cv-service:8001"
+      CV_SERVICE_URL: http://cv-service:8001
     depends_on:
       redis:
         condition: service_healthy
@@ -116,13 +125,20 @@ services:
         condition: service_started
     volumes:
       - .:/app
-      
     networks:
       - ai-interview-network
     command: python -m workers.worker_entrypoint
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "celery", "-A", "workers.celery_app", "inspect", "ping"]
+      test:
+        [
+          "CMD",
+          "celery",
+          "-A",
+          "workers.celery_app",
+          "inspect",
+          "ping"
+        ]
       interval: 30s
       timeout: 10s
       start_period: 30s
@@ -137,19 +153,20 @@ services:
     build:
       context: ./cv_service
       dockerfile: Dockerfile
-
     container_name: ai-interview-cv-service
-
     ports:
       - "8001:8001"
-
     networks:
       - ai-interview-network
-
     restart: unless-stopped
-
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8001/health"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-fsS",
+          "http://localhost:8001/health"
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -162,18 +179,29 @@ services:
     ports:
       - "5555:5555"
     environment:
-      REDIS_URL: "redis://redis:6379/0"
+      REDIS_URL: redis://redis:6379/0
       API_TOKEN: "${API_TOKEN:-dev-token-change-me}"
-      PYTHONPATH: "/app"
+      PYTHONPATH: /app
     depends_on:
       redis:
         condition: service_healthy
     working_dir: /app
     networks:
       - ai-interview-network
-    command: celery -A workers.celery_app.celery_app flower --url_prefix=flower
+    command:
+      - celery
+      - -A
+      - workers.celery_app.celery_app
+      - flower
+      - --url_prefix=flower
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:5555/flower/"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-fsS",
+          "http://localhost:5555/flower/"
+        ]
       interval: 30s
       timeout: 5s
       start_period: 15s
@@ -217,7 +245,14 @@ services:
       - "--storage.tsdb.retention.time=30d"
       - "--web.enable-lifecycle"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "-q",
+          "http://localhost:9090/-/healthy"
+        ]
       interval: 15s
       timeout: 5s
       start_period: 10s
@@ -235,20 +270,28 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - ai-interview-network
 
   jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: ai-interview-jaeger
     environment:
-      - COLLECTOR_OTLP_ENABLED=true
+      COLLECTOR_OTLP_ENABLED: "true"
     ports:
       - "16686:16686"
       - "4317:4317"
     networks:
       - ai-interview-network
- 
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "-q",
+          "http://localhost:16686/"
+        ]
       interval: 15s
       timeout: 5s
       start_period: 30s
@@ -258,7 +301,6 @@ services:
         limits:
           memory: 256M
           cpus: "0.5"
-       
 
   frontend:
     build:
@@ -275,7 +317,14 @@ services:
     networks:
       - ai-interview-network
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "-q",
+          "http://127.0.0.1:3000/"
+        ]
       interval: 15s
       timeout: 5s
       start_period: 30s
@@ -292,7 +341,7 @@ services:
       dockerfile: Dockerfile
     container_name: ai-interview-digest-notifications
     ports:
-      - "8080:8080"
+      - "8081:8080"
     environment:
       API_TOKEN: "${API_TOKEN:-dev-token-change-me}"
       DIGEST_BATCH_SIZE: "5"
@@ -301,8 +350,27 @@ services:
     networks:
       - ai-interview-network
     working_dir: /app/Digest-Notifications
-    command: python src/digest.py --serve --port 8080 --host 0.0.0.0
+    command:
+      - python
+      - src/digest.py
+      - --serve
+      - --port
+      - "8080"
+      - --host
+      - "0.0.0.0"
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-fsS",
+          "http://localhost:8080/"
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -314,6 +382,7 @@ volumes:
   postgres_data:
   prometheus_data:
   grafana_data:
+  sqlite_data:
 
 networks:
   ai-interview-network:
