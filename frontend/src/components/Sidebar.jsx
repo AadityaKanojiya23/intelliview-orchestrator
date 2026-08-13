@@ -11,12 +11,14 @@ import {
   Shield,
   Video,
   UserCircle,
-  Mail
+  Mail,
+  LayoutList
 } from "lucide-react";
 import { jsx, jsxs } from "react/jsx-runtime";
 const items = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/interview", label: "Interview", icon: Video },
+  { href: "/templates", label: "Templates", icon: LayoutList },
   { href: "/sessions", label: "Sessions", icon: Activity },
   { href: "/candidates", label: "Candidates", icon: UserCircle },
   { href: "/workers", label: "Workers", icon: Users },
