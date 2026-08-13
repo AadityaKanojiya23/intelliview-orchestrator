@@ -602,13 +602,6 @@ class WorkerRegistry:
                 if last_hb < timeout_threshold:
                     unhealthy.append(worker_id)
                     worker["status"] = "unhealthy"
-                WORKERS_HEALTHY.set(
-                    sum(1 for w in self.local_workers.values() if w["status"] == "healthy")
-                )
-
-                WORKERS_UNHEALTHY.set(
-                    sum(1 for w in self.local_workers.values() if w["status"] == "unhealthy")
-                )
 
         # Broadcast if status changes to unhealthy
         for wid in unhealthy:
