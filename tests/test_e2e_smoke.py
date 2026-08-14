@@ -46,13 +46,21 @@ def test_health(api_base_url):
 
 def test_start_interview_and_get_status(api_base_url):
     _wait_for_api(api_base_url)
-    r = httpx.post(
-        f"{api_base_url}/start-interview",
-        headers=API_HEADERS,
-        json={"candidate_id": f"cand-{uuid.uuid4().hex[:8]}", "priority": "high"},
-        timeout=10.0,
-    )
+    # The worker pool may take a few seconds to become available after startup.
+    # Retry a few times before declaring failure.
+    r = None
+    for _ in range(5):
+        r = httpx.post(
+            f"{api_base_url}/start-interview",
+            headers=API_HEADERS,
+            json={"candidate_id": f"cand-{uuid.uuid4().hex[:8]}", "priority": "high"},
+            timeout=10.0,
+        )
+        if r.status_code == 200:
+            break
+        time.sleep(3)
     assert r.status_code == 200, r.text
+
     session_id = r.json()["session_id"]
     assert session_id.startswith("session_")
 
@@ -95,7 +103,7 @@ def test_worker_register_requires_token(api_base_url):
     r = httpx.post(
         f"{api_base_url}/register-worker",
         json={"worker_id": "test-w", "capacity": 2},
-        headers={"X-API-Token": "dev-token-change-me"},
+        headers=API_HEADERS,
         timeout=5.0,
     )
     assert r.status_code == 200, r.text
@@ -104,12 +112,17 @@ def test_worker_register_requires_token(api_base_url):
 def test_full_pipeline_completes(api_base_url):
     """End-to-end: start an interview, wait for the worker to process it."""
     _wait_for_api(api_base_url)
-    r = httpx.post(
-        f"{api_base_url}/start-interview",
-        headers=API_HEADERS,
-        json={"candidate_id": f"e2e-{uuid.uuid4().hex[:8]}", "priority": "medium"},
-        timeout=10.0,
-    )
+    r = None
+    for _ in range(5):
+        r = httpx.post(
+            f"{api_base_url}/start-interview",
+            headers=API_HEADERS,
+            json={"candidate_id": f"e2e-{uuid.uuid4().hex[:8]}", "priority": "medium"},
+            timeout=10.0,
+        )
+        if r.status_code == 200:
+            break
+        time.sleep(3)
     assert r.status_code == 200
     session_id = r.json()["session_id"]
 
@@ -164,7 +177,7 @@ def test_worker_lifecycle(api_base_url):
     """End-to-end: register a worker, send a heartbeat, see it listed, then deregister it."""
     _wait_for_api(api_base_url)
     worker_id = f"e2e-worker-{uuid.uuid4().hex[:8]}"
-    headers = {"X-API-Token": "test-token"}
+    headers = API_HEADERS
 
     r = httpx.post(
         f"{api_base_url}/register-worker",

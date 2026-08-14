@@ -1,71 +1,130 @@
 """
 Shared pytest fixtures and configuration for the test suite.
 
-These tests are designed to run against a live local stack (see docker-compose).
+These tests are designed to run against a live local stack.
 For unit tests that don't need Redis/Postgres, see test_unit_*.py.
 """
 
 import os
+import pathlib
+import sys
+from types import SimpleNamespace
+
+import pytest
 
 # ---------------------------------------------------------------------------
-# IMPORTANT — Set default env vars BEFORE any import that triggers config.py.
-# workers/celery_app.py does `from config import REDIS_URL`, which
-# instantiates pydantic Settings (cached via @lru_cache).  If that
-# happens before os.environ is seeded, pydantic reads .env first and
-# the test's API_TOKEN override is silently ignored, causing E2E auth
-# failures (401 "invalid or missing API token").
-#
-# Keep these assignments at the very top of this file.
+# Test environment defaults
 # ---------------------------------------------------------------------------
+
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("POSTGRES_HOST", "localhost")
 os.environ.setdefault("POSTGRES_DB", "ai_interview_db")
 os.environ.setdefault("POSTGRES_USER", "postgres")
 os.environ.setdefault("POSTGRES_PASSWORD", "postgres")
 os.environ.setdefault("API_TOKEN", "ci-test-token")
+os.environ.setdefault("RATE_LIMIT_PER_MINUTE", "10000")
+
 os.environ["OTEL_SDK_DISABLED"] = "true"
 
-import pathlib
-import sys
+# ---------------------------------------------------------------------------
+# Make project root importable
+# ---------------------------------------------------------------------------
 
-import pytest
-from testcontainers.postgres import PostgresContainer
-
-from workers.celery_app import celery_app
-
-# Make project root importable so `from config import ...` works.
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# Point at a local instance by default; tests can override via env.
-os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
-os.environ.setdefault("POSTGRES_HOST", "localhost")
-os.environ.setdefault("POSTGRES_DB", "ai_interview_db")
-os.environ.setdefault("POSTGRES_USER", "postgres")
-os.environ.setdefault("POSTGRES_PASSWORD", "postgres")
-os.environ.setdefault("API_TOKEN", "test-token")
+# ---------------------------------------------------------------------------
+# PostgreSQL Testcontainer
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session")
 def postgres_container():
-    """Start a PostgreSQL Testcontainer for integration tests."""
+    """
+    Provide PostgreSQL for integration tests.
+
+    GitHub Actions / act:
+        Use the PostgreSQL service defined in ci.yml.
+
+    Local development:
+        Start PostgreSQL using Testcontainers.
+    """
+
+    if os.getenv("GITHUB_ACTIONS") == "true":
+        database_url = (
+            "postgresql+psycopg2://postgres:postgres"
+            "@localhost:5432/ai_interview_test"
+        )
+
+        postgres = SimpleNamespace(get_connection_url=lambda: database_url)
+
+        yield postgres
+        return
+
+    from testcontainers.community.postgres import PostgresContainer
+
     with PostgresContainer("postgres:16") as postgres:
+        database_url = postgres.get_connection_url()
+
+        os.environ["DATABASE_URL"] = database_url
         os.environ["POSTGRES_HOST"] = postgres.get_container_host_ip()
         os.environ["POSTGRES_PORT"] = str(postgres.get_exposed_port(5432))
         os.environ["POSTGRES_DB"] = postgres.dbname
         os.environ["POSTGRES_USER"] = postgres.username
         os.environ["POSTGRES_PASSWORD"] = postgres.password
-        os.environ["DATABASE_URL"] = postgres.get_connection_url()
-        from database.db import Base, engine
 
-        Base.metadata.create_all(bind=engine)
         yield postgres
+
+
+# ---------------------------------------------------------------------------
+# Database session
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def db_session(postgres_container):
+    """Provide a SQLAlchemy session connected to the test database."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from database.models import Base
+
+    engine = create_engine(
+        postgres_container.get_connection_url(),
+        future=True,
+    )
+
+    Base.metadata.create_all(engine)
+
+    TestingSessionLocal = sessionmaker(bind=engine)
+    session = TestingSessionLocal()
+
+    try:
+        yield session
+    finally:
+        session.close()
+        Base.metadata.drop_all(engine)
+        engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# API
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session")
 def api_base_url() -> str:
-    return os.getenv("API_BASE_URL", "http://localhost:8000")
+    return os.getenv(
+        "API_BASE_URL",
+        "http://localhost:8000",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Celery
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session")
@@ -78,4 +137,6 @@ def celery_config():
 
 @pytest.fixture(scope="session")
 def celery_app_fixture():
+    from workers.celery_app import celery_app
+
     return celery_app
