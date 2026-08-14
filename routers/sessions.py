@@ -815,10 +815,10 @@ def create_session_routes(
             question_bank.record_usage(request.question_id, score=request.score)
 
             from workers.evaluation_pipeline import score_answer
+
             ai_result = score_answer(question["text"], request.answer_text)
             score = ai_result["score"]
             feedback = ai_result["reasoning"]
-
 
             questions_asked = session_data.get("questions_asked", [])
             questions_asked.append(
@@ -829,15 +829,14 @@ def create_session_routes(
                 }
             )
 
-
             answers = session_data.get("answers_provided", [])
             answers.append(
                 {
                     "question_id": request.question_id,
                     "answer_text": request.answer_text,
                     "score": score,
-                    }
-                    )
+                }
+            )
             feedbacks = session_data.get("feedback_generated", [])
             feedbacks.append(
                 {
@@ -846,8 +845,8 @@ def create_session_routes(
                     "reasoning": ai_result["reasoning"],
                     "strengths": ai_result["strengths"],
                     "gaps": ai_result["gaps"],
-                    }
-                    )
+                }
+            )
 
             scores = [a.get("score") for a in answers if a.get("score") is not None]
             overall_score = sum(scores) / len(scores) if scores else None

@@ -572,6 +572,7 @@ def evaluate_hallucination(
         "explanation": "Stub evaluation (models unavailable): deterministic seeded signal.",
     }
 
+
 def score_answer(question: str, answer: str) -> dict[str, Any]:
     """
     Score a single candidate answer using Gemini on a 0-10 scale.
@@ -632,9 +633,7 @@ def score_answer(question: str, answer: str) -> dict[str, Any]:
     # Fallback stub — keeps the endpoint working if Gemini is down/unset
     return {
         "score": 5.0,
-        "reasoning": (
-            "AI scoring unavailable; returning a neutral placeholder score."
-        ),
+        "reasoning": ("AI scoring unavailable; returning a neutral placeholder score."),
         "strengths": [],
         "gaps": [],
     }
