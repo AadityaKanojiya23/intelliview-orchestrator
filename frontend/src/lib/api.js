@@ -44,6 +44,9 @@ class ApiClient {
   post(path, body) {
     return this.request("POST", path, body);
   }
+  put(path, body) {
+    return this.request("PUT", path, body);
+  }
   delete(path) {
     return this.request("DELETE", path);
   }
@@ -58,6 +61,13 @@ const api = new ApiClient();
 const endpoints = {
   health: () => api.get("/health"),
   startInterview: (payload) => api.post("/start-interview", payload),
+    startInterview: (payload) => api.post("/start-interview", payload),
+  templates: (interview_type) =>
+    api.get(`/templates${interview_type ? `?interview_type=${interview_type}` : ""}`),
+  getTemplate: (id) => api.get(`/templates/${id}`),
+  createTemplate: (payload) => api.post("/templates", payload),
+  updateTemplate: (id, payload) => api.put(`/templates/${id}`, payload),
+  deleteTemplate: (id) => api.delete(`/templates/${id}`),
   sessionStatus: (id) => api.get(`/session-status/${id}`),
   activeSessions: () => api.get("/active-sessions"),
   completedSessions: (limit = 50) => api.get(`/completed-sessions?limit=${limit}`),

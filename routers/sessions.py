@@ -29,6 +29,7 @@ class StartInterviewRequest(BaseModel):
     candidate_name: str | None = Field(default=None, max_length=200)
     position: str | None = Field(default=None, max_length=120)
     priority: str = Field(default="medium", description="One of: low, medium, high")
+    template_id: str | None = Field(default=None, description="Optional interview template ID")
 
     @field_validator("candidate_id")
     @classmethod
@@ -282,6 +283,17 @@ def create_session_routes(
                 candidate_name=request.candidate_name,
                 position=request.position,
             )
+
+            if request.template_id:
+                from orchestrator.interview_templates import interview_template_manager
+                interview_template_manager.record_usage(request.template_id)
+                template_details = interview_template_manager.get_template(request.template_id)
+                if template_details:
+                    session_manager.update_session_status(
+                        session_id,
+                        session_manager.CREATED,
+                        {"template_id": request.template_id, "template": template_details},
+                    )
 
             # Increment total interview sessions created
             SESSIONS_CREATED.inc()

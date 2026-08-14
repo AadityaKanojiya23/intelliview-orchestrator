@@ -11,12 +11,18 @@ import {
   Shield,
   Video,
   UserCircle,
-  Mail
+  Mail,
+  FileText,
+  LayoutList,
+  Calendar
 } from "lucide-react";
 import { jsx, jsxs } from "react/jsx-runtime";
 const items = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/templates", label: "Templates", icon: FileText },
+  { href: "/schedule", label: "Schedule", icon: Calendar },
   { href: "/interview", label: "Interview", icon: Video },
+  { href: "/templates", label: "Templates", icon: LayoutList },
   { href: "/sessions", label: "Sessions", icon: Activity },
   { href: "/candidates", label: "Candidates", icon: UserCircle },
   { href: "/workers", label: "Workers", icon: Users },
@@ -24,6 +30,7 @@ const items = [
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "http://localhost:8080", label: "Digest Control", icon: Mail, external: true }
 ];
+
 function Sidebar({ mobile = false, onNavigate }) {
   const pathname = usePathname();
   return /* @__PURE__ */ jsxs("aside", { className: cn(

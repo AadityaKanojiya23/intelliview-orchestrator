@@ -115,6 +115,81 @@ class QuestionBank:
         finally:
             db.close()
 
+    def get_questions_for_plan(
+        self,
+        question_plan: dict[str, int],
+        exclude_ids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Retrieve questions according to a template question plan.
+
+        question_plan example:
+        {
+            "technical": 4,
+            "behavioral": 3,
+            "situational": 3
+        }
+
+        Questions are selected from each category independently.
+        Already-used question IDs can be excluded.
+        """
+
+        exclude_ids = set(exclude_ids or [])
+        selected_questions: list[dict[str, Any]] = []
+
+        db = SessionLocal()
+
+        try:
+            for category, required_count in question_plan.items():
+
+                if category not in self.CATEGORIES:
+                    raise ValueError(
+                        f"Invalid category in question plan: {category}. "
+                        f"Must be one of: {self.CATEGORIES}"
+                    )
+
+                if required_count <= 0:
+                    continue
+
+                stmt = (
+                    select(Question)
+                    .where(Question.category == category)
+                    .order_by(
+                        Question.usage_count.asc(),
+                        Question.created_at.desc(),
+                    )
+                )
+
+                rows = db.execute(stmt).scalars().all()
+
+                category_count = 0
+
+                for question in rows:
+                    if question.question_id in exclude_ids:
+                        continue
+
+                    selected_questions.append(
+                        {
+                            "question_id": question.question_id,
+                            "text": question.text,
+                            "category": question.category,
+                            "difficulty": question.difficulty,
+                            "tags": question.tags or [],
+                            "usage_count": question.usage_count,
+                        }
+                    )
+
+                    exclude_ids.add(question.question_id)
+                    category_count += 1
+
+                    if category_count >= required_count:
+                        break
+
+            return selected_questions
+
+        finally:
+            db.close()
+
     def get_question(self, question_id: str) -> dict[str, Any] | None:
         """Get a single question by ID"""
         db = SessionLocal()
