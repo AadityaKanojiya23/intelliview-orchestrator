@@ -501,10 +501,9 @@ class WorkerRegistry:
         available = []
         with self.lock:
             for worker in self.local_workers.values():
-                if (
-                    worker["status"] == "healthy"
-                    and worker["active_tasks"] < worker["capacity"]
-                ):
+                if worker.get("status") == "healthy" and worker.get(
+                    "active_tasks", 0
+                ) < worker.get("capacity", 0):
                     available.append(worker)
 
         return available
@@ -603,6 +602,21 @@ class WorkerRegistry:
                 if last_hb < timeout_threshold:
                     unhealthy.append(worker_id)
                     worker["status"] = "unhealthy"
+                WORKERS_HEALTHY.set(
+                    sum(
+                        1
+                        for w in self.local_workers.values()
+                        if w["status"] == "healthy"
+                    )
+                )
+
+                WORKERS_UNHEALTHY.set(
+                    sum(
+                        1
+                        for w in self.local_workers.values()
+                        if w["status"] == "unhealthy"
+                    )
+                )
 
         # Broadcast if status changes to unhealthy
         for wid in unhealthy:
