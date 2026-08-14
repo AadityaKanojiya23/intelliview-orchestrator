@@ -34,10 +34,15 @@ const DIST_COLORS = [
 ];
 
 function CategoryDistribution({ distribution }) {
-  const entries = Object.entries(distribution || {});
-  if (entries.length === 0) {
+  const rawEntries = Object.entries(distribution || {});
+  if (rawEntries.length === 0) {
     return <div className="text-xs text-muted">No category breakdown set.</div>;
   }
+  // Templates may store this as fractions (0.4) or as whole percentages (40).
+  // Normalize against the total so the bar always adds up to 100%, regardless
+  // of which convention a given template was created with.
+  const total = rawEntries.reduce((sum, [, v]) => sum + (Number(v) || 0), 0);
+  const entries = rawEntries.map(([key, v]) => [key, total > 0 ? (Number(v) || 0) / total : 0]);
   return (
     <div>
       <div className="flex h-2 w-full overflow-hidden rounded-full bg-bg-card">
@@ -121,8 +126,22 @@ function CreateTemplateDialog({ open, onOpenChange, onCreated }) {
   const [description, setDescription] = useState("");
   const [duration, setDuration] = useState(60);
   const [questionCount, setQuestionCount] = useState(10);
+  const [categoryPercents, setCategoryPercents] = useState({
+    technical: 40,
+    behavioral: 30,
+    situational: 30,
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  const categoryTotal = Object.values(categoryPercents).reduce(
+    (sum, v) => sum + (Number(v) || 0),
+    0
+  );
+
+  function setCategoryPercent(key, value) {
+    setCategoryPercents((prev) => ({ ...prev, [key]: value }));
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -130,12 +149,23 @@ function CreateTemplateDialog({ open, onOpenChange, onCreated }) {
     setSubmitting(true);
     setError(null);
     try {
+      // Store as fractions (0-1) that sum to 1, regardless of what the user typed,
+      // so the interview flow gets a consistent, correctly-weighted split.
+      let category_distribution = null;
+      if (categoryTotal > 0) {
+        category_distribution = Object.fromEntries(
+          Object.entries(categoryPercents)
+            .filter(([, v]) => Number(v) > 0)
+            .map(([key, v]) => [key, Number(v) / categoryTotal])
+        );
+      }
       const template = await endpoints.createTemplate({
         name: name.trim(),
         interview_type: interviewType,
         description: description.trim() || null,
         duration_minutes: Number(duration) || 60,
         question_count: Number(questionCount) || 10,
+        category_distribution,
       });
       toast.success("Template created", template.name);
       setName("");
@@ -201,6 +231,46 @@ function CreateTemplateDialog({ open, onOpenChange, onCreated }) {
               onChange={(e) => setQuestionCount(e.target.value)}
             />
           </div>
+
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-xs font-medium text-zinc-300">
+                Category distribution (%)
+              </label>
+              <span
+                className={cn(
+                  "text-xs",
+                  categoryTotal === 100
+                    ? "text-emerald-400"
+                    : categoryTotal === 0
+                      ? "text-muted"
+                      : "text-amber-400"
+                )}
+              >
+                Total: {categoryTotal}%
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {Object.entries(categoryPercents).map(([key, value]) => (
+                <div key={key}>
+                  <label className="mb-1 block text-[11px] capitalize text-muted">{key}</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={value}
+                    onChange={(e) => setCategoryPercent(key, e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+            {categoryTotal > 0 && categoryTotal !== 100 && (
+              <p className="mt-1.5 text-[11px] text-amber-400">
+                These will be auto-scaled to add up to 100% when saved.
+              </p>
+            )}
+          </div>
+
           {error && <div className="text-xs text-rose-400">{error}</div>}
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
