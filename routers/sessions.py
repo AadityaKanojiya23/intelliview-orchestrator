@@ -5,10 +5,9 @@ import logging
 import re
 from datetime import datetime, timezone
 
-from requests import request
-
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, field_validator
+from requests import request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
