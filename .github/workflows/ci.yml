@@ -30,7 +30,6 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 5
-
       postgres:
         image: postgres:15
         env:
@@ -44,7 +43,6 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 5
-
     env:
       REDIS_URL: redis://localhost:6379/0
       POSTGRES_HOST: localhost
@@ -76,7 +74,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install ruff black isort
-
       - name: Black format check
         run: black --check .
 
@@ -125,17 +122,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install httpx pytest
-
       - name: Validate API import path
         run: |
           docker compose -f docker-compose.yml run --rm fastapi \
             python -c "import orchestrator.main; print('ok')"
-
       - name: Bring up full stack
         run: |
           docker compose -f docker-compose.yml up -d --build \
             redis postgres fastapi worker
-
       - name: Wait for API to become healthy
         run: |
           for i in $(seq 1 60); do
@@ -143,15 +137,12 @@ jobs:
               echo "API is up"
               exit 0
             fi
-
             echo "Waiting for API... ($i)"
             sleep 2
           done
-
           echo "API never became healthy" >&2
           docker compose -f docker-compose.yml logs
           exit 1
-
       - name: Run end-to-end smoke tests
         run: pytest tests/test_e2e_smoke.py -v -m e2e
 
@@ -198,6 +189,31 @@ jobs:
         run: npm run build
 
   # --------------------------------------------------
+  # Check whether Docker Hub secrets are configured
+  # (job-level `if:` conditions cannot reference the
+  # `secrets` context directly, so we resolve it here
+  # inside a step and expose it as a job output)
+  # --------------------------------------------------
+
+  check-secrets:
+    name: Check Docker Secrets
+    runs-on: ubuntu-latest
+    outputs:
+      has-docker-creds: ${{ steps.check.outputs.has-docker-creds }}
+
+    steps:
+      - name: Check for Docker Hub credentials
+        id: check
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        run: |
+          if [ -n "$DOCKER_USERNAME" ]; then
+            echo "has-docker-creds=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-docker-creds=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # --------------------------------------------------
   # Docker build and push
   # Runs only after merge/push to main
   # --------------------------------------------------
@@ -208,9 +224,13 @@ jobs:
       - test
       - e2e
       - frontend
+      - check-secrets
     runs-on: ubuntu-latest
 
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Stabilized-version') && secrets.DOCKER_USERNAME != ''
+    if: |
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/Stabilized-version') &&
+      needs.check-secrets.outputs.has-docker-creds == 'true'
 
     steps:
       - name: Checkout code
@@ -234,7 +254,6 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/intelliview-fastapi:latest
-
       - name: Build and push Worker image
         uses: docker/build-push-action@v6
         with:
