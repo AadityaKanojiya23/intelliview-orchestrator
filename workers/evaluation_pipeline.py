@@ -32,13 +32,11 @@ from workers.prompt_categorization import categorize_prompt
 
 
 def _llm_evaluate_answer_quality(
-    session_id: str, question: str, answer: str, language: str | None = "en"
+    session_id: str, question: str, answer: str
 ) -> dict[str, Any] | None:
     """Use GPT-4o/Gemini/Grok to evaluate answer quality and relevance."""
     prompt = (
-        f"Evaluate the candidate's answer. The interview is conducted in '{language or 'en'}'. "
-        f"The candidate is expected to answer in '{language or 'en'}' (or code-mix with English). "
-        f"Generate the 'feedback' text in '{language or 'en'}'. "
+        "Evaluate the candidate's answer. "
         "Return JSON: overall_quality_score (0-100), relevance (0-1), completeness (0-1), clarity (0-1), feedback."
     )
     prompt_category = categorize_prompt(prompt)
@@ -172,12 +170,11 @@ def _llm_evaluate_answer_quality(
 
 
 def _llm_evaluate_technical_accuracy(
-    session_id: str, question: str, answer: str, language: str | None = "en"
+    session_id: str, question: str, answer: str
 ) -> dict[str, Any] | None:
     """Use GPT-4o/Gemini/Grok to evaluate technical accuracy."""
     prompt = (
-        f"Evaluate the answer. The interview is conducted in '{language or 'en'}'. "
-        f"The candidate is expected to answer in '{language or 'en'}' (or code-mix with English). "
+        "Evaluate the answer. "
         "Return JSON with keys: accuracy_score, correct_concepts_count, incorrect_concepts_count, knowledge_gaps."
     )
     user_msg = f"Question: {question}\n\nAnswer: {answer}"
@@ -300,7 +297,7 @@ def _llm_evaluate_technical_accuracy(
 
 
 def _llm_evaluate_communication(
-    session_id: str, question: str, answer: str, language: str | None = "en"
+    session_id: str, question: str, answer: str
 ) -> dict[str, Any] | None:
     """Use GPT-4o to evaluate communication clarity."""
     try:
@@ -311,8 +308,7 @@ def _llm_evaluate_communication(
                 {
                     "role": "system",
                     "content": (
-                        f"Evaluate communication. The interview is conducted in '{language or 'en'}'. "
-                        f"The candidate is expected to answer in '{language or 'en'}' (or code-mix with English). "
+                        "Evaluate communication. "
                         "Return JSON with keys: clarity_score, professionalism, confidence_level, pace_appropriateness."
                     ),
                 },
@@ -352,7 +348,7 @@ def _llm_evaluate_communication(
 
 
 def _llm_generate_feedback(
-    session_id: str, question: str, answer: str, language: str | None = "en"
+    session_id: str, question: str, answer: str
 ) -> dict[str, Any] | None:
     """Use GPT-4o to generate personalized interview feedback."""
     try:
@@ -363,8 +359,7 @@ def _llm_generate_feedback(
                 {
                     "role": "system",
                     "content": (
-                        f"Generate structured interview feedback. The interview is conducted in '{language or 'en'}'. "
-                        f"Generate strengths, improvements, and detailed_feedback in '{language or 'en'}'. "
+                        "Generate structured interview feedback. "
                         "Return JSON: strengths, improvements, detailed_feedback, recommendation.(strong_hire|hire|maybe|no_hire)."
                     ),
                 },
@@ -653,38 +648,15 @@ def evaluate_answers(session_id: str) -> dict[str, Any]:
     """Execute answer evaluation pipeline for an interview session."""
     logger.info(f"Starting answer evaluation for session {session_id}")
 
-    from database.db import SessionLocal
-    from database.models import InterviewSession
-    from sqlalchemy import select
-
-    language = "en"
-    db_session = SessionLocal()
-    try:
-        interview = db_session.execute(
-            select(InterviewSession).where(
-                InterviewSession.session_id == session_id
-            )
-        ).scalar_one_or_none()
-        if interview and hasattr(interview, "language") and interview.language:
-            language = interview.language
-    except Exception as exc:
-        logger.warning(
-            "Failed to retrieve language from database for session %s: %s",
-            session_id,
-            exc,
-        )
-    finally:
-        db_session.close()
-
-    quality = evaluate_answer_quality(session_id, language=language)
-    accuracy = evaluate_technical_accuracy(session_id, language=language)
-    clarity = evaluate_communication(session_id, language=language)
+    quality = evaluate_answer_quality(session_id)
+    accuracy = evaluate_technical_accuracy(session_id)
+    clarity = evaluate_communication(session_id)
     hallucination = evaluate_hallucination(
         session_id,
         "Describe your experience with distributed systems.",
         "I have five years of experience building distributed systems in Python and Go.",
     )
-    feedback = generate_feedback(session_id, language=language)
+    feedback = generate_feedback(session_id)
 
     results = {
         "session_id": session_id,
@@ -701,7 +673,7 @@ def evaluate_answers(session_id: str) -> dict[str, Any]:
     return results
 
 
-def evaluate_answer_quality(session_id: str, language: str | None = "en") -> dict[str, Any]:
+def evaluate_answer_quality(session_id: str) -> dict[str, Any]:
     """Evaluate answer quality — real LLM with semantic similarity fallback."""
     logger.info(f"Evaluating answer quality for session {session_id}")
 
@@ -709,7 +681,6 @@ def evaluate_answer_quality(session_id: str, language: str | None = "en") -> dic
         session_id,
         "Describe your experience with distributed systems.",
         "I have five years of experience building distributed systems in Python and Go.",
-        language=language,
     )
     reference_answer = (
         "Distributed systems are collections of independent computers"
@@ -737,7 +708,7 @@ def evaluate_answer_quality(session_id: str, language: str | None = "en") -> dic
     }
 
 
-def evaluate_technical_accuracy(session_id: str, language: str | None = "en") -> dict[str, Any]:
+def evaluate_technical_accuracy(session_id: str) -> dict[str, Any]:
     """Evaluate technical accuracy — real LLM with seeded stub fallback."""
     logger.info(f"Evaluating technical accuracy for session {session_id}")
 
@@ -745,7 +716,6 @@ def evaluate_technical_accuracy(session_id: str, language: str | None = "en") ->
         session_id,
         "Describe your experience with distributed systems.",
         "I have five years of experience building distributed systems in Python and Go.",
-        language=language,
     )
     if real is not None:
         return real
@@ -759,7 +729,7 @@ def evaluate_technical_accuracy(session_id: str, language: str | None = "en") ->
     }
 
 
-def evaluate_communication(session_id: str, language: str | None = "en") -> dict[str, Any]:
+def evaluate_communication(session_id: str) -> dict[str, Any]:
     """Evaluate communication clarity — real LLM with seeded stub fallback."""
     logger.info(f"Evaluating communication clarity for session {session_id}")
 
@@ -767,7 +737,6 @@ def evaluate_communication(session_id: str, language: str | None = "en") -> dict
         session_id,
         "Describe your experience with distributed systems.",
         "I have five years of experience building distributed systems in Python and Go.",
-        language=language,
     )
     if real is not None:
         return real
@@ -781,7 +750,7 @@ def evaluate_communication(session_id: str, language: str | None = "en") -> dict
     }
 
 
-def generate_feedback(session_id: str, language: str | None = "en") -> dict[str, Any]:
+def generate_feedback(session_id: str) -> dict[str, Any]:
     """Generate feedback — real LLM with seeded stub fallback."""
     logger.info(f"Generating feedback for session {session_id}")
 
@@ -789,7 +758,6 @@ def generate_feedback(session_id: str, language: str | None = "en") -> dict[str,
         session_id,
         "Describe your experience with distributed systems.",
         "I have five years of experience building distributed systems in Python and Go.",
-        language=language,
     )
     if real is not None:
         return real

@@ -24,8 +24,7 @@ import { useAppStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useMomentTracking } from "@/hooks/useMomentTracking";
-import RiskTimeline from "@/components/RiskTimeline";
-import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, getLanguageLabel, isSupportedLanguage } from "@/lib/languages";
+import  RiskTimeline  from "@/components/RiskTimeline";
 import { cn, riskColor } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -46,7 +45,6 @@ export default function InterviewPage() {
   const [feedback, setFeedback] = useState([]);
   const [audioLevels, setAudioLevels] = useState(new Array(32).fill(0));
   const [candidate, setCandidate] = useState("");
-  const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
   const [starting, setStarting] = useState(false);
 
   const {
@@ -56,10 +54,6 @@ export default function InterviewPage() {
     stopTracking,
     trackEvent,
   } = useMomentTracking(activeSession);
-
-  const handleLanguageChange = (selectedLanguage) => {
-    setLanguage(isSupportedLanguage(selectedLanguage) ? selectedLanguage : DEFAULT_LANGUAGE);
-  };
 
   const { connected } = useWebSocket({
     path: "/monitoring/ws/metrics",
@@ -136,25 +130,14 @@ export default function InterviewPage() {
       toast.warn("Enter a candidate ID", "Required to start the interview");
       return;
     }
-    const normalizedLanguage = isSupportedLanguage(language)
-      ? language
-      : DEFAULT_LANGUAGE;
-
     setStarting(true);
     try {
-      const r = await endpoints.startInterview({
-        candidate_id: candidate.trim(),
-        priority: "high",
-        language: normalizedLanguage,
-      });
+      const r = await endpoints.startInterview({ candidate_id: candidate.trim(), priority: "high" });
       setActiveSession(r.session_id);
       setIsLive(true);
       await startCamera();
       startTracking();
-      trackEvent("session_start", {
-        candidate_id: candidate.trim(),
-        language: normalizedLanguage,
-      });
+      trackEvent("session_start", { candidate_id: candidate.trim() });
       toast.success("Interview started", `Session ${r.session_id}`);
     } catch (err) {
       toast.error("Failed to start", err instanceof Error ? err.message : String(err));
@@ -214,21 +197,6 @@ export default function InterviewPage() {
                   placeholder="cand-1234"
                   className="mt-1 w-full rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-zinc-100 placeholder:text-muted focus:border-accent focus:outline-none"
                 />
-              </div>
-              <div className="min-w-[200px]">
-                <label className="block text-xs text-muted">Language</label>
-                <select
-                  name="interview-language"
-                  value={language}
-                  onChange={(e) => handleLanguageChange(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-zinc-100 focus:border-accent focus:outline-none"
-                >
-                  {LANGUAGE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
               </div>
               <button
                 onClick={handleStart}
@@ -370,10 +338,6 @@ export default function InterviewPage() {
                 <div className="flex justify-between">
                   <span className="text-muted">Candidate</span>
                   <span className="text-zinc-300">{candidate || "—"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">Language</span>
-                  <span className="text-zinc-300">{getLanguageLabel(language)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Status</span>

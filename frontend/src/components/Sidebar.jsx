@@ -11,8 +11,7 @@ import {
   Shield,
   Video,
   UserCircle,
-  Mail,
-  GraduationCap
+  Mail
 } from "lucide-react";
 import { jsx, jsxs } from "react/jsx-runtime";
 const items = [
@@ -20,7 +19,6 @@ const items = [
   { href: "/interview", label: "Interview", icon: Video },
   { href: "/sessions", label: "Sessions", icon: Activity },
   { href: "/candidates", label: "Candidates", icon: UserCircle },
-  { href: "/coaching", label: "Coaching", icon: GraduationCap },
   { href: "/workers", label: "Workers", icon: Users },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },

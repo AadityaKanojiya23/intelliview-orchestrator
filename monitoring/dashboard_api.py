@@ -311,7 +311,9 @@ def create_dashboard_routes(
     # ========== WebSocket Real-Time Metrics Endpoint ==========
 
     @router.websocket("/ws/metrics")
-    async def websocket_metrics(websocket: WebSocket):
+    async def websocket_metrics(
+        websocket: WebSocket, token: str | None = Query(default=None)
+    ):
         """
         WebSocket endpoint for real-time metrics push
 
@@ -323,7 +325,6 @@ def create_dashboard_routes(
 
         Auth: pass ?token=<API_TOKEN> as a query parameter.
         """
-        token = websocket.query_params.get("token")
         if token != API_TOKEN:
             await websocket.close(code=1008, reason="invalid token")
             return
