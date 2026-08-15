@@ -94,6 +94,36 @@ async def lifespan(app: FastAPI):
     settings.validate_configuration()
     Base.metadata.create_all(bind=engine)
 
+    # Seed admin user
+    import uuid
+
+    from passlib.context import CryptContext
+
+    from database.db import SessionLocal
+    from database.models import User
+
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+    def bcrypt_safe_password(password: str) -> str:
+        if len(password.encode("utf-8")) > 72:
+            raise ValueError("Password must be 72 bytes or fewer for bcrypt")
+        return password
+
+    with SessionLocal() as db:
+        try:
+            if not db.query(User).first():
+                admin = User(
+                    user_id=str(uuid.uuid4()),
+                    email="admin@example.com",
+                    password_hash=pwd_context.hash(bcrypt_safe_password("admin123")),
+                    role="admin",
+                )
+                db.add(admin)
+                db.commit()
+                logger.info("Created initial admin user: admin@example.com / admin123")
+        except ValueError as exc:
+            logger.error("Startup user initialization failed: %s", exc)
+
     # Initialize webhook subscriber store
     create_table()
 
@@ -331,6 +361,10 @@ app.include_router(create_admin_routes(state_sync=state_sync, load_balancer=load
 app.include_router(risk_configs_router)
 
 app.include_router(metrics_router)
+
+from routers.auth import router as auth_router
+
+app.include_router(auth_router)
 
 
 @app.get("/risk-engine/weights/{role}")

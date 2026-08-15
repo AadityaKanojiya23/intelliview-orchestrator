@@ -279,6 +279,9 @@ class StateSynchronizer:
                 if "evaluation_analysis" in session_data:
                     interview.evaluation_analysis = session_data["evaluation_analysis"]
 
+                if "feedback_generated" in session_data:
+                    interview.feedback_generated = session_data["feedback_generated"]
+
                 interview.updated_at = datetime.now(timezone.utc)
                 session_db.commit()
 

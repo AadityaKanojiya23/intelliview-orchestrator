@@ -983,16 +983,17 @@ def create_session_routes(
                 {
                     "question_id": request.question_id,
                     "answer_text": request.answer_text,
-                    "score": request.score,
+                    "score": score,
                 }
             )
-
             feedbacks = session_data.get("feedback_generated", [])
             feedbacks.append(
                 {
                     "question_id": request.question_id,
-                    "feedback": feedback,
-                    "score": request.score,
+                    "score": score,
+                    "reasoning": ai_result["reasoning"],
+                    "strengths": ai_result["strengths"],
+                    "gaps": ai_result["gaps"],
                 }
             )
 
@@ -1012,7 +1013,7 @@ def create_session_routes(
                 session_id=request.session_id,
                 question_id=request.question_id,
                 feedback=feedback,
-                score=request.score,
+                score=score,
                 questions_asked=len(questions_asked),
                 overall_score=overall_score,
             )

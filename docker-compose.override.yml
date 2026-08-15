@@ -9,6 +9,8 @@
 
 services:
   fastapi:
+    env_file:
+      - .env
     volumes:
       - .:/app   # bind-mount: code changes are reflected without rebuild (restart container to pick up)
     command: sh -c "alembic upgrade head && uvicorn orchestrator.main:app --host 0.0.0.0 --port 8000"
@@ -20,6 +22,8 @@ services:
       start_period: 45s  # hot-reload takes longer to boot than a prebuilt image
 
   worker:
+    env_file:
+      - .env
     volumes:
       - .:/app
     environment:

@@ -63,3 +63,22 @@ def test_full_pipeline_does_not_crash_on_invalid_json():
 
     assert result["session_id"] == "session-123"
     assert 0.0 <= result["risk_score"] <= 1.0
+
+
+def test_score_answer_falls_back_on_invalid_json():
+    with (
+        patch("workers.ai_client.HAS_GEMINI", True),
+        patch(
+            "workers.ai_client.gemini_generate",
+            return_value=(
+                "not valid json",
+                {"provider": "google", "model": "x", "total_tokens": 0},
+            ),
+        ),
+    ):
+        result = evaluation_pipeline.score_answer(
+            "What is a hash map?", "It's a key-value store."
+        )
+
+    assert result["score"] == 5.0
+    assert "strengths" in result and "gaps" in result
