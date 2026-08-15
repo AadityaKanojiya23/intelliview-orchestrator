@@ -345,7 +345,6 @@ def transcribe_audio_file(
     vad_config: Any | None = None,
     speech_segments: list[Any] | None = None,
     raw_audio: bool = False,
-    language: str | None = "en",
 ) -> dict[str, Any] | None:
     """Transcribe an audio file using VAD pre-filtering and local Whisper.
 
@@ -363,7 +362,7 @@ def transcribe_audio_file(
         detector = VoiceActivityDetector(vad_config)
 
         if raw_audio:
-            result = whisper_model.transcribe(audio_path, language=language)
+            result = whisper_model.transcribe(audio_path)
 
             return {
                 "text": result.get("text", "").strip(),
@@ -421,7 +420,7 @@ def transcribe_audio_file(
             if samples is None or len(samples) == 0:
                 continue
 
-            seg_result = whisper_model.transcribe(samples, language=language)
+            seg_result = whisper_model.transcribe(samples)
             if seg_result is None:
                 continue
 
@@ -452,9 +451,9 @@ def transcribe_audio_file(
         )
 
         return {
-            "text": combined_text,
-            "language": detected_language,
-            "segments": aligned_whisper_segments,
+            "text": result.get("text", ""),
+            "language": result.get("language", "en"),
+            "segments": result.get("segments", []),
         }
     except Exception as exc:
         logger.warning("Whisper transcription failed: %s", exc)
