@@ -58,6 +58,9 @@ const api = new ApiClient();
 const endpoints = {
   health: () => api.get("/health"),
   startInterview: (payload) => api.post("/start-interview", payload),
+  askQuestion: (payload) => api.post("/interviews/ask-question", payload),
+
+submitAnswer: (payload) => api.post("/interviews/submit-answer", payload),
   sessionStatus: (id) => api.get(`/session-status/${id}`),
   activeSessions: () => api.get("/active-sessions"),
   completedSessions: (limit = 50) => api.get(`/completed-sessions?limit=${limit}`),
