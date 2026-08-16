@@ -193,5 +193,82 @@ class QuestionBank:
         finally:
             db.close()
 
+    def update_question(
+        self,
+        question_id: str,
+        text: str | None = None,
+        category: str | None = None,
+        difficulty: str | None = None,
+        tags: list[str] | None = None,
+    ) -> dict[str, Any] | None:
+        """Update an existing question. Only non-None fields are changed."""
+        if category is not None:
+            category = category.strip().lower()
+            if category not in self.CATEGORIES:
+                raise ValueError(
+                    f"Invalid category: {category}. Must be one of: {self.CATEGORIES}"
+                )
+        if difficulty is not None:
+            difficulty = difficulty.strip().lower()
+            if difficulty not in self.DIFFICULTIES:
+                raise ValueError(
+                    f"Invalid difficulty: {difficulty}. Must be one of: {self.DIFFICULTIES}"
+                )
+
+        db = SessionLocal()
+        try:
+            q = db.execute(
+                select(Question).where(Question.question_id == question_id)
+            ).scalar_one_or_none()
+            if not q:
+                return None
+            if text is not None:
+                q.text = text
+            if category is not None:
+                q.category = category
+            if difficulty is not None:
+                q.difficulty = difficulty
+            if tags is not None:
+                q.tags = tags
+            q.updated_at = utcnow()
+            db.commit()
+            logger.info(f"Updated question {question_id}")
+            return {
+                "question_id": q.question_id,
+                "text": q.text,
+                "category": q.category,
+                "difficulty": q.difficulty,
+                "tags": q.tags or [],
+                "usage_count": q.usage_count,
+                "avg_score": q.avg_score,
+                "created_at": q.created_at.isoformat() if q.created_at else None,
+            }
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error updating question {question_id}: {e}")
+            raise
+        finally:
+            db.close()
+
+    def delete_question(self, question_id: str) -> bool:
+        """Delete a question by ID. Returns True if deleted, False if not found."""
+        db = SessionLocal()
+        try:
+            q = db.execute(
+                select(Question).where(Question.question_id == question_id)
+            ).scalar_one_or_none()
+            if not q:
+                return False
+            db.delete(q)
+            db.commit()
+            logger.info(f"Deleted question {question_id}")
+            return True
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error deleting question {question_id}: {e}")
+            raise
+        finally:
+            db.close()
+
 
 question_bank = QuestionBank()
