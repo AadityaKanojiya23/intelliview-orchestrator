@@ -3,7 +3,6 @@ Tests for Interview Templates API endpoints.
 Covers GET/POST/PUT/DELETE /templates and the question-plan integration.
 """
 
-import pytest
 from fastapi.testclient import TestClient
 
 from orchestrator.main import app

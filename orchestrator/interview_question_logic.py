@@ -320,8 +320,8 @@ def build_question_plan(
     beh_pct = distribution.get("behavioral", 0.30)
     sit_pct = distribution.get("situational", 0.30)
 
-    tech_count = int(round(question_count * tech_pct))
-    beh_count = int(round(question_count * beh_pct))
+    tech_count = round(question_count * tech_pct)
+    beh_count = round(question_count * beh_pct)
     # Adjust situational count to fit exactly total question count
     sit_count = max(0, question_count - tech_count - beh_count)
 
