@@ -141,18 +141,12 @@ class InterviewTemplateManager:
                 "domain": template.domain,
                 "duration_minutes": template.duration_minutes,
                 "question_count": template.question_count,
-                "category_distribution": (
-                    template.category_distribution or {}
-                ),
-                "difficulty_distribution": (
-                    template.difficulty_distribution or {}
-                ),
+                "category_distribution": (template.category_distribution or {}),
+                "difficulty_distribution": (template.difficulty_distribution or {}),
                 "usage_count": template.usage_count,
                 "success_rate": template.success_rate,
                 "created_at": (
-                    template.created_at.isoformat()
-                    if template.created_at
-                    else None
+                    template.created_at.isoformat() if template.created_at else None
                 ),
             }
 
@@ -185,19 +179,13 @@ class InterviewTemplateManager:
 
             if interview_type:
                 stmt = stmt.where(
-                    InterviewTemplate.interview_type
-                    == interview_type.strip().lower()
+                    InterviewTemplate.interview_type == interview_type.strip().lower()
                 )
 
             if domain:
-                stmt = stmt.where(
-                    InterviewTemplate.domain == normalize_domain(domain)
-                )
+                stmt = stmt.where(InterviewTemplate.domain == normalize_domain(domain))
 
-            stmt = (
-                stmt.order_by(InterviewTemplate.created_at.desc())
-                .limit(limit)
-            )
+            stmt = stmt.order_by(InterviewTemplate.created_at.desc()).limit(limit)
 
             rows = db.execute(stmt).scalars().all()
 
@@ -210,18 +198,12 @@ class InterviewTemplateManager:
                     "domain": template.domain,
                     "duration_minutes": template.duration_minutes,
                     "question_count": template.question_count,
-                    "category_distribution": (
-                        template.category_distribution or {}
-                    ),
-                    "difficulty_distribution": (
-                        template.difficulty_distribution or {}
-                    ),
+                    "category_distribution": (template.category_distribution or {}),
+                    "difficulty_distribution": (template.difficulty_distribution or {}),
                     "usage_count": template.usage_count,
                     "success_rate": template.success_rate,
                     "created_at": (
-                        template.created_at.isoformat()
-                        if template.created_at
-                        else None
+                        template.created_at.isoformat() if template.created_at else None
                     ),
                 }
                 for template in rows
@@ -282,10 +264,8 @@ class InterviewTemplateManager:
                 template.question_count = question_count
 
             if category_distribution is not None:
-                template.category_distribution = (
-                    validate_category_distribution(
-                        category_distribution
-                    )
+                template.category_distribution = validate_category_distribution(
+                    category_distribution
                 )
 
             if difficulty_distribution is not None:
@@ -304,23 +284,15 @@ class InterviewTemplateManager:
                 "domain": template.domain,
                 "duration_minutes": template.duration_minutes,
                 "question_count": template.question_count,
-                "category_distribution": (
-                    template.category_distribution or {}
-                ),
-                "difficulty_distribution": (
-                    template.difficulty_distribution or {}
-                ),
+                "category_distribution": (template.category_distribution or {}),
+                "difficulty_distribution": (template.difficulty_distribution or {}),
                 "usage_count": template.usage_count,
                 "success_rate": template.success_rate,
                 "created_at": (
-                    template.created_at.isoformat()
-                    if template.created_at
-                    else None
+                    template.created_at.isoformat() if template.created_at else None
                 ),
                 "updated_at": (
-                    template.updated_at.isoformat()
-                    if template.updated_at
-                    else None
+                    template.updated_at.isoformat() if template.updated_at else None
                 ),
             }
 
@@ -356,10 +328,7 @@ class InterviewTemplateManager:
                 template.success_rate = 1.0 if success else 0.0
             else:
                 template.success_rate = (
-                    (
-                        template.success_rate * (count - 1)
-                    )
-                    + (1.0 if success else 0.0)
+                    (template.success_rate * (count - 1)) + (1.0 if success else 0.0)
                 ) / count
 
             template.updated_at = utcnow()
@@ -370,9 +339,7 @@ class InterviewTemplateManager:
 
         except Exception as e:
             db.rollback()
-            logger.error(
-                f"Error recording template usage: {e}"
-            )
+            logger.error(f"Error recording template usage: {e}")
             return False
 
         finally:
@@ -421,14 +388,10 @@ class InterviewTemplateManager:
         total = sum(distribution.values())
 
         if any(pct < 0 for pct in distribution.values()):
-            raise ValueError(
-                f"{field_name} percentages cannot be negative"
-            )
+            raise ValueError(f"{field_name} percentages cannot be negative")
 
         if abs(total - 100) > 0.01:
-            raise ValueError(
-                f"{field_name} must sum to 100, got {total}"
-            )
+            raise ValueError(f"{field_name} must sum to 100, got {total}")
 
     def get_question_plan(
         self,
