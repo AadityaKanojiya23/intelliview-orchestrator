@@ -20,6 +20,15 @@ class AddQuestionRequest(BaseModel):
     tags: list[str] | None = None
 
 
+class UpdateQuestionRequest(BaseModel):
+    """Request model for updating a question (all fields optional)"""
+
+    text: str | None = Field(default=None, min_length=1, max_length=1000)
+    category: str | None = None
+    difficulty: str | None = None
+    tags: list[str] | None = None
+
+
 def create_question_routes(question_bank) -> APIRouter:
     """Create question bank routes.
 
@@ -108,4 +117,45 @@ def create_question_routes(question_bank) -> APIRouter:
                 status_code=500,
                 detail="Error retrieving questions by plan",
             )
+    @router.put("/questions/{question_id}")
+    async def update_question(
+        question_id: str,
+        request: UpdateQuestionRequest,
+        session_db: Session = Depends(get_db),
+    ):
+        """Update an existing question in the bank"""
+        try:
+            updated = question_bank.update_question(
+                question_id=question_id,
+                text=request.text,
+                category=request.category,
+                difficulty=request.difficulty,
+                tags=request.tags,
+            )
+            if updated is None:
+                raise HTTPException(status_code=404, detail="Question not found")
+            return updated
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error updating question: {e!s}")
+            raise HTTPException(status_code=500, detail="Error updating question")
+
+    @router.delete("/questions/{question_id}", status_code=204)
+    async def delete_question(
+        question_id: str,
+        session_db: Session = Depends(get_db),
+    ):
+        """Delete a question from the bank"""
+        try:
+            deleted = question_bank.delete_question(question_id)
+            if not deleted:
+                raise HTTPException(status_code=404, detail="Question not found")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error deleting question: {e!s}")
+            raise HTTPException(status_code=500, detail="Error deleting question")
     return router

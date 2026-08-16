@@ -88,3 +88,24 @@ curl http://localhost:8000/risk-engine/weights/Software%20Engineer
 PYTHONPATH=src pytest tests/test_api.py -v
 # 26 passed
 ```
+
+## Quick Setup
+
+Run the setup script to prepare and start the project locally.
+
+Command:
+
+    chmod +x setup.sh && ./setup.sh
+
+This will:
+- Verify Docker and Docker Compose are installed
+- Create a .env file from .env.example if needed
+- Build and start the project services
+- Seed demo data when supported
+
+After setup completes:
+- Frontend: http://localhost:3000
+- API: http://localhost:8000
+- API documentation: http://localhost:8000/docs
+
+For Windows, use setup.ps1 if provided, or run setup.sh through WSL/Git Bash.

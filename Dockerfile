@@ -1,44 +1,100 @@
-FROM python:3.11-slim-bullseye AS builder
+FROM python:3.11-slim-bullseye
 
+# ---------------------------------------------------------
+# Environment
+# ---------------------------------------------------------
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONPATH=/app
 
+# ---------------------------------------------------------
+# Working directory
+# ---------------------------------------------------------
 WORKDIR /app
-# System deps
-RUN groupadd --system --gid 1001 app \
-    && useradd --system --uid 1001 --gid app --create-home app
 
-WORKDIR /app
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-       curl \
-       procps \
+# ---------------------------------------------------------
+# System dependencies
+# ---------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    procps \
+    gcc \
+    g++ \
+    build-essential \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./
+# ---------------------------------------------------------
+# Create non-root user
+# ---------------------------------------------------------
+RUN groupadd --system --gid 1001 appgroup && \
+    useradd --system \
+    --uid 1001 \
+    --gid appgroup \
+    --create-home \
+    --home-dir /home/appuser \
+    appuser
 
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-RUN pip install -r requirements.txt
+# ---------------------------------------------------------
+# Copy dependency file first
+# This improves Docker layer caching
+# ---------------------------------------------------------
+COPY requirements.txt /app/requirements.txt
 
-COPY . .
+# ---------------------------------------------------------
+# Install PyTorch CPU version
+# ---------------------------------------------------------
+RUN pip install --no-cache-dir \
+    torch \
+    --index-url https://download.pytorch.org/whl/cpu
 
-EXPOSE 8000
+# ---------------------------------------------------------
+# Install Python dependencies
+# ---------------------------------------------------------
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Create a secure, non-root system group and user
-RUN groupadd -r appgroup && useradd -r -g appgroup -d /app -s /sbin/nologin appuser
+# ---------------------------------------------------------
+# Copy application
+# ---------------------------------------------------------
+COPY . /app
 
-# Give our new user ownership over the application files
-RUN mkdir -p /app/.cache /app/data && chown -R appuser:appgroup /app
+# ---------------------------------------------------------
+# Create writable directories
+# ---------------------------------------------------------
+RUN mkdir -p \
+    /app/data \
+    /app/.cache \
+    /app/logs \
+    /app/tmp
 
-# Switch from root to non-root user
+# ---------------------------------------------------------
+# Set ownership
+# ---------------------------------------------------------
+RUN chown -R appuser:appgroup /app
+
+# ---------------------------------------------------------
+# Run as non-root
+# ---------------------------------------------------------
 USER appuser
 
-# Healthcheck running as non-root
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+# ---------------------------------------------------------
+# Port
+# ---------------------------------------------------------
+EXPOSE 8000
+
+# ---------------------------------------------------------
+# FastAPI healthcheck
+# ---------------------------------------------------------
+HEALTHCHECK --interval=30s \
+    --timeout=10s \
+    --start-period=40s \
+    --retries=3 \
     CMD curl -fsS http://localhost:8000/health || exit 1
 
-# Start the application
+# ---------------------------------------------------------
+# Default application
+# docker-compose overrides this for worker/flower
+# ---------------------------------------------------------
 CMD ["uvicorn", "orchestrator.main:app", "--host", "0.0.0.0", "--port", "8000"]
