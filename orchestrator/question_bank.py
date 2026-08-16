@@ -141,11 +141,9 @@ class QuestionBank:
 
         try:
             for category, required_count in question_plan.items():
-
                 if category not in self.CATEGORIES:
                     raise ValueError(
-                        f"Invalid category in question plan: {category}. "
-                        f"Must be one of: {self.CATEGORIES}"
+                        f"Invalid category in question plan: {category}. Must be one of: {self.CATEGORIES}"
                     )
 
                 if required_count <= 0:

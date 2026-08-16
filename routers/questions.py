@@ -77,6 +77,7 @@ def create_question_routes(question_bank) -> APIRouter:
         except Exception as e:
             logger.error(f"Error adding question: {e!s}")
             raise HTTPException(status_code=500, detail="Error adding question")
+
     @router.post("/questions/by-plan")
     async def get_questions_by_plan(
         question_plan: dict[str, int],
@@ -109,14 +110,13 @@ def create_question_routes(question_bank) -> APIRouter:
             )
 
         except Exception as e:
-            logger.error(
-                f"Error retrieving questions by plan: {e!s}"
-            )
+            logger.error(f"Error retrieving questions by plan: {e!s}")
 
             raise HTTPException(
                 status_code=500,
                 detail="Error retrieving questions by plan",
             )
+
     @router.put("/questions/{question_id}")
     async def update_question(
         question_id: str,
@@ -158,4 +158,5 @@ def create_question_routes(question_bank) -> APIRouter:
         except Exception as e:
             logger.error(f"Error deleting question: {e!s}")
             raise HTTPException(status_code=500, detail="Error deleting question")
+
     return router

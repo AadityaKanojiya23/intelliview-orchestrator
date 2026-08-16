@@ -189,7 +189,7 @@ DOMAIN_QUESTION_BANK = {
             "difficulty": "hard",
             "tags": ["prompt_engineering", "optimization"],
         },
-    ],   
+    ],
     "general_behavioral": [
         {
             "question_id": "q_beh_01",
@@ -255,7 +255,9 @@ def normalize_domain(domain: str | None) -> str:
     return d
 
 
-def validate_category_distribution(distribution: dict[str, float] | None) -> dict[str, float]:
+def validate_category_distribution(
+    distribution: dict[str, float] | None,
+) -> dict[str, float]:
     """
     Validates category distribution map.
     Accepts fractions (e.g. 0.40, 0.30, 0.30) or percentages (e.g. 40, 30, 30).
@@ -309,7 +311,9 @@ def build_question_plan(
     Calculates exact counts for technical, behavioral, and situational questions.
     """
     question_count = int(template.get("question_count", 10))
-    domain_name = normalize_domain(domain or template.get("domain") or template.get("name"))
+    domain_name = normalize_domain(
+        domain or template.get("domain") or template.get("name")
+    )
     distribution = validate_category_distribution(template.get("category_distribution"))
 
     tech_pct = distribution.get("technical", 0.40)
@@ -338,14 +342,18 @@ def build_question_plan(
     return plan
 
 
-def get_template_questions(domain: str | None, distribution: dict[str, float] | None, question_count: int = 10) -> list[dict[str, Any]]:
+def get_template_questions(
+    domain: str | None, distribution: dict[str, float] | None, question_count: int = 10
+) -> list[dict[str, Any]]:
     """
     Generates an ordered question list matching the template's domain and category distribution.
     For Python Dev templates, returns 40% Python technical, 30% behavioral, 30% situational questions.
     """
     dom = normalize_domain(domain)
     dist = validate_category_distribution(distribution)
-    plan = build_question_plan({"question_count": question_count, "category_distribution": dist}, domain=dom)
+    plan = build_question_plan(
+        {"question_count": question_count, "category_distribution": dist}, domain=dom
+    )
 
     tech_needed = plan["category_counts"]["technical"]
     beh_needed = plan["category_counts"]["behavioral"]
@@ -356,9 +364,7 @@ def get_template_questions(domain: str | None, distribution: dict[str, float] | 
     # 1. Fetch domain technical questions
     tech_pool = DOMAIN_QUESTION_BANK.get(dom)
     if tech_pool is None:
-        raise ValueError(
-            f"No question bank available for domain: {dom}"
-        )
+        raise ValueError(f"No question bank available for domain: {dom}")
     for q in tech_pool[:tech_needed]:
         selected_questions.append(q)
 

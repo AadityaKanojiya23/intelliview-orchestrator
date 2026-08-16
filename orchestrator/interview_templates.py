@@ -11,12 +11,13 @@ from sqlalchemy import select
 
 from database.db import SessionLocal
 from database.models import InterviewTemplate
-from orchestrator.time_utils import utcnow
 from orchestrator.interview_question_logic import (
     build_question_plan,
     normalize_domain,
     validate_category_distribution,
 )
+from orchestrator.time_utils import utcnow
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,7 +62,9 @@ class InterviewTemplateManager:
                 domain=domain,
                 duration_minutes=duration_minutes,
                 question_count=question_count,
-                category_distribution=validate_category_distribution(category_distribution),
+                category_distribution=validate_category_distribution(
+                    category_distribution
+                ),
                 difficulty_distribution=difficulty_distribution or {},
                 usage_count=0,
                 success_rate=None,
@@ -72,8 +75,7 @@ class InterviewTemplateManager:
             db.commit()
 
             logger.info(
-                "Created interview template %s: %s "
-                "(type=%s, domain=%s, questions=%s)",
+                "Created interview template %s: %s (type=%s, domain=%s, questions=%s)",
                 template_id,
                 name,
                 interview_type,
@@ -128,9 +130,10 @@ class InterviewTemplateManager:
             }
         finally:
             db.close()
+
     def build_template_question_plan(
-    self,
-    template_id: str,
+        self,
+        template_id: str,
     ) -> dict[str, Any] | None:
         """Build a question plan for an interview template."""
 
@@ -140,6 +143,7 @@ class InterviewTemplateManager:
             return None
 
         return build_question_plan(template)
+
     def list_templates(
         self,
         interview_type: str | None = None,
@@ -155,9 +159,7 @@ class InterviewTemplateManager:
                     InterviewTemplate.interview_type == interview_type.strip().lower()
                 )
             if domain:
-                stmt = stmt.where(
-                InterviewTemplate.domain == normalize_domain(domain)
-                )
+                stmt = stmt.where(InterviewTemplate.domain == normalize_domain(domain))
             stmt = stmt.order_by(InterviewTemplate.created_at.desc()).limit(limit)
             rows = db.execute(stmt).scalars().all()
 
@@ -180,6 +182,7 @@ class InterviewTemplateManager:
             ]
         finally:
             db.close()
+
     def update_template(
         self,
         template_id: str,
@@ -214,8 +217,7 @@ class InterviewTemplateManager:
 
                 if interview_type not in self.INTERVIEW_TYPES:
                     raise ValueError(
-                        f"Invalid interview type: {interview_type}. "
-                        f"Must be one of: {self.INTERVIEW_TYPES}"
+                        f"Invalid interview type: {interview_type}. Must be one of: {self.INTERVIEW_TYPES}"
                     )
 
                 template.interview_type = interview_type
@@ -233,8 +235,8 @@ class InterviewTemplateManager:
                 template.question_count = question_count
 
             if category_distribution is not None:
-                template.category_distribution = (
-                    validate_category_distribution(category_distribution)
+                template.category_distribution = validate_category_distribution(
+                    category_distribution
                 )
 
             if difficulty_distribution is not None:
@@ -253,23 +255,15 @@ class InterviewTemplateManager:
                 "domain": template.domain,
                 "duration_minutes": template.duration_minutes,
                 "question_count": template.question_count,
-                "category_distribution": (
-                    template.category_distribution or {}
-                ),
-                "difficulty_distribution": (
-                    template.difficulty_distribution or {}
-                ),
+                "category_distribution": (template.category_distribution or {}),
+                "difficulty_distribution": (template.difficulty_distribution or {}),
                 "usage_count": template.usage_count,
                 "success_rate": template.success_rate,
                 "created_at": (
-                    template.created_at.isoformat()
-                    if template.created_at
-                    else None
+                    template.created_at.isoformat() if template.created_at else None
                 ),
                 "updated_at": (
-                    template.updated_at.isoformat()
-                    if template.updated_at
-                    else None
+                    template.updated_at.isoformat() if template.updated_at else None
                 ),
             }
 
@@ -279,6 +273,7 @@ class InterviewTemplateManager:
 
         finally:
             db.close()
+
     def record_usage(self, template_id: str, success: bool = True) -> bool:
         """Record a template usage and update success rate"""
         db = SessionLocal()
@@ -308,6 +303,7 @@ class InterviewTemplateManager:
             return False
         finally:
             db.close()
+
     def delete_template(self, template_id: str) -> bool:
         """Delete an interview template by ID."""
 
@@ -340,7 +336,9 @@ class InterviewTemplateManager:
         finally:
             db.close()
 
-    def _validate_distribution(self, distribution: dict[str, float] | None, field_name: str) -> None:
+    def _validate_distribution(
+        self, distribution: dict[str, float] | None, field_name: str
+    ) -> None:
         """Ensure a percentage distribution sums to 100 if provided."""
         if not distribution:
             return
@@ -459,5 +457,6 @@ class InterviewTemplateManager:
             for category, pct in distribution.items()
         }
         return {"template_id": template_id, "question_plan": plan}
+
 
 interview_template_manager = InterviewTemplateManager()

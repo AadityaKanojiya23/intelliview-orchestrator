@@ -82,9 +82,7 @@ def create_template_routes(interview_template_manager) -> APIRouter:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(
-                f"Error getting template {template_id}: {e!s}"
-            )
+            logger.error(f"Error getting template {template_id}: {e!s}")
             raise HTTPException(
                 status_code=500,
                 detail="Error retrieving template",
@@ -116,9 +114,7 @@ def create_template_routes(interview_template_manager) -> APIRouter:
             )
 
         except Exception as e:
-            logger.error(
-                f"Error creating template: {e!s}"
-            )
+            logger.error(f"Error creating template: {e!s}")
             raise HTTPException(
                 status_code=500,
                 detail="Error creating template",
@@ -162,9 +158,7 @@ def create_template_routes(interview_template_manager) -> APIRouter:
             raise
 
         except Exception as e:
-            logger.error(
-                f"Error updating template {template_id}: {e!s}"
-            )
+            logger.error(f"Error updating template {template_id}: {e!s}")
             raise HTTPException(
                 status_code=500,
                 detail="Error updating template",
@@ -177,9 +171,7 @@ def create_template_routes(interview_template_manager) -> APIRouter:
     ):
         """Delete an interview template."""
         try:
-            success = interview_template_manager.delete_template(
-                template_id
-            )
+            success = interview_template_manager.delete_template(template_id)
 
             if not success:
                 raise HTTPException(
@@ -197,9 +189,7 @@ def create_template_routes(interview_template_manager) -> APIRouter:
             raise
 
         except Exception as e:
-            logger.error(
-                f"Error deleting template {template_id}: {e!s}"
-            )
+            logger.error(f"Error deleting template {template_id}: {e!s}")
             raise HTTPException(
                 status_code=500,
                 detail="Error deleting template",
@@ -214,9 +204,7 @@ def create_template_routes(interview_template_manager) -> APIRouter:
     ):
         """Generate the question plan for a selected interview template."""
         try:
-            plan = interview_template_manager.build_template_question_plan(
-                template_id
-            )
+            plan = interview_template_manager.build_template_question_plan(template_id)
 
             if not plan:
                 raise HTTPException(
@@ -236,10 +224,7 @@ def create_template_routes(interview_template_manager) -> APIRouter:
             )
 
         except Exception as e:
-            logger.error(
-                f"Error generating question plan for "
-                f"{template_id}: {e!s}"
-            )
+            logger.error(f"Error generating question plan for {template_id}: {e!s}")
             raise HTTPException(
                 status_code=500,
                 detail="Error generating question plan",

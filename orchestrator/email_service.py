@@ -62,7 +62,7 @@ Candidate: {candidate_name} ({candidate_email})
 Date: {interview_date}
 Time: {interview_time}
 Interviewer: {interviewer_name}
-{f'Notes: {notes}' if notes else ''}
+{f"Notes: {notes}" if notes else ""}
 
 Please make sure to join on time. 
 
@@ -119,7 +119,7 @@ IntelliView Interview Team
           <td style="padding: 6px 0; color: #a1a1aa; font-size: 14px;">Interviewer:</td>
           <td style="padding: 6px 0; color: #f4f4f5; font-size: 14px;">{interviewer_name}</td>
         </tr>
-        {f'<tr><td style="padding: 6px 0; color: #a1a1aa; font-size: 14px;">Notes:</td><td style="padding: 6px 0; color: #e4e4e7; font-size: 14px;">{notes}</td></tr>' if notes else ''}
+        {f'<tr><td style="padding: 6px 0; color: #a1a1aa; font-size: 14px;">Notes:</td><td style="padding: 6px 0; color: #e4e4e7; font-size: 14px;">{notes}</td></tr>' if notes else ""}
       </table>
     </div>
 

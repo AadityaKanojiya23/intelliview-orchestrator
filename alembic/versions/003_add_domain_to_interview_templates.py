@@ -4,7 +4,6 @@ import sqlalchemy as sa
 
 from alembic import op
 
-
 revision = "003_add_template_domain"
 
 down_revision = "002_add_llm_usage"
