@@ -40,19 +40,30 @@ class InterviewTemplateManager:
         category_distribution: dict[str, float] | None = None,
         difficulty_distribution: dict[str, float] | None = None,
     ) -> dict[str, Any]:
-        """Create a new interview template"""
+        """Create a new interview template."""
         interview_type = interview_type.strip().lower()
         domain = normalize_domain(domain)
+
         if interview_type not in self.INTERVIEW_TYPES:
             raise ValueError(
-                f"Invalid interview type: {interview_type}. Must be one of: {self.INTERVIEW_TYPES}"
+                f"Invalid interview type: {interview_type}. "
+                f"Must be one of: {self.INTERVIEW_TYPES}"
             )
-        self._validate_distribution(category_distribution, "category_distribution")
-        self._validate_distribution(difficulty_distribution, "difficulty_distribution")
+
+        self._validate_distribution(
+            category_distribution,
+            "category_distribution",
+        )
+        self._validate_distribution(
+            difficulty_distribution,
+            "difficulty_distribution",
+        )
+
         template_id = f"tmpl_{uuid.uuid4().hex[:12]}"
         now = utcnow()
 
         db = SessionLocal()
+
         try:
             template = InterviewTemplate(
                 template_id=template_id,
@@ -71,17 +82,20 @@ class InterviewTemplateManager:
                 created_at=now,
                 updated_at=now,
             )
+
             db.add(template)
             db.commit()
 
             logger.info(
-                "Created interview template %s: %s (type=%s, domain=%s, questions=%s)",
+                "Created interview template %s: %s "
+                "(type=%s, domain=%s, questions=%s)",
                 template_id,
                 name,
                 interview_type,
                 domain,
                 question_count,
             )
+
             return {
                 "template_id": template_id,
                 "name": name.strip(),
@@ -96,38 +110,46 @@ class InterviewTemplateManager:
                 "success_rate": None,
                 "created_at": now.isoformat(),
             }
+
         except Exception as e:
             db.rollback()
             logger.error(f"Error creating template: {e}")
             raise
+
         finally:
             db.close()
 
     def get_template(self, template_id: str) -> dict[str, Any] | None:
-        """Get a template by ID"""
+        """Get a template by ID."""
         db = SessionLocal()
+
         try:
-            t = db.execute(
+            template = db.execute(
                 select(InterviewTemplate).where(
                     InterviewTemplate.template_id == template_id
                 )
             ).scalar_one_or_none()
-            if not t:
+
+            if not template:
                 return None
+
             return {
-                "template_id": t.template_id,
-                "name": t.name,
-                "description": t.description,
-                "interview_type": t.interview_type,
-                "domain": t.domain,
-                "duration_minutes": t.duration_minutes,
-                "question_count": t.question_count,
-                "category_distribution": t.category_distribution or {},
-                "difficulty_distribution": t.difficulty_distribution or {},
-                "usage_count": t.usage_count,
-                "success_rate": t.success_rate,
-                "created_at": t.created_at.isoformat() if t.created_at else None,
+                "template_id": template.template_id,
+                "name": template.name,
+                "description": template.description,
+                "interview_type": template.interview_type,
+                "domain": template.domain,
+                "duration_minutes": template.duration_minutes,
+                "question_count": template.question_count,
+                "category_distribution": (template.category_distribution or {}),
+                "difficulty_distribution": (template.difficulty_distribution or {}),
+                "usage_count": template.usage_count,
+                "success_rate": template.success_rate,
+                "created_at": (
+                    template.created_at.isoformat() if template.created_at else None
+                ),
             }
+
         finally:
             db.close()
 
@@ -136,7 +158,6 @@ class InterviewTemplateManager:
         template_id: str,
     ) -> dict[str, Any] | None:
         """Build a question plan for an interview template."""
-
         template = self.get_template(template_id)
 
         if not template:
@@ -150,36 +171,44 @@ class InterviewTemplateManager:
         domain: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
-        """List templates with optional type filter"""
+        """List templates with optional type and domain filters."""
         db = SessionLocal()
+
         try:
             stmt = select(InterviewTemplate)
+
             if interview_type:
                 stmt = stmt.where(
                     InterviewTemplate.interview_type == interview_type.strip().lower()
                 )
+
             if domain:
                 stmt = stmt.where(InterviewTemplate.domain == normalize_domain(domain))
+
             stmt = stmt.order_by(InterviewTemplate.created_at.desc()).limit(limit)
+
             rows = db.execute(stmt).scalars().all()
 
             return [
                 {
-                    "template_id": t.template_id,
-                    "name": t.name,
-                    "description": t.description,
-                    "interview_type": t.interview_type,
-                    "domain": t.domain,
-                    "duration_minutes": t.duration_minutes,
-                    "question_count": t.question_count,
-                    "category_distribution": t.category_distribution or {},
-                    "difficulty_distribution": t.difficulty_distribution or {},
-                    "usage_count": t.usage_count,
-                    "success_rate": t.success_rate,
-                    "created_at": t.created_at.isoformat() if t.created_at else None,
+                    "template_id": template.template_id,
+                    "name": template.name,
+                    "description": template.description,
+                    "interview_type": template.interview_type,
+                    "domain": template.domain,
+                    "duration_minutes": template.duration_minutes,
+                    "question_count": template.question_count,
+                    "category_distribution": (template.category_distribution or {}),
+                    "difficulty_distribution": (template.difficulty_distribution or {}),
+                    "usage_count": template.usage_count,
+                    "success_rate": template.success_rate,
+                    "created_at": (
+                        template.created_at.isoformat() if template.created_at else None
+                    ),
                 }
-                for t in rows
+                for template in rows
             ]
+
         finally:
             db.close()
 
@@ -196,7 +225,6 @@ class InterviewTemplateManager:
         difficulty_distribution: dict[str, float] | None = None,
     ) -> dict[str, Any] | None:
         """Update an existing interview template."""
-
         db = SessionLocal()
 
         try:
@@ -217,7 +245,8 @@ class InterviewTemplateManager:
 
                 if interview_type not in self.INTERVIEW_TYPES:
                     raise ValueError(
-                        f"Invalid interview type: {interview_type}. Must be one of: {self.INTERVIEW_TYPES}"
+                        f"Invalid interview type: {interview_type}. "
+                        f"Must be one of: {self.INTERVIEW_TYPES}"
                     )
 
                 template.interview_type = interview_type
@@ -274,39 +303,50 @@ class InterviewTemplateManager:
         finally:
             db.close()
 
-    def record_usage(self, template_id: str, success: bool = True) -> bool:
-        """Record a template usage and update success rate"""
+    def record_usage(
+        self,
+        template_id: str,
+        success: bool = True,
+    ) -> bool:
+        """Record a template usage and update success rate."""
         db = SessionLocal()
+
         try:
-            t = db.execute(
+            template = db.execute(
                 select(InterviewTemplate).where(
                     InterviewTemplate.template_id == template_id
                 )
             ).scalar_one_or_none()
-            if not t:
+
+            if not template:
                 return False
 
-            t.usage_count = (t.usage_count or 0) + 1
-            count = t.usage_count
-            if t.success_rate is None:
-                t.success_rate = 1.0 if success else 0.0
+            template.usage_count = (template.usage_count or 0) + 1
+            count = template.usage_count
+
+            if template.success_rate is None:
+                template.success_rate = 1.0 if success else 0.0
             else:
-                t.success_rate = (
-                    (t.success_rate * (count - 1)) + (1.0 if success else 0.0)
+                template.success_rate = (
+                    (template.success_rate * (count - 1)) + (1.0 if success else 0.0)
                 ) / count
-            t.updated_at = utcnow()
+
+            template.updated_at = utcnow()
+
             db.commit()
+
             return True
+
         except Exception as e:
             db.rollback()
             logger.error(f"Error recording template usage: {e}")
             return False
+
         finally:
             db.close()
 
     def delete_template(self, template_id: str) -> bool:
         """Delete an interview template by ID."""
-
         db = SessionLocal()
 
         try:
@@ -337,33 +377,49 @@ class InterviewTemplateManager:
             db.close()
 
     def _validate_distribution(
-        self, distribution: dict[str, float] | None, field_name: str
+        self,
+        distribution: dict[str, float] | None,
+        field_name: str,
     ) -> None:
         """Ensure a percentage distribution sums to 100 if provided."""
         if not distribution:
             return
+
         total = sum(distribution.values())
+
         if any(pct < 0 for pct in distribution.values()):
             raise ValueError(f"{field_name} percentages cannot be negative")
+
         if abs(total - 100) > 0.01:
             raise ValueError(f"{field_name} must sum to 100, got {total}")
 
-    def get_question_plan(self, template_id: str) -> dict[str, Any] | None:
+    def get_question_plan(
+        self,
+        template_id: str,
+    ) -> dict[str, Any] | None:
         """
-        Connects a template to the question system: given a template's
-        question_count and category_distribution, returns how many
-        questions to pull from each category.
+        Connect a template to the question system.
+
+        Given a template's question_count and category_distribution,
+        return how many questions to pull from each category.
         """
         template = self.get_template(template_id)
+
         if not template:
             return None
+
         question_count = template["question_count"]
         distribution = template["category_distribution"] or {}
+
         plan = {
             category: round(question_count * pct / 100)
             for category, pct in distribution.items()
         }
-        return {"template_id": template_id, "question_plan": plan}
+
+        return {
+            "template_id": template_id,
+            "question_plan": plan,
+        }
 
 
 interview_template_manager = InterviewTemplateManager()
