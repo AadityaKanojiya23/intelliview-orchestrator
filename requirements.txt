@@ -40,3 +40,6 @@ testcontainers
 
 #for hallucination_detector
 sentence-transformers
+
+google-generativeai
+

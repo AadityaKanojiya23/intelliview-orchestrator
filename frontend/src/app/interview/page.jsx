@@ -46,14 +46,22 @@ export default function InterviewPage() {
   const [audioLevels, setAudioLevels] = useState(new Array(32).fill(0));
   const [candidate, setCandidate] = useState("");
   const [starting, setStarting] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+
   const [answerText, setAnswerText] = useState("");
+  const [questionLoading, setQuestionLoading] = useState(false);
+  const [answerLoading, setAnswerLoading] = useState(false);
+  const [qaFeedback, setQaFeedback] = useState(null);
+
   const [questionScore, setQuestionScore] = useState("");
   const [questionId, setQuestionId] = useState("");
+
   const [evaluation, setEvaluation] = useState({
     score: null,
     overall_score: null,
     feedback: "",
   });
+
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const {
@@ -133,7 +141,63 @@ export default function InterviewPage() {
     }
     setAudioEnabled((v) => !v);
   }, [audioEnabled]);
+  const handleNextQuestion = async () => {
+    if (!activeSession) {
+      toast.warn("Start the interview first");
+      return;
+    }
 
+    setQuestionLoading(true);
+
+    try {
+      const response = await endpoints.askQuestion({
+        session_id: activeSession,
+      });
+
+      setCurrentQuestion(response);
+      setAnswerText("");
+      setQaFeedback(null);
+    } catch (err) {
+      toast.error(
+        "Failed to get question",
+        err instanceof Error ? err.message : String(err)
+      );
+    } finally {
+      setQuestionLoading(false);
+    }
+  };
+
+  const handleSubmitAnswer = async () => {
+    if (!activeSession || !currentQuestion) {
+      toast.warn("Get a question first");
+      return;
+    }
+
+    if (!answerText.trim()) {
+      toast.warn("Enter an answer first");
+      return;
+    }
+
+    setAnswerLoading(true);
+
+    try {
+      const response = await endpoints.submitAnswer({
+        session_id: activeSession,
+        question_id: currentQuestion.question_id,
+        answer_text: answerText.trim(),
+        score: null,
+      });
+
+      setQaFeedback(response);
+    } catch (err) {
+      toast.error(
+        "Failed to submit answer",
+        err instanceof Error ? err.message : String(err)
+      );
+    } finally {
+      setAnswerLoading(false);
+    }
+  };
   const handleStart = async () => {
     if (!candidate.trim()) {
       toast.warn("Enter a candidate ID", "Required to start the interview");
@@ -353,7 +417,101 @@ export default function InterviewPage() {
                 </div>
               )}
             </Card>
+<Card
+  title="Interview Q&A"
+  description="Ask the candidate questions and record their answers."
+>
+  <div className="space-y-4">
+    {/* Current Question */}
+    <div className="rounded-md border border-border bg-bg-card p-4">
+      <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+        Current Question
+      </div>
 
+      {currentQuestion ? (
+        <p className="text-base font-medium text-zinc-100">
+          {currentQuestion.question ||
+            currentQuestion.question_text ||
+            "Question received."}
+        </p>
+      ) : (
+        <p className="text-sm text-muted">
+          Click "Next Question" to get the first interview question.
+        </p>
+      )}
+    </div>
+
+    {/* Answer */}
+    <div>
+      <label className="mb-2 block text-xs font-medium text-muted">
+        Candidate Answer
+      </label>
+
+      <textarea
+        value={answerText}
+        onChange={(e) => setAnswerText(e.target.value)}
+        disabled={!currentQuestion || answerLoading}
+        placeholder={
+          currentQuestion
+            ? "Type the candidate's answer here..."
+            : "Get a question first..."
+        }
+        rows={5}
+        className="w-full resize-none rounded-md border border-border bg-bg-card px-3 py-2 text-sm text-zinc-100 placeholder:text-muted focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      />
+    </div>
+
+    {/* Buttons */}
+    <div className="flex flex-wrap gap-2">
+      <button
+        onClick={handleNextQuestion}
+        disabled={!isLive || questionLoading || !activeSession}
+        className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {questionLoading ? "Getting Question..." : "Next Question"}
+      </button>
+
+      <button
+        onClick={handleSubmitAnswer}
+        disabled={
+          !currentQuestion ||
+          !answerText.trim() ||
+          answerLoading
+        }
+        className="rounded-md border border-border bg-bg-card px-4 py-2 text-sm font-medium text-zinc-100 hover:bg-bg-panel disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {answerLoading ? "Submitting..." : "Submit Answer"}
+      </button>
+    </div>
+
+    {/* Score / Feedback */}
+    {qaFeedback && (
+      <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-4">
+        <div className="mb-2 text-xs font-medium uppercase tracking-wide text-emerald-400">
+          Answer Feedback
+        </div>
+
+        {qaFeedback.score != null && (
+          <div className="mb-2 text-lg font-semibold text-zinc-100">
+            Score: {qaFeedback.score}
+          </div>
+        )}
+
+        {qaFeedback.feedback && (
+          <p className="text-sm text-zinc-300">
+            {qaFeedback.feedback}
+          </p>
+        )}
+
+        {qaFeedback.message && !qaFeedback.feedback && (
+          <p className="text-sm text-zinc-300">
+            {qaFeedback.message}
+          </p>
+        )}
+      </div>
+    )}
+  </div>
+</Card>
           <div className="space-y-4">
             <Card title="Risk Score" description="Real-time risk assessment">
               <div className="flex flex-col items-center py-4">

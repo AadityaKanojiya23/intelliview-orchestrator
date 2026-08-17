@@ -47,6 +47,9 @@ class ApiClient {
   delete(path) {
     return this.request("DELETE", path);
   }
+  put(path, body) {
+    return this.request("PUT", path, body);
+  }
   /** Build the WebSocket URL with the token as a query param. */
   wsUrl(path) {
     const base = (process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000").replace(/^http/, "ws");
@@ -58,6 +61,9 @@ const api = new ApiClient();
 const endpoints = {
   health: () => api.get("/health"),
   startInterview: (payload) => api.post("/start-interview", payload),
+  askQuestion: (payload) => api.post("/interviews/ask-question", payload),
+
+submitAnswer: (payload) => api.post("/interviews/submit-answer", payload),
   sessionStatus: (id) => api.get(`/session-status/${id}`),
   activeSessions: () => api.get("/active-sessions"),
   completedSessions: (limit = 50) => api.get(`/completed-sessions?limit=${limit}`),
@@ -76,11 +82,18 @@ const endpoints = {
   faultStatistics: () => api.get("/fault-statistics"),
   failureLog: (limit = 50) => api.get(`/failure-log?limit=${limit}`),
   deadLetterQueue: (limit = 50) => api.get(`/dead-letter-queue?limit=${limit}`),
-retrySession: (session_id) => api.post(`/retry-session/${session_id}`),
-detectFailures: () => api.post("/detect-failures"),
-reportWebVitals: (payload) => api.post("/metrics/web-vitals", payload),
-submitAnswer: (payload) =>api.post("/interviews/submit-answer", payload),
+  retrySession: (session_id) => api.post(`/retry-session/${session_id}`),
+  detectFailures: () => api.post("/detect-failures"),
+  reportWebVitals: (payload) => api.post("/metrics/web-vitals", payload),
+  submitAnswer: (payload) => api.post("/interviews/submit-answer", payload),
 
+  listQuestions: () => api.get("/questions"),
+  createQuestion: (payload) => api.post("/questions", payload),
+  updateQuestion: (questionId, payload) =>
+    api.put(`/questions/${questionId}`, payload),
+  deleteQuestion: (questionId) =>
+    api.delete(`/questions/${questionId}`),
+  };
 
 export {
   ApiClient,
