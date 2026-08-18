@@ -46,12 +46,24 @@ export default function InterviewPage() {
   const [audioLevels, setAudioLevels] = useState(new Array(32).fill(0));
   const [candidate, setCandidate] = useState("");
   const [starting, setStarting] = useState(false);
-    const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+
   const [answerText, setAnswerText] = useState("");
   const [questionLoading, setQuestionLoading] = useState(false);
   const [answerLoading, setAnswerLoading] = useState(false);
   const [qaFeedback, setQaFeedback] = useState(null);
 
+  const [questionScore, setQuestionScore] = useState("");
+  const [questionId, setQuestionId] = useState("");
+
+  const [evaluation, setEvaluation] = useState({
+    score: null,
+    overall_score: null,
+    feedback: "",
+  });
+
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const {
     moments,
     isTracking,
@@ -218,7 +230,68 @@ export default function InterviewPage() {
     setFeedback([]);
     toast.info("Interview ended");
   };
+  
+  const handleSubmitAnswer = async () => {
+    setSubmitError("");
 
+    // Empty answer validation
+    if (!answerText.trim()) {
+      setSubmitError("Please enter the candidate's answer.");
+      toast.warn("Candidate answer is required.");
+      return;
+    }
+
+    // Session validation
+    if (!activeSession) {
+      setSubmitError("No active interview session.");
+      toast.error("Start an interview first.");
+      return;
+    }
+
+    // Question validation
+    if (!questionId.trim()) {
+      setSubmitError("Please enter Question ID.");
+      toast.warn("Question ID is required.");
+      return;
+    }
+
+    setSubmitLoading(true);
+
+    try {
+      const response = await endpoints.submitAnswer({
+        session_id: activeSession,
+        question_id: questionId,
+        answer_text: answerText,
+        score:
+          questionScore === ""
+            ? null
+            : Number(questionScore),
+      });
+
+      setEvaluation({
+        score: response.score,
+        overall_score: response.overall_score,
+        feedback: response.feedback,
+      });
+
+      toast.success("Answer submitted successfully.");
+
+      // Optional: clear inputs after successful submission
+      setAnswerText("");
+      setQuestionScore("");
+      setQuestionId("");
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to submit answer.";
+
+      setSubmitError(message);
+      toast.error("Submission Failed", message);
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
   const handlePause = () => {
     setIsPaused((v) => !v);
     if (streamRef.current) {
@@ -520,7 +593,92 @@ export default function InterviewPage() {
                 </div>
               </div>
             </Card>
+            <Card
+              title="Answer Evaluation"
+              description="Evaluate candidate answer and view AI feedback."
+            >
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Question ID
+                  </label>
 
+                  <input
+                    type="text"
+                    value={questionId}
+                    onChange={(e) => setQuestionId(e.target.value)}
+                    placeholder="Enter Question ID"
+                    className="w-full rounded-lg border border-border bg-bg-card p-3"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Candidate Answer
+                  </label>
+
+                  <textarea
+                    rows={5}
+                    value={answerText}
+                    onChange={(e) => setAnswerText(e.target.value)}
+                    placeholder="Type candidate answer here..."
+                    className="w-full rounded-lg border border-border bg-bg-card p-3"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Score (0 - 10)
+                  </label>
+
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                    value={questionScore}
+                    onChange={(e) => setQuestionScore(e.target.value)}
+                    className="w-40 rounded-lg border border-border bg-bg-card p-2"
+                  />
+                </div>
+
+                {submitError && (
+                  <div className="rounded-lg border border-red-500 bg-red-500/10 p-3 text-red-400">
+                    {submitError}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleSubmitAnswer}
+                  disabled={submitLoading}
+                  className="rounded-lg bg-accent px-5 py-2 text-white disabled:opacity-60"
+                >
+                  {submitLoading ? "Submitting..." : "Submit Answer"}
+                </button>
+
+                <div className="rounded-lg border border-border p-4 space-y-2">
+                  <h3 className="font-semibold">AI Evaluation</h3>
+
+                  <p>
+                    <strong>Score:</strong>{" "}
+                    {evaluation.score ?? "--"}
+                  </p>
+
+                  <p>
+                    <strong>Overall Score:</strong>{" "}
+                    {evaluation.overall_score ?? "--"}
+                  </p>
+
+                  <div>
+                    <strong>Feedback:</strong>
+
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {evaluation.feedback || "No feedback available yet."}
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+            </Card>
             <Card
     title="Risk Timeline"
     description={
