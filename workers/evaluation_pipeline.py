@@ -31,7 +31,9 @@ from workers.prompt_categorization import categorize_prompt
 # ---------------------------------------------------------------------------
 
 
-def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
+def _llm_evaluate_answer_quality(
+    session_id: str, question: str, answer: str
+) -> dict[str, Any] | None:
     """Use GPT-4o/Gemini/Grok to evaluate answer quality and relevance."""
     prompt = (
         "Evaluate the candidate's answer. "
@@ -65,11 +67,15 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                 try:
                     parsed = json.loads(response)
                 except json.JSONDecodeError:
-                    logger.error("Invalid JSON from LLM (openai, quality): %s", response)
+                    logger.error(
+                        "Invalid JSON from LLM (openai, quality): %s", response
+                    )
                 return None
 
                 return {
-                    "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
+                    "overall_quality_score": round(
+                        parsed.get("overall_quality_score", 50), 2
+                    ),
                     "relevance": round(parsed.get("relevance", 0.5), 2),
                     "completeness": round(parsed.get("completeness", 0.5), 2),
                     "clarity": round(parsed.get("clarity", 0.5), 2),
@@ -99,10 +105,14 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                 try:
                     parsed = json.loads(response)
                 except json.JSONDecodeError:
-                    logger.error("Invalid JSON from LLM (openai, quality): %s", response)
+                    logger.error(
+                        "Invalid JSON from LLM (openai, quality): %s", response
+                    )
                 return None
             return {
-                "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
+                "overall_quality_score": round(
+                    parsed.get("overall_quality_score", 50), 2
+                ),
                 "relevance": round(parsed.get("relevance", 0.5), 2),
                 "completeness": round(parsed.get("completeness", 0.5), 2),
                 "clarity": round(parsed.get("clarity", 0.5), 2),
@@ -137,10 +147,14 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
                 try:
                     parsed = json.loads(response)
                 except json.JSONDecodeError:
-                    logger.error("Invalid JSON from LLM (gemini, quality): %s", response)
+                    logger.error(
+                        "Invalid JSON from LLM (gemini, quality): %s", response
+                    )
                     return None
                 return {
-                    "overall_quality_score": round(parsed.get("overall_quality_score", 50), 2),
+                    "overall_quality_score": round(
+                        parsed.get("overall_quality_score", 50), 2
+                    ),
                     "relevance": round(parsed.get("relevance", 0.5), 2),
                     "completeness": round(parsed.get("completeness", 0.5), 2),
                     "clarity": round(parsed.get("clarity", 0.5), 2),
@@ -155,7 +169,9 @@ def _llm_evaluate_answer_quality(session_id: str, question: str, answer: str) ->
     return None
 
 
-def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
+def _llm_evaluate_technical_accuracy(
+    session_id: str, question: str, answer: str
+) -> dict[str, Any] | None:
     """Use GPT-4o/Gemini/Grok to evaluate technical accuracy."""
     prompt = (
         "Evaluate the answer. "
@@ -187,12 +203,16 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
                 try:
                     parsed = json.loads(response)
                 except json.JSONDecodeError:
-                    logger.error("Invalid JSON from LLM (openai, accuracy): %s", response)
+                    logger.error(
+                        "Invalid JSON from LLM (openai, accuracy): %s", response
+                    )
                     return None
                 return {
                     "accuracy_score": round(parsed.get("accuracy_score", 50), 2),
                     "correct_concepts_count": parsed.get("correct_concepts_count", 0),
-                    "incorrect_concepts_count": parsed.get("incorrect_concepts_count", 0),
+                    "incorrect_concepts_count": parsed.get(
+                        "incorrect_concepts_count", 0
+                    ),
                     "knowledge_gaps": parsed.get("knowledge_gaps", []),
                     "provider": "openai",
                     "usage": usage,
@@ -218,12 +238,16 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
                 try:
                     parsed = json.loads(response)
                 except json.JSONDecodeError:
-                    logger.error("Invalid JSON from LLM (gemini, accuracy): %s", response)
+                    logger.error(
+                        "Invalid JSON from LLM (gemini, accuracy): %s", response
+                    )
                     return None
                 return {
                     "accuracy_score": round(parsed.get("accuracy_score", 50), 2),
                     "correct_concepts_count": parsed.get("correct_concepts_count", 0),
-                    "incorrect_concepts_count": parsed.get("incorrect_concepts_count", 0),
+                    "incorrect_concepts_count": parsed.get(
+                        "incorrect_concepts_count", 0
+                    ),
                     "knowledge_gaps": parsed.get("knowledge_gaps", []),
                     "provider": "gemini",
                     "usage": usage,
@@ -259,7 +283,9 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
                 return {
                     "accuracy_score": round(parsed.get("accuracy_score", 50), 2),
                     "correct_concepts_count": parsed.get("correct_concepts_count", 0),
-                    "incorrect_concepts_count": parsed.get("incorrect_concepts_count", 0),
+                    "incorrect_concepts_count": parsed.get(
+                        "incorrect_concepts_count", 0
+                    ),
                     "knowledge_gaps": parsed.get("knowledge_gaps", []),
                     "provider": "grok",
                     "usage": usage,
@@ -270,7 +296,9 @@ def _llm_evaluate_technical_accuracy(session_id: str, question: str, answer: str
     return None
 
 
-def _llm_evaluate_communication(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
+def _llm_evaluate_communication(
+    session_id: str, question: str, answer: str
+) -> dict[str, Any] | None:
     """Use GPT-4o to evaluate communication clarity."""
     try:
         from workers.ai_client import chat_completion
@@ -319,7 +347,9 @@ def _llm_evaluate_communication(session_id: str, question: str, answer: str) -> 
         return None
 
 
-def _llm_generate_feedback(session_id: str, question: str, answer: str) -> dict[str, Any] | None:
+def _llm_generate_feedback(
+    session_id: str, question: str, answer: str
+) -> dict[str, Any] | None:
     """Use GPT-4o to generate personalized interview feedback."""
     try:
         from workers.ai_client import chat_completion
@@ -403,7 +433,9 @@ def _get_banned_patterns() -> list[re.Pattern[str]]:
                 "medical condition",
                 "health condition",
             ]
-        _BANNED_TOPIC_PATTERNS = [re.compile(r"\b" + kw + r"\b", re.IGNORECASE) for kw in BANNED_TOPICS]
+        _BANNED_TOPIC_PATTERNS = [
+            re.compile(r"\b" + kw + r"\b", re.IGNORECASE) for kw in BANNED_TOPICS
+        ]
     return _BANNED_TOPIC_PATTERNS
 
 
@@ -440,7 +472,9 @@ def validate_generated_question(question: str) -> tuple[bool, list[str]]:
     return (len(reasons) == 0, reasons)
 
 
-def _llm_generate_question(session_id: str, topic: str = "systems_design") -> str | None:
+def _llm_generate_question(
+    session_id: str, topic: str = "systems_design"
+) -> str | None:
     """Use LLM to generate a dynamic interview question."""
     try:
         from workers.ai_client import chat_completion
@@ -472,7 +506,9 @@ def _llm_generate_question(session_id: str, topic: str = "systems_design") -> st
         question = response.strip()
         is_valid, _reasons = validate_generated_question(question)
         if not question or not is_valid:
-            logger.warning("LLM-generated question failed validation (rejected): %s", question)
+            logger.warning(
+                "LLM-generated question failed validation (rejected): %s", question
+            )
             return None
 
         return question
@@ -500,7 +536,9 @@ def _get_hallucination_detector():
 
             _hallucination_detector = HallucinationDetector()
         except Exception as exc:
-            logger.warning(f"Hallucination detector models unavailable, using stub: {exc}")
+            logger.warning(
+                f"Hallucination detector models unavailable, using stub: {exc}"
+            )
             _hallucination_detector_unavailable = True
             return None
     return _hallucination_detector
@@ -521,7 +559,9 @@ def evaluate_hallucination(
             result = detector.evaluate(reference, answer)
             return result.to_dict()
         except Exception as exc:
-            logger.debug(f"Hallucination model evaluation failed, falling back to stub: {exc}")
+            logger.debug(
+                f"Hallucination model evaluation failed, falling back to stub: {exc}"
+            )
 
     base = 0.15 + _seeded_unit(session_id, "hallucination") * 0.3
     risk_level = "low" if base < 0.3 else "medium" if base < 0.6 else "high"
@@ -563,7 +603,9 @@ def score_answer(question: str, answer: str) -> dict[str, Any]:
         from workers.ai_client import HAS_GEMINI, gemini_generate
 
         if HAS_GEMINI:
-            response, usage = gemini_generate(prompt, temperature=0.2, max_output_tokens=512)
+            response, usage = gemini_generate(
+                prompt, temperature=0.2, max_output_tokens=512
+            )
             logger.info(
                 "llm_token_usage provider=%s model=%s tokens=%s",
                 usage.get("provider"),
@@ -582,7 +624,9 @@ def score_answer(question: str, answer: str) -> dict[str, Any]:
                         "gaps": parsed.get("gaps", []),
                     }
                 except (json.JSONDecodeError, TypeError, ValueError):
-                    logger.error("Invalid JSON from Gemini in score_answer: %s", response)
+                    logger.error(
+                        "Invalid JSON from Gemini in score_answer: %s", response
+                    )
     except Exception as exc:
         logger.debug("Gemini scoring failed in score_answer: %s", exc)
 
@@ -642,7 +686,9 @@ def evaluate_answer_quality(session_id: str) -> dict[str, Any]:
         "Distributed systems are collections of independent computers"
         "that work together as as a single system."
     )
-    candidate_answer = "I have five years of experience building distributed systems in Python and Go."
+    candidate_answer = (
+        "I have five years of experience building distributed systems in Python and Go."
+    )
     semantic_score = calculate_semantic_similarity(
         reference_answer,
         candidate_answer,
@@ -729,10 +775,14 @@ def calculate_evaluation_risk_score(results: dict[str, Any]) -> float:
     from workers.risk_engine import RiskScoringEngine
 
     # Fallback default values
-    quality = results.get("answer_quality_score", {}).get("overall_quality_score", 50) / 100.0
+    quality = (
+        results.get("answer_quality_score", {}).get("overall_quality_score", 50) / 100.0
+    )
     accuracy = results.get("technical_accuracy", {}).get("accuracy_score", 50) / 100.0
     clarity = results.get("communication_clarity", {}).get("clarity_score", 50) / 100.0
-    hallucination_score = 1.0 if results.get("hallucination_check", {}).get("is_hallucination") else 0.0
+    hallucination_score = (
+        1.0 if results.get("hallucination_check", {}).get("is_hallucination") else 0.0
+    )
 
     factors = RiskScoringEngine.get_evaluation_factors()
 

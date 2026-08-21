@@ -53,7 +53,9 @@ def postgres_container():
     """
 
     if os.getenv("GITHUB_ACTIONS") == "true":
-        database_url = "postgresql+psycopg2://postgres:postgres@localhost:5432/ai_interview_test"
+        database_url = (
+            "postgresql+psycopg2://postgres:postgres@localhost:5432/ai_interview_test"
+        )
 
         postgres = SimpleNamespace(get_connection_url=lambda: database_url)
 

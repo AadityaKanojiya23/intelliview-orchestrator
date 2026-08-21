@@ -22,7 +22,10 @@ def test_analyze_scoring_consistency_detects_group_gap():
     assert result["demographic_attribute"] == "gender"
     assert result["fairness_gap"] > 0.2
     assert result["status"] in {"REVIEW", "ALERT"}
-    assert result["groups"]["female"]["average_score"] > result["groups"]["male"]["average_score"]
+    assert (
+        result["groups"]["female"]["average_score"]
+        > result["groups"]["male"]["average_score"]
+    )
 
 
 def test_analyze_scoring_consistency_reports_pass_when_scores_are_balanced():

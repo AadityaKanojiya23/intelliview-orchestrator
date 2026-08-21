@@ -22,10 +22,18 @@ class CreateScheduleRequest(BaseModel):
     """Payload for creating a new interview schedule."""
 
     candidate_id: str = Field(..., description="ID of the candidate")
-    interviewer_id: str = Field(..., description="Name or ID of the assigned interviewer")
-    scheduled_at: datetime = Field(..., description="ISO datetime string for the scheduled interview")
-    notes: str | None = Field(default=None, description="Optional interview notes or description")
-    send_email: bool = Field(default=True, description="Whether to send confirmation email via smtplib")
+    interviewer_id: str = Field(
+        ..., description="Name or ID of the assigned interviewer"
+    )
+    scheduled_at: datetime = Field(
+        ..., description="ISO datetime string for the scheduled interview"
+    )
+    notes: str | None = Field(
+        default=None, description="Optional interview notes or description"
+    )
+    send_email: bool = Field(
+        default=True, description="Whether to send confirmation email via smtplib"
+    )
 
 
 class UpdateScheduleRequest(BaseModel):
@@ -33,7 +41,9 @@ class UpdateScheduleRequest(BaseModel):
 
     status: str | None = Field(default=None, description="New schedule status")
     notes: str | None = Field(default=None, description="Updated notes")
-    scheduled_at: datetime | None = Field(default=None, description="Rescheduled datetime")
+    scheduled_at: datetime | None = Field(
+        default=None, description="Rescheduled datetime"
+    )
 
 
 def create_schedule_routes() -> APIRouter:
@@ -121,7 +131,9 @@ def create_schedule_routes() -> APIRouter:
         except Exception as e:
             logger.error(f"Error scheduling interview: {e!s}")
             db.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to schedule interview: {e!s}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to schedule interview: {e!s}"
+            )
 
     @router.get("")
     async def list_schedules(
@@ -163,7 +175,9 @@ def create_schedule_routes() -> APIRouter:
             return {"count": len(schedules_data), "schedules": schedules_data}
         except Exception as e:
             logger.error(f"Error fetching schedules: {e!s}")
-            raise HTTPException(status_code=500, detail="Error fetching interview schedules")
+            raise HTTPException(
+                status_code=500, detail="Error fetching interview schedules"
+            )
 
     @router.get("/upcoming")
     async def list_upcoming_schedules(
@@ -175,7 +189,9 @@ def create_schedule_routes() -> APIRouter:
             now = datetime.now(timezone.utc)
             stmt = (
                 select(InterviewSchedule, Candidate)
-                .join(Candidate, InterviewSchedule.candidate_id == Candidate.candidate_id)
+                .join(
+                    Candidate, InterviewSchedule.candidate_id == Candidate.candidate_id
+                )
                 .where(InterviewSchedule.scheduled_at >= now)
                 .where(InterviewSchedule.status == "scheduled")
                 .order_by(InterviewSchedule.scheduled_at.asc())
@@ -201,7 +217,9 @@ def create_schedule_routes() -> APIRouter:
             return {"count": len(upcoming_data), "upcoming": upcoming_data}
         except Exception as e:
             logger.error(f"Error fetching upcoming schedules: {e!s}")
-            raise HTTPException(status_code=500, detail="Error fetching upcoming schedules")
+            raise HTTPException(
+                status_code=500, detail="Error fetching upcoming schedules"
+            )
 
     @router.get("/{schedule_id}")
     async def get_schedule(
@@ -212,7 +230,9 @@ def create_schedule_routes() -> APIRouter:
         try:
             stmt = (
                 select(InterviewSchedule, Candidate)
-                .join(Candidate, InterviewSchedule.candidate_id == Candidate.candidate_id)
+                .join(
+                    Candidate, InterviewSchedule.candidate_id == Candidate.candidate_id
+                )
                 .where(InterviewSchedule.id == schedule_id)
             )
             result = db.execute(stmt).first()
@@ -236,7 +256,9 @@ def create_schedule_routes() -> APIRouter:
             raise
         except Exception as e:
             logger.error(f"Error getting schedule: {e!s}")
-            raise HTTPException(status_code=500, detail="Error getting schedule details")
+            raise HTTPException(
+                status_code=500, detail="Error getting schedule details"
+            )
 
     @router.patch("/{schedule_id}")
     async def update_schedule(

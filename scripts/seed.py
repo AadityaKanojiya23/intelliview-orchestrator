@@ -80,7 +80,9 @@ def seed_sessions(reset: bool = False) -> None:
             db.commit()
             print(f"  - deleted {deleted} existing sessions")
 
-        existing_ids = {row.session_id for row in db.query(InterviewSession.session_id).all()}
+        existing_ids = {
+            row.session_id for row in db.query(InterviewSession.session_id).all()
+        }
         if existing_ids:
             print(f"  = {len(existing_ids)} sessions already present; skipping insert")
             return
@@ -150,7 +152,9 @@ def seed_sessions(reset: bool = False) -> None:
                     status=status,
                     assigned_node=rng.choice([w["worker_id"] for w in WORKER_FIXTURES]),
                     start_time=(
-                        now - timedelta(seconds=rng.randint(20, 600)) if status != "QUEUED" else None
+                        now - timedelta(seconds=rng.randint(20, 600))
+                        if status != "QUEUED"
+                        else None
                     ),
                     end_time=None,
                     created_at=now - timedelta(seconds=rng.randint(20, 1200)),

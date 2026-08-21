@@ -17,7 +17,9 @@ def _get_model():
 
         _model = SentenceTransformer("all-MiniLM-L6-v2")
     except Exception as exc:  # pragma: no cover - depends on env
-        logger.warning("SentenceTransformer unavailable, semantic similarity disabled: %s", exc)
+        logger.warning(
+            "SentenceTransformer unavailable, semantic similarity disabled: %s", exc
+        )
         _model = None
     return _model
 

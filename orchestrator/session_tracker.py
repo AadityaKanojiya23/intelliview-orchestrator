@@ -66,7 +66,9 @@ class SessionTracker:
             ]
 
             # 1. Start with the baseline query for active statuses
-            stmt = select(InterviewSession).where(InterviewSession.status.in_(active_statuses))
+            stmt = select(InterviewSession).where(
+                InterviewSession.status.in_(active_statuses)
+            )
 
             # 2. Filter by status subset if provided
             if status:
@@ -85,7 +87,9 @@ class SessionTracker:
                 stmt = stmt.where(InterviewSession.start_time > since_dt)
 
             # 4. Handle dynamic column sorting safely
-            sort_column = getattr(InterviewSession, sort_by, InterviewSession.start_time)
+            sort_column = getattr(
+                InterviewSession, sort_by, InterviewSession.start_time
+            )
             if order.lower() == "desc":
                 stmt = stmt.order_by(sort_column.desc().nullslast())
             else:
@@ -103,10 +107,16 @@ class SessionTracker:
                         "status": s.status,
                         "assigned_node": s.assigned_node,
                         "start_time": (
-                            s.start_time.isoformat() if hasattr(s, "start_time") and s.start_time else None
+                            s.start_time.isoformat()
+                            if hasattr(s, "start_time") and s.start_time
+                            else None
                         ),
-                        "created_at": (s.created_at.isoformat() if s.created_at else None),
-                        "updated_at": (s.updated_at.isoformat() if s.updated_at else None),
+                        "created_at": (
+                            s.created_at.isoformat() if s.created_at else None
+                        ),
+                        "updated_at": (
+                            s.updated_at.isoformat() if s.updated_at else None
+                        ),
                     }
                 )
 
@@ -154,7 +164,9 @@ class SessionTracker:
                     "start_time": s.start_time.isoformat() if s.start_time else None,
                     "end_time": s.end_time.isoformat() if s.end_time else None,
                     "duration_seconds": (
-                        (s.end_time - s.start_time).total_seconds() if s.start_time and s.end_time else None
+                        (s.end_time - s.start_time).total_seconds()
+                        if s.start_time and s.end_time
+                        else None
                     ),
                 }
                 for s in rows
@@ -175,11 +187,16 @@ class SessionTracker:
         session_db = SessionLocal()
         try:
             total_sessions = (
-                session_db.execute(select(func.count()).select_from(InterviewSession)).scalar() or 0
+                session_db.execute(
+                    select(func.count()).select_from(InterviewSession)
+                ).scalar()
+                or 0
             )
 
             status_rows = session_db.execute(
-                select(InterviewSession.status, func.count()).group_by(InterviewSession.status)
+                select(InterviewSession.status, func.count()).group_by(
+                    InterviewSession.status
+                )
             ).all()
             status_counts: dict[str, int] = {row[0]: row[1] for row in status_rows}
 
@@ -195,17 +212,23 @@ class SessionTracker:
                 .all()
             )
 
-            durations = [(s.end_time - s.start_time).total_seconds() for s in completed_sessions]
+            durations = [
+                (s.end_time - s.start_time).total_seconds() for s in completed_sessions
+            ]
             avg_duration = sum(durations) / len(durations) if durations else 0
 
             risk_scores_list = list(
                 session_db.execute(
-                    select(InterviewSession.risk_score).where(InterviewSession.risk_score.isnot(None))
+                    select(InterviewSession.risk_score).where(
+                        InterviewSession.risk_score.isnot(None)
+                    )
                 )
                 .scalars()
                 .all()
             )
-            avg_risk = sum(risk_scores_list) / len(risk_scores_list) if risk_scores_list else 0
+            avg_risk = (
+                sum(risk_scores_list) / len(risk_scores_list) if risk_scores_list else 0
+            )
             max_risk = max(risk_scores_list) if risk_scores_list else 0
             min_risk = min(risk_scores_list) if risk_scores_list else 0
 
@@ -262,7 +285,9 @@ class SessionTracker:
         """
         session_db = SessionLocal()
         try:
-            cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
+            cutoff_time = datetime.now(timezone.utc) - timedelta(
+                minutes=timeout_minutes
+            )
 
             stuck_sessions = (
                 session_db.execute(
@@ -277,20 +302,26 @@ class SessionTracker:
 
             result = []
             for s in stuck_sessions:
-                elapsed_time = (datetime.now(timezone.utc) - s.start_time).total_seconds()
+                elapsed_time = (
+                    datetime.now(timezone.utc) - s.start_time
+                ).total_seconds()
                 result.append(
                     {
                         "session_id": s.session_id,
                         "candidate_id": s.candidate_id,
                         "status": s.status,
                         "assigned_node": s.assigned_node,
-                        "start_time": (s.start_time.isoformat() if s.start_time else None),
+                        "start_time": (
+                            s.start_time.isoformat() if s.start_time else None
+                        ),
                         "elapsed_seconds": round(elapsed_time, 2),
                     }
                 )
 
             if result:
-                logger.warning(f"Found {len(result)} stuck sessions (timeout > {timeout_minutes} minutes)")
+                logger.warning(
+                    f"Found {len(result)} stuck sessions (timeout > {timeout_minutes} minutes)"
+                )
 
             return result
 
@@ -317,7 +348,9 @@ class SessionTracker:
             ]
             sessions = (
                 session_db.execute(
-                    select(InterviewSession).where(InterviewSession.status.in_(active_statuses))
+                    select(InterviewSession).where(
+                        InterviewSession.status.in_(active_statuses)
+                    )
                 )
                 .scalars()
                 .all()
@@ -337,7 +370,9 @@ class SessionTracker:
         finally:
             session_db.close()
 
-    def get_high_risk_sessions(self, threshold: float = 0.8, limit: int = 50) -> list[dict[str, Any]]:
+    def get_high_risk_sessions(
+        self, threshold: float = 0.8, limit: int = 50
+    ) -> list[dict[str, Any]]:
         """
         Get high-risk sessions that completed
 
@@ -376,7 +411,9 @@ class SessionTracker:
                     }
                 )
 
-            logger.debug(f"Retrieved {len(result)} high-risk sessions (threshold: {threshold})")
+            logger.debug(
+                f"Retrieved {len(result)} high-risk sessions (threshold: {threshold})"
+            )
             return result
 
         except Exception as e:
@@ -401,7 +438,9 @@ class SessionTracker:
             sessions = (
                 session_db.execute(
                     select(InterviewSession)
-                    .where(InterviewSession.status.in_(["FAILED", "TIMEOUT", "CANCELLED"]))
+                    .where(
+                        InterviewSession.status.in_(["FAILED", "TIMEOUT", "CANCELLED"])
+                    )
                     .order_by(InterviewSession.updated_at.desc().nullslast())
                     .limit(limit)
                 )

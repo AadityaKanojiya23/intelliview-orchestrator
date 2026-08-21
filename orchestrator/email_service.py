@@ -142,7 +142,9 @@ IntelliView Interview Team
         message.attach(MIMEText(html_body, "html"))
 
         try:
-            logger.info(f"Attempting to send email via SMTP to {candidate_email} via {host}:{port}")
+            logger.info(
+                f"Attempting to send email via SMTP to {candidate_email} via {host}:{port}"
+            )
             with smtplib.SMTP(host=host, port=port, timeout=10) as server:
                 if self.settings.smtp_use_tls:
                     server.starttls()

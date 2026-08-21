@@ -78,7 +78,9 @@ class MomentTracker:
         except Exception as e:
             logger.warning(f"Failed to track moment in Redis: {e}")
 
-        logger.info(f"Moment tracked: session={session_id} type={moment_type} metadata={metadata or {}}")
+        logger.info(
+            f"Moment tracked: session={session_id} type={moment_type} metadata={metadata or {}}"
+        )
 
         return moment
 
@@ -112,9 +114,15 @@ class MomentTracker:
         moments = self.get_session_moments(session_id, limit=1000)
 
         if start_time:
-            moments = [m for m in moments if datetime.fromisoformat(m["timestamp"]) >= start_time]
+            moments = [
+                m
+                for m in moments
+                if datetime.fromisoformat(m["timestamp"]) >= start_time
+            ]
         if end_time:
-            moments = [m for m in moments if datetime.fromisoformat(m["timestamp"]) <= end_time]
+            moments = [
+                m for m in moments if datetime.fromisoformat(m["timestamp"]) <= end_time
+            ]
 
         moments.sort(key=lambda m: m["timestamp"])
 
@@ -148,7 +156,9 @@ class MomentTracker:
         risk_moments = [m for m in moments if m.get("type") == MomentType.RISK_DETECTED]
         avg_risk = 0
         if risk_moments:
-            risk_scores = [m.get("metadata", {}).get("risk_score", 0) for m in risk_moments]
+            risk_scores = [
+                m.get("metadata", {}).get("risk_score", 0) for m in risk_moments
+            ]
             avg_risk = sum(risk_scores) / len(risk_scores) if risk_scores else 0
 
         return {
@@ -171,7 +181,11 @@ class MomentTracker:
 
             sessions = set()
             for sid_key in session_ids:
-                sid = sid_key.decode().split(":")[0] if isinstance(sid_key, bytes) else sid_key.split(":")[0]
+                sid = (
+                    sid_key.decode().split(":")[0]
+                    if isinstance(sid_key, bytes)
+                    else sid_key.split(":")[0]
+                )
                 sessions.add(sid)
 
             total_moments = 0

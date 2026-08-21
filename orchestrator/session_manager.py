@@ -124,7 +124,9 @@ class SessionManager:
             # Generate collision-safe unique session ID
             session_id = f"session_{uuid.uuid4().hex[:16]}"
 
-            logger.info(f"Creating new interview session: {session_id} for candidate {candidate_id}")
+            logger.info(
+                f"Creating new interview session: {session_id} for candidate {candidate_id}"
+            )
 
             # Create database record
             interview_session = InterviewSession(
@@ -181,7 +183,9 @@ class SessionManager:
         try:
             # Get current session
             interview = session_db.execute(
-                select(InterviewSession).where(InterviewSession.session_id == session_id)
+                select(InterviewSession).where(
+                    InterviewSession.session_id == session_id
+                )
             ).scalar_one_or_none()
 
             if not interview:
@@ -197,7 +201,9 @@ class SessionManager:
                 )
                 return False
 
-            logger.info(f"Updating session {session_id} status: {current_status} -> {new_status}")
+            logger.info(
+                f"Updating session {session_id} status: {current_status} -> {new_status}"
+            )
 
             # Update database
             interview.status = new_status
@@ -217,7 +223,9 @@ class SessionManager:
             logger.info(f"Session {session_id} status updated to {new_status}")
 
             # Broadcast the transition to dashboard WebSocket clients (non-blocking).
-            self._broadcast_status(session_id, new_status, interview.risk_score, metadata or {})
+            self._broadcast_status(
+                session_id, new_status, interview.risk_score, metadata or {}
+            )
 
             return True
 
@@ -248,7 +256,9 @@ class SessionManager:
             session_db = SessionLocal()
             try:
                 interview = session_db.execute(
-                    select(InterviewSession).where(InterviewSession.session_id == session_id)
+                    select(InterviewSession).where(
+                        InterviewSession.session_id == session_id
+                    )
                 ).scalar_one_or_none()
 
                 if not interview:
@@ -262,10 +272,24 @@ class SessionManager:
                     "status": interview.status,
                     "risk_score": interview.risk_score,
                     "assigned_node": interview.assigned_node,
-                    "start_time": (interview.start_time.isoformat() if interview.start_time else None),
-                    "end_time": (interview.end_time.isoformat() if interview.end_time else None),
-                    "created_at": (interview.created_at.isoformat() if interview.created_at else None),
-                    "updated_at": (interview.updated_at.isoformat() if interview.updated_at else None),
+                    "start_time": (
+                        interview.start_time.isoformat()
+                        if interview.start_time
+                        else None
+                    ),
+                    "end_time": (
+                        interview.end_time.isoformat() if interview.end_time else None
+                    ),
+                    "created_at": (
+                        interview.created_at.isoformat()
+                        if interview.created_at
+                        else None
+                    ),
+                    "updated_at": (
+                        interview.updated_at.isoformat()
+                        if interview.updated_at
+                        else None
+                    ),
                     "video_analysis": interview.video_analysis,
                     "audio_analysis": interview.audio_analysis,
                     "evaluation_analysis": interview.evaluation_analysis,
@@ -297,16 +321,22 @@ class SessionManager:
         """
         logger.warning(f"Marking session {session_id} as failed: {error_message}")
 
-        return self.update_session_status(session_id, self.FAILED, {"error_message": error_message})
+        return self.update_session_status(
+            session_id, self.FAILED, {"error_message": error_message}
+        )
 
     def mark_session_completed(self, session_id: str, risk_score: float) -> bool:
 
-        logger.info(f"Marking session {session_id} as completed with risk score {risk_score}")
+        logger.info(
+            f"Marking session {session_id} as completed with risk score {risk_score}"
+        )
 
         session_db = SessionLocal()
         try:
             interview = session_db.execute(
-                select(InterviewSession).where(InterviewSession.session_id == session_id)
+                select(InterviewSession).where(
+                    InterviewSession.session_id == session_id
+                )
             ).scalar_one_or_none()
 
             if not interview:

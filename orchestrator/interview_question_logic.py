@@ -296,18 +296,24 @@ def validate_category_distribution(
         total = sum(normalized.values())
 
     if not math.isclose(total, 1.0, abs_tol=0.01):
-        raise ValueError(f"Category distribution total must equal 1.0 (or 100%). Current sum is {total:.2f}")
+        raise ValueError(
+            f"Category distribution total must equal 1.0 (or 100%). Current sum is {total:.2f}"
+        )
 
     return normalized
 
 
-def build_question_plan(template: dict[str, Any], domain: str | None = None) -> dict[str, Any]:
+def build_question_plan(
+    template: dict[str, Any], domain: str | None = None
+) -> dict[str, Any]:
     """
     Builds a question allocation plan based on template parameters.
     Calculates exact counts for technical, behavioral, and situational questions.
     """
     question_count = int(template.get("question_count", 10))
-    domain_name = normalize_domain(domain or template.get("domain") or template.get("name"))
+    domain_name = normalize_domain(
+        domain or template.get("domain") or template.get("name")
+    )
     distribution = validate_category_distribution(template.get("category_distribution"))
 
     tech_pct = distribution.get("technical", 0.40)
@@ -345,7 +351,9 @@ def get_template_questions(
     """
     dom = normalize_domain(domain)
     dist = validate_category_distribution(distribution)
-    plan = build_question_plan({"question_count": question_count, "category_distribution": dist}, domain=dom)
+    plan = build_question_plan(
+        {"question_count": question_count, "category_distribution": dist}, domain=dom
+    )
 
     tech_needed = plan["category_counts"]["technical"]
     beh_needed = plan["category_counts"]["behavioral"]

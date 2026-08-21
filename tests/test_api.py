@@ -195,7 +195,9 @@ class TestUpdate:
 
     def test_update_description_only(self):
         created = client.post("/risk-configs/", json=make_config()).json()
-        r = client.put(f"/risk-configs/{created['id']}", json={"description": "Updated desc"})
+        r = client.put(
+            f"/risk-configs/{created['id']}", json={"description": "Updated desc"}
+        )
         assert r.status_code == 200
         assert r.json()["description"] == "Updated desc"
 

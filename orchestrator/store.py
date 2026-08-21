@@ -34,7 +34,9 @@ def create_config(data: RiskConfigCreate) -> RiskConfigResponse:
     # Prevent duplicate job positions
     for record in _store.values():
         if record["job_position"].lower() == data.job_position.lower():
-            raise ValueError(f"Config for '{data.job_position}' already exists. Use PUT to update.")
+            raise ValueError(
+                f"Config for '{data.job_position}' already exists. Use PUT to update."
+            )
 
     config_id = str(uuid.uuid4())
     now = _now()
