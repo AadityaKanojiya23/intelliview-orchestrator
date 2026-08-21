@@ -76,7 +76,9 @@ def run_benchmark(runs: int, ref_date: str) -> None:
         render_digest_text(p, unsubscribe_url=unsubscribe_url)
 
     t5 = timeit.timeit(full_pipeline, number=runs)
-    print(f"End-to-end (build + HTML + text)   : {(t5 / runs) * 1000:.3f} ms avg per digest")
+    print(
+        f"End-to-end (build + HTML + text)   : {(t5 / runs) * 1000:.3f} ms avg per digest"
+    )
 
     # ── Output sizes (not timing, but useful alongside it) ──
     html = render_digest_html(payload, unsubscribe_url=unsubscribe_url)
@@ -93,7 +95,9 @@ def run_benchmark(runs: int, ref_date: str) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Benchmark the digest generation pipeline")
+    parser = argparse.ArgumentParser(
+        description="Benchmark the digest generation pipeline"
+    )
     parser.add_argument(
         "--runs",
         type=int,

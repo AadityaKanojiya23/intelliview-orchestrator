@@ -106,7 +106,11 @@ def _build_payload(digest_type: str, ref_date_str: str) -> DigestPayload:
     end_date_str = end_date.isoformat()
 
     top_n, total_upcoming_count = get_upcoming_interviews(ref_date_str, end_date_str)
-    freq = DigestFrequency.DAILY if digest_type.lower() == "daily" else DigestFrequency.WEEKLY
+    freq = (
+        DigestFrequency.DAILY
+        if digest_type.lower() == "daily"
+        else DigestFrequency.WEEKLY
+    )
     recipient = DigestRecipient(
         user_id="u-default-recruiter",
         email="digest-recipients@example.com",
@@ -132,7 +136,9 @@ def generate_digest_html_output(digest_type="daily", ref_date_str=None):
     # Date range label
     if digest_type.lower() == "weekly":
         end_date = ref_date + datetime.timedelta(days=6)
-        date_range = f"{ref_date.strftime('%B %d, %Y')} - {end_date.strftime('%B %d, %Y')}"
+        date_range = (
+            f"{ref_date.strftime('%B %d, %Y')} - {end_date.strftime('%B %d, %Y')}"
+        )
     else:
         date_range = ref_date.strftime("%B %d, %Y")
 
@@ -154,7 +160,9 @@ def generate_all_outputs(digest_type="daily", ref_date_str=None):
         ref_date_str = datetime.date.today().isoformat()
 
     payload = _build_payload(digest_type, ref_date_str)
-    unsubscribe_url = f"{UNSUBSCRIBE_BASE}/unsubscribe?user_id={payload.recipient.user_id}"
+    unsubscribe_url = (
+        f"{UNSUBSCRIBE_BASE}/unsubscribe?user_id={payload.recipient.user_id}"
+    )
 
     # ── Empty digest suppression ───────────────────────────────────────────────
     if payload.total_count == 0:
@@ -181,7 +189,9 @@ def generate_all_outputs(digest_type="daily", ref_date_str=None):
     ref_date = datetime.date.fromisoformat(ref_date_str)
     if digest_type.lower() == "weekly":
         end_date = ref_date + datetime.timedelta(days=6)
-        date_range = f"{ref_date.strftime('%B %d, %Y')} - {end_date.strftime('%B %d, %Y')}"
+        date_range = (
+            f"{ref_date.strftime('%B %d, %Y')} - {end_date.strftime('%B %d, %Y')}"
+        )
     else:
         date_range = ref_date.strftime("%B %d, %Y")
 
@@ -226,7 +236,10 @@ def dispatch_digest(digest_type="daily", ref_date_str=None):
         unsubscribe_base_url=UNSUBSCRIBE_BASE,
     )
 
-    if send_result.get("status") == "sent_simulated" or send_result.get("provider") == "none":
+    if (
+        send_result.get("status") == "sent_simulated"
+        or send_result.get("provider") == "none"
+    ):
         status_label = "Simulated / no provider configured"
     else:
         status_label = "Sent"
@@ -280,7 +293,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def validate_auth(self) -> bool:
         incoming_token = self.headers.get("X-API-Token", "").strip()
         if incoming_token != API_TOKEN:
-            self.send_json(401, {"status": "error", "message": "Invalid or missing API Token"})
+            self.send_json(
+                401, {"status": "error", "message": "Invalid or missing API Token"}
+            )
             return False
         return True
 
@@ -308,7 +323,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         path = parsed_url.path
 
         if path in ("/", "/index.html"):
-            self.send_file(os.path.join(BASE_DIR, "src", "web", "index.html"), "text/html")
+            self.send_file(
+                os.path.join(BASE_DIR, "src", "web", "index.html"), "text/html"
+            )
         elif path == "/main.js":
             self.send_file(
                 os.path.join(BASE_DIR, "src", "web", "main.js"),
@@ -399,7 +416,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     }
                 )
 
-            self.send_json(200, {"logs": logs, "total": total, "limit": limit, "offset": offset})
+            self.send_json(
+                200, {"logs": logs, "total": total, "limit": limit, "offset": offset}
+            )
         elif path == "/api/config":
             self.send_json(200, {"batch_size": DIGEST_BATCH_SIZE})
         elif path == "/api/download/txt":
@@ -407,14 +426,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if not os.path.exists(txt_path):
                 self.send_json(
                     404,
-                    {"error": "Text file not generated yet. Click Generate Preview first."},
+                    {
+                        "error": "Text file not generated yet. Click Generate Preview first."
+                    },
                 )
                 return
             with open(txt_path, "rb") as f:
                 data = f.read()
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.send_header("Content-Disposition", 'attachment; filename="digest_email.txt"')
+            self.send_header(
+                "Content-Disposition", 'attachment; filename="digest_email.txt"'
+            )
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
@@ -610,7 +633,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 )
 
                 # Determine the status label based on the sender result/provider
-                if result.get("status") == "sent_simulated" or result.get("provider") == "none":
+                if (
+                    result.get("status") == "sent_simulated"
+                    or result.get("provider") == "none"
+                ):
                     status_label = "Simulated / no provider configured"
                     message_label = "Email digest send simulated successfully (no provider configured)."
                 else:
@@ -678,16 +704,22 @@ class DashboardHandler(BaseHTTPRequestHandler):
             params = urllib.parse.parse_qs(parsed_url.query)
             interview_id = params.get("id", [None])[0]
             if not interview_id:
-                self.send_json(400, {"status": "error", "message": "Missing ID parameter"})
+                self.send_json(
+                    400, {"status": "error", "message": "Missing ID parameter"}
+                )
                 return
             with FILE_LOCK:
                 conn = get_db_conn()
                 cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM interviews WHERE id = ?", (interview_id,))
+                cursor.execute(
+                    "SELECT COUNT(*) FROM interviews WHERE id = ?", (interview_id,)
+                )
                 exists = cursor.fetchone()[0]
                 if not exists:
                     conn.close()
-                    self.send_json(404, {"status": "error", "message": "Interview not found"})
+                    self.send_json(
+                        404, {"status": "error", "message": "Interview not found"}
+                    )
                     return
                 cursor.execute("DELETE FROM interviews WHERE id = ?", (interview_id,))
                 conn.commit()
@@ -703,10 +735,16 @@ def main():
 
     parser = argparse.ArgumentParser(description="Digest Notification Engine")
     parser.add_argument("--cli", action="store_true", help="Run in CLI generation mode")
-    parser.add_argument("--type", choices=["daily", "weekly"], default="daily", help="Type of digest")
+    parser.add_argument(
+        "--type", choices=["daily", "weekly"], default="daily", help="Type of digest"
+    )
     parser.add_argument("--ref-date", help="Reference date YYYY-MM-DD (default: today)")
-    parser.add_argument("--serve", action="store_true", help="Run interactive web server dashboard")
-    parser.add_argument("--port", type=int, default=8000, help="Port for dashboard (default: 8000)")
+    parser.add_argument(
+        "--serve", action="store_true", help="Run interactive web server dashboard"
+    )
+    parser.add_argument(
+        "--port", type=int, default=8000, help="Port for dashboard (default: 8000)"
+    )
     parser.add_argument(
         "--host",
         default="127.0.0.1",
