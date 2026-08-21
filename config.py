@@ -100,6 +100,14 @@ class Settings(BaseSettings):
     # --- Database SSL ---
     database_sslmode: str = "disable"
 
+    # --- Email Notification (SMTP) ---
+    smtp_host: str = "localhost"
+    smtp_port: int = 1025
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = "notifications@intelliview.ai"
+    smtp_use_tls: bool = False
+
     @field_validator("postgres_host", "postgres_db", "postgres_user")
     @classmethod
     def validate_required_database_fields(cls, value: str) -> str:

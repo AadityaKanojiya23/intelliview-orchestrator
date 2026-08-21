@@ -78,6 +78,45 @@ def create_question_routes(question_bank) -> APIRouter:
             logger.error(f"Error adding question: {e!s}")
             raise HTTPException(status_code=500, detail="Error adding question")
 
+    @router.post("/questions/by-plan")
+    async def get_questions_by_plan(
+        question_plan: dict[str, int],
+        session_db: Session = Depends(get_db),
+    ):
+        """
+        Retrieve questions according to a template-generated question plan.
+
+        Example request:
+        {
+            "technical": 4,
+            "behavioral": 3,
+            "situational": 3
+        }
+        """
+        try:
+            questions = question_bank.get_questions_for_plan(
+                question_plan=question_plan
+            )
+
+            return {
+                "count": len(questions),
+                "questions": questions,
+            }
+
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=str(e),
+            )
+
+        except Exception as e:
+            logger.error(f"Error retrieving questions by plan: {e!s}")
+
+            raise HTTPException(
+                status_code=500,
+                detail="Error retrieving questions by plan",
+            )
+
     @router.put("/questions/{question_id}")
     async def update_question(
         question_id: str,

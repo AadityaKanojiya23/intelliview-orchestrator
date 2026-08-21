@@ -37,6 +37,10 @@ export default function OverviewPage() {
     refreshInterval: 3000,
   });
 
+  const upcomingSchedules = useSWR("/api/schedule/upcoming", {
+    refreshInterval: 5000,
+  });
+
   const [completedHist, setCompletedHist] = useState([]);
   const [failedHist, setFailedHist] = useState([]);
   const [riskHist, setRiskHist] = useState([]);
@@ -386,9 +390,7 @@ export default function OverviewPage() {
                     </Td>
 
                     <Td>
-                      <StatusBadge
-                        status={worker.health_status}
-                      />
+                      <StatusBadge status={worker.health_status} />
                     </Td>
 
                     <Td>
