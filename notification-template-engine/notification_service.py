@@ -40,7 +40,9 @@ def send_notification(user, event, data, format="txt"):
 
     template = load_template(user.locale, event, format=format)
 
-    placeholders = {placeholder.strip() for placeholder in re.findall(r"\{\{(.*?)\}\}", template)}
+    placeholders = {
+        placeholder.strip() for placeholder in re.findall(r"\{\{(.*?)\}\}", template)
+    }
 
     required_fields = placeholders - {"name"}
 
