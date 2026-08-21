@@ -46,8 +46,7 @@ class InterviewTemplateManager:
 
         if interview_type not in self.INTERVIEW_TYPES:
             raise ValueError(
-                f"Invalid interview type: {interview_type}. "
-                f"Must be one of: {self.INTERVIEW_TYPES}"
+                f"Invalid interview type: {interview_type}. Must be one of: {self.INTERVIEW_TYPES}"
             )
 
         self._validate_distribution(
@@ -87,8 +86,7 @@ class InterviewTemplateManager:
             db.commit()
 
             logger.info(
-                "Created interview template %s: %s "
-                "(type=%s, domain=%s, questions=%s)",
+                "Created interview template %s: %s (type=%s, domain=%s, questions=%s)",
                 template_id,
                 name,
                 interview_type,
@@ -245,8 +243,7 @@ class InterviewTemplateManager:
 
                 if interview_type not in self.INTERVIEW_TYPES:
                     raise ValueError(
-                        f"Invalid interview type: {interview_type}. "
-                        f"Must be one of: {self.INTERVIEW_TYPES}"
+                        f"Invalid interview type: {interview_type}. Must be one of: {self.INTERVIEW_TYPES}"
                     )
 
                 template.interview_type = interview_type
