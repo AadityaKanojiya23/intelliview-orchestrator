@@ -17,9 +17,7 @@ from orchestrator.email_service import EmailService
 from routers.schedule import create_schedule_routes
 
 # Create clean testing app with in-memory SQLite engine
-test_engine = create_engine(
-    "sqlite:///:memory:", connect_args={"check_same_thread": False}
-)
+test_engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 test_app = FastAPI()
@@ -148,9 +146,7 @@ def test_create_schedule_api_endpoint(client, db_session):
         "send_email": True,
     }
 
-    with patch(
-        "orchestrator.email_service.email_service.send_interview_confirmation"
-    ) as mock_send:
+    with patch("orchestrator.email_service.email_service.send_interview_confirmation") as mock_send:
         mock_send.return_value = (True, "Email sent successfully")
         response = client.post("/api/schedule", json=payload)
 

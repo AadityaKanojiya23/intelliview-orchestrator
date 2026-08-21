@@ -22,9 +22,7 @@ def _all_routes(application: FastAPI):
             # own — recurse into its wrapped router to reach the real routes.
             original_router = getattr(r, "original_router", None)
             if original_router is not None:
-                sub_prefix = (
-                    getattr(getattr(r, "include_context", None), "prefix", "") or ""
-                )
+                sub_prefix = getattr(getattr(r, "include_context", None), "prefix", "") or ""
                 _walk(original_router.routes, prefix + sub_prefix)
                 continue
             methods = getattr(r, "methods", None) or set()

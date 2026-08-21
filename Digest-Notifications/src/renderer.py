@@ -49,8 +49,7 @@ def render_digest_html(
     template: Template = environment.get_template(template_name)
 
     grouped_for_template = {
-        next(iter(events)).display_date: events
-        for events in payload.grouped_interviews.values()
+        next(iter(events)).display_date: events for events in payload.grouped_interviews.values()
     }
 
     return template.render(

@@ -129,9 +129,7 @@ class ExperimentalRiskModel(BaseRiskScoringModel):
                 audio_result,
                 evaluation_result,
             ),
-            "recommendation": RiskScoringEngine._generate_recommendation(
-                classification
-            ),
+            "recommendation": RiskScoringEngine._generate_recommendation(classification),
         }
 
         return report

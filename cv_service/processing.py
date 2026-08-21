@@ -42,9 +42,7 @@ def run_video_analysis(session_id: str) -> dict[str, Any]:
     return results
 
 
-def detect_faces_in_frame(
-    frame_bytes: bytes | None = None, frame_path: str = ""
-) -> dict[str, Any] | None:
+def detect_faces_in_frame(frame_bytes: bytes | None = None, frame_path: str = "") -> dict[str, Any] | None:
     """Detect faces in a single frame using MediaPipe.
 
     Accepts raw bytes or a file path. Returns dict with face_count,
@@ -66,9 +64,7 @@ def detect_faces_in_frame(
             return None
 
         rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        with mp.solutions.face_detection.FaceDetection(
-            model_selection=1, min_detection_confidence=0.5
-        ) as fd:
+        with mp.solutions.face_detection.FaceDetection(model_selection=1, min_detection_confidence=0.5) as fd:
             results = fd.process(rgb)
             detections = []
             if results.detections:

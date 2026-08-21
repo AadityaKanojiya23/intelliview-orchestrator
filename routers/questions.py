@@ -50,9 +50,7 @@ def create_question_routes(question_bank) -> APIRouter:
     ):
         """List questions with optional category/difficulty filter"""
         try:
-            questions = question_bank.get_questions(
-                category=category, difficulty=difficulty, limit=limit
-            )
+            questions = question_bank.get_questions(category=category, difficulty=difficulty, limit=limit)
             return {"count": len(questions), "questions": questions}
         except Exception as e:
             logger.error(f"Error listing questions: {e!s}")
@@ -94,9 +92,7 @@ def create_question_routes(question_bank) -> APIRouter:
         }
         """
         try:
-            questions = question_bank.get_questions_for_plan(
-                question_plan=question_plan
-            )
+            questions = question_bank.get_questions_for_plan(question_plan=question_plan)
 
             return {
                 "count": len(questions),

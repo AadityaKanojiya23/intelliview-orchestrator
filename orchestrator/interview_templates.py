@@ -46,8 +46,7 @@ class InterviewTemplateManager:
 
         if interview_type not in self.INTERVIEW_TYPES:
             raise ValueError(
-                f"Invalid interview type: {interview_type}. "
-                f"Must be one of: {self.INTERVIEW_TYPES}"
+                f"Invalid interview type: {interview_type}. Must be one of: {self.INTERVIEW_TYPES}"
             )
 
         self._validate_distribution(
@@ -73,9 +72,7 @@ class InterviewTemplateManager:
                 domain=domain,
                 duration_minutes=duration_minutes,
                 question_count=question_count,
-                category_distribution=validate_category_distribution(
-                    category_distribution
-                ),
+                category_distribution=validate_category_distribution(category_distribution),
                 difficulty_distribution=difficulty_distribution or {},
                 usage_count=0,
                 success_rate=None,
@@ -87,8 +84,7 @@ class InterviewTemplateManager:
             db.commit()
 
             logger.info(
-                "Created interview template %s: %s "
-                "(type=%s, domain=%s, questions=%s)",
+                "Created interview template %s: %s (type=%s, domain=%s, questions=%s)",
                 template_id,
                 name,
                 interview_type,
@@ -125,9 +121,7 @@ class InterviewTemplateManager:
 
         try:
             template = db.execute(
-                select(InterviewTemplate).where(
-                    InterviewTemplate.template_id == template_id
-                )
+                select(InterviewTemplate).where(InterviewTemplate.template_id == template_id)
             ).scalar_one_or_none()
 
             if not template:
@@ -145,9 +139,7 @@ class InterviewTemplateManager:
                 "difficulty_distribution": (template.difficulty_distribution or {}),
                 "usage_count": template.usage_count,
                 "success_rate": template.success_rate,
-                "created_at": (
-                    template.created_at.isoformat() if template.created_at else None
-                ),
+                "created_at": (template.created_at.isoformat() if template.created_at else None),
             }
 
         finally:
@@ -178,9 +170,7 @@ class InterviewTemplateManager:
             stmt = select(InterviewTemplate)
 
             if interview_type:
-                stmt = stmt.where(
-                    InterviewTemplate.interview_type == interview_type.strip().lower()
-                )
+                stmt = stmt.where(InterviewTemplate.interview_type == interview_type.strip().lower())
 
             if domain:
                 stmt = stmt.where(InterviewTemplate.domain == normalize_domain(domain))
@@ -202,9 +192,7 @@ class InterviewTemplateManager:
                     "difficulty_distribution": (template.difficulty_distribution or {}),
                     "usage_count": template.usage_count,
                     "success_rate": template.success_rate,
-                    "created_at": (
-                        template.created_at.isoformat() if template.created_at else None
-                    ),
+                    "created_at": (template.created_at.isoformat() if template.created_at else None),
                 }
                 for template in rows
             ]
@@ -229,9 +217,7 @@ class InterviewTemplateManager:
 
         try:
             template = db.execute(
-                select(InterviewTemplate).where(
-                    InterviewTemplate.template_id == template_id
-                )
+                select(InterviewTemplate).where(InterviewTemplate.template_id == template_id)
             ).scalar_one_or_none()
 
             if not template:
@@ -245,8 +231,7 @@ class InterviewTemplateManager:
 
                 if interview_type not in self.INTERVIEW_TYPES:
                     raise ValueError(
-                        f"Invalid interview type: {interview_type}. "
-                        f"Must be one of: {self.INTERVIEW_TYPES}"
+                        f"Invalid interview type: {interview_type}. Must be one of: {self.INTERVIEW_TYPES}"
                     )
 
                 template.interview_type = interview_type
@@ -264,9 +249,7 @@ class InterviewTemplateManager:
                 template.question_count = question_count
 
             if category_distribution is not None:
-                template.category_distribution = validate_category_distribution(
-                    category_distribution
-                )
+                template.category_distribution = validate_category_distribution(category_distribution)
 
             if difficulty_distribution is not None:
                 template.difficulty_distribution = difficulty_distribution
@@ -288,12 +271,8 @@ class InterviewTemplateManager:
                 "difficulty_distribution": (template.difficulty_distribution or {}),
                 "usage_count": template.usage_count,
                 "success_rate": template.success_rate,
-                "created_at": (
-                    template.created_at.isoformat() if template.created_at else None
-                ),
-                "updated_at": (
-                    template.updated_at.isoformat() if template.updated_at else None
-                ),
+                "created_at": (template.created_at.isoformat() if template.created_at else None),
+                "updated_at": (template.updated_at.isoformat() if template.updated_at else None),
             }
 
         except Exception:
@@ -313,9 +292,7 @@ class InterviewTemplateManager:
 
         try:
             template = db.execute(
-                select(InterviewTemplate).where(
-                    InterviewTemplate.template_id == template_id
-                )
+                select(InterviewTemplate).where(InterviewTemplate.template_id == template_id)
             ).scalar_one_or_none()
 
             if not template:
@@ -351,9 +328,7 @@ class InterviewTemplateManager:
 
         try:
             template = db.execute(
-                select(InterviewTemplate).where(
-                    InterviewTemplate.template_id == template_id
-                )
+                select(InterviewTemplate).where(InterviewTemplate.template_id == template_id)
             ).scalar_one_or_none()
 
             if not template:
@@ -411,10 +386,7 @@ class InterviewTemplateManager:
         question_count = template["question_count"]
         distribution = template["category_distribution"] or {}
 
-        plan = {
-            category: round(question_count * pct / 100)
-            for category, pct in distribution.items()
-        }
+        plan = {category: round(question_count * pct / 100) for category, pct in distribution.items()}
 
         return {
             "template_id": template_id,

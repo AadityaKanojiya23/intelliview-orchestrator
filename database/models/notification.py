@@ -18,6 +18,4 @@ class Notification(Base):
     created_at = Column(DateTime, nullable=False, default=utcnow)
 
     def __repr__(self):
-        return (
-            f"<Notification(id={self.id}, user_id='{self.user_id}', read={self.read})>"
-        )
+        return f"<Notification(id={self.id}, user_id='{self.user_id}', read={self.read})>"

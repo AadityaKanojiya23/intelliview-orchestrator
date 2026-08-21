@@ -76,9 +76,7 @@ def test_score_answer_falls_back_on_invalid_json():
             ),
         ),
     ):
-        result = evaluation_pipeline.score_answer(
-            "What is a hash map?", "It's a key-value store."
-        )
+        result = evaluation_pipeline.score_answer("What is a hash map?", "It's a key-value store.")
 
     assert result["score"] == 5.0
     assert "strengths" in result and "gaps" in result

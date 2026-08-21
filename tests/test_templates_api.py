@@ -38,18 +38,14 @@ class TestCreateTemplate:
     def test_create_distribution_not_100_returns_400(self):
         res = client.post(
             "/templates",
-            json=make_payload(
-                category_distribution={"technical": 50, "behavioral": 40}
-            ),
+            json=make_payload(category_distribution={"technical": 50, "behavioral": 40}),
         )
         assert res.status_code == 400
 
     def test_create_negative_percentage_returns_400(self):
         res = client.post(
             "/templates",
-            json=make_payload(
-                category_distribution={"technical": 110, "behavioral": -10}
-            ),
+            json=make_payload(category_distribution={"technical": 110, "behavioral": -10}),
         )
         assert res.status_code == 400
 

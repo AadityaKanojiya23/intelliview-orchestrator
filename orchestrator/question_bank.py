@@ -37,13 +37,9 @@ class QuestionBank:
         difficulty = difficulty.strip().lower()
 
         if category not in self.CATEGORIES:
-            raise ValueError(
-                f"Invalid category: {category}. Must be one of: {self.CATEGORIES}"
-            )
+            raise ValueError(f"Invalid category: {category}. Must be one of: {self.CATEGORIES}")
         if difficulty not in self.DIFFICULTIES:
-            raise ValueError(
-                f"Invalid difficulty: {difficulty}. Must be one of: {self.DIFFICULTIES}"
-            )
+            raise ValueError(f"Invalid difficulty: {difficulty}. Must be one of: {self.DIFFICULTIES}")
 
         question_id = f"q_{uuid.uuid4().hex[:12]}"
         now = utcnow()
@@ -192,9 +188,7 @@ class QuestionBank:
         """Get a single question by ID"""
         db = SessionLocal()
         try:
-            q = db.execute(
-                select(Question).where(Question.question_id == question_id)
-            ).scalar_one_or_none()
+            q = db.execute(select(Question).where(Question.question_id == question_id)).scalar_one_or_none()
             if not q:
                 return None
             return {
@@ -243,9 +237,7 @@ class QuestionBank:
         """Increment usage count and optionally update running average score"""
         db = SessionLocal()
         try:
-            q = db.execute(
-                select(Question).where(Question.question_id == question_id)
-            ).scalar_one_or_none()
+            q = db.execute(select(Question).where(Question.question_id == question_id)).scalar_one_or_none()
             if not q:
                 return False
 
@@ -278,21 +270,15 @@ class QuestionBank:
         if category is not None:
             category = category.strip().lower()
             if category not in self.CATEGORIES:
-                raise ValueError(
-                    f"Invalid category: {category}. Must be one of: {self.CATEGORIES}"
-                )
+                raise ValueError(f"Invalid category: {category}. Must be one of: {self.CATEGORIES}")
         if difficulty is not None:
             difficulty = difficulty.strip().lower()
             if difficulty not in self.DIFFICULTIES:
-                raise ValueError(
-                    f"Invalid difficulty: {difficulty}. Must be one of: {self.DIFFICULTIES}"
-                )
+                raise ValueError(f"Invalid difficulty: {difficulty}. Must be one of: {self.DIFFICULTIES}")
 
         db = SessionLocal()
         try:
-            q = db.execute(
-                select(Question).where(Question.question_id == question_id)
-            ).scalar_one_or_none()
+            q = db.execute(select(Question).where(Question.question_id == question_id)).scalar_one_or_none()
             if not q:
                 return None
             if text is not None:
@@ -327,9 +313,7 @@ class QuestionBank:
         """Delete a question by ID. Returns True if deleted, False if not found."""
         db = SessionLocal()
         try:
-            q = db.execute(
-                select(Question).where(Question.question_id == question_id)
-            ).scalar_one_or_none()
+            q = db.execute(select(Question).where(Question.question_id == question_id)).scalar_one_or_none()
             if not q:
                 return False
             db.delete(q)
