@@ -1,5 +1,6 @@
 "use client";
 
+
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
